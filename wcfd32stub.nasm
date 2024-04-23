@@ -2,7 +2,7 @@
 
 %ifdef LINUXPROG
 org 0x8048000  ; Typical Linux i386 executable program.
-bits 32  ; NASM 0.97 supports this but ignores `use32'.
+bits 32
 cpu 386
 RX equ 5  ; It's segmentation fault unless FileSiz == MemSiz.
 RWX equ 7  ; Section permission: read + write + execute.

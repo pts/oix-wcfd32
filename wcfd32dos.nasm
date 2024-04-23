@@ -46,7 +46,7 @@ INT21H_FUNC_3DH_OPEN_FILE       equ 0x3D
 INT21H_FUNC_3EH_CLOSE_FILE      equ 0x3E
 INT21H_FUNC_3FH_READ_FROM_FILE  equ 0x3F
 INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE equ 0x40
-INT21H_FUNC_42H_DELETE_NAMED_FILE equ 0x41
+INT21H_FUNC_41H_DELETE_NAMED_FILE equ 0x41
 INT21H_FUNC_42H_SEEK_IN_FILE    equ 0x42
 INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES equ 0x43
 INT21H_FUNC_44H_IOCTL_IN_FILE   equ 0x44
@@ -492,6 +492,10 @@ return:
 		pop ecx
 		pop ebx
 		ret
+
+wcfd32_near_syscall:
+		push cs
+		; Fall through to wcfd32_far_syscall.
 
 wcfd32_far_syscall:  ; proc far
 		;call debug_syscall  ; !!

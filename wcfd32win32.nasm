@@ -118,7 +118,7 @@ INT21H_FUNC_3DH_OPEN_FILE       equ 0x3D
 INT21H_FUNC_3EH_CLOSE_FILE      equ 0x3E
 INT21H_FUNC_3FH_READ_FROM_FILE  equ 0x3F
 INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE equ 0x40
-INT21H_FUNC_42H_DELETE_NAMED_FILE equ 0x41
+INT21H_FUNC_41H_DELETE_NAMED_FILE equ 0x41
 INT21H_FUNC_42H_SEEK_IN_FILE    equ 0x42
 INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES equ 0x43
 INT21H_FUNC_44H_IOCTL_IN_FILE   equ 0x44
@@ -326,7 +326,7 @@ end_of_fmt:
 		mov edx, esp	    ; r_edx
 		mov ebx, [MsgFileHandle]  ; r_ebx
 		mov ah, INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE  ; r_eax
-		call call_dos_int21h
+		call wcfd32_near_syscall
 		rcl eax, 1
 		ror eax, 1
 		add esp, 80h
@@ -342,7 +342,7 @@ pop_esi_edx_ecx_ebx_ret:
 		ret
 
 %define CONFIG_LOAD_SINGLE_READ
-%define CONFIG_LOAD_INT21H call call_dos_int21h
+%define CONFIG_LOAD_INT21H call wcfd32_near_syscall
 %undef  CONFIG_LOAD_MALLOC_EAX
 %undef  CONFIG_LOAD_MALLOC_EBX
 
@@ -556,7 +556,7 @@ dump_registers_to_file_and_abort:
 		mov edx, dump_filename  ; "_watcom_.dmp"
 		xor ecx, ecx	    ; r_ecx
 		mov ah, INT21H_FUNC_3CH_CREATE_FILE  ; r_eax
-		call call_dos_int21h
+		call wcfd32_near_syscall
 		rcl eax, 1
 		ror eax, 1
 		mov edx, eax
@@ -582,7 +582,7 @@ dump_registers_to_file_and_abort:
 		mov ebx, [MsgFileHandle]  ; r_ebx
 		mov esi, 1	    ; r_esi
 		mov ah, INT21H_FUNC_3EH_CLOSE_FILE  ; r_eax
-		call call_dos_int21h
+		call wcfd32_near_syscall
 		rcl eax, 1
 		ror eax, 1
 		mov [MsgFileHandle], esi
@@ -1010,8 +1010,8 @@ loc_4108FB:
 		; Now we call the entry point.
 		;
 		; Input: AH: operating system (WCFD32_OS_DOS or WCFD32_OS_WIN32).
-		; Input: BX: segment of the call_far_dos_int21h syscall.
-		; Input: EDX: offset of the call_far_dos_int21h syscall.
+		; Input: BX: segment of the wcfd32_far_syscall syscall.
+		; Input: EDX: offset of the wcfd32_far_syscall syscall.
 		; Input: ECX: must be 0 (unknown parameter).
 		; Input: EDI: wcfd32_param_struct
 		; Input: dword [wcfd32_param_struct]: program filename (ASCIIZ)
@@ -1024,9 +1024,9 @@ loc_4108FB:
 		; Call: far call.
 		; Output: EAX: exit code (0 for EXIT_SUCCESS).
 		sub ecx, ecx  ; This is an unknown parameter, which we always set to 0.
-		mov edx, call_far_dos_int21h
+		mov edx, wcfd32_far_syscall
 		mov edi, wcfd32_param_struct
-		mov bx, cs  ; Segment of call_far_dos_int21h for the far call.
+		mov bx, cs  ; Segment of wcfd32_far_syscall for the far call.
 		mov ah, WCFD32_OS_WIN32  ; The LX program in the DOS version sets this to WCFD32_OS_DOS.
 		pop esi  ; Entry point address.
 		push cs  ; For the `retf' of the far call.
@@ -1036,12 +1036,12 @@ loc_4108FB:
 		jmp exit_eax
 		; Not reached.
 
-call_far_dos_int21h:  ; proc far
-		call call_dos_int21h
+wcfd32_far_syscall:  ; proc far
+		call wcfd32_near_syscall
 		retf
 
-; unsigned __int8 __usercall call_dos_int21h@<cf>(unsigned int r_eax@<eax>, unsigned int r_ebx@<ebx>, unsigned int r_ecx@<ecx>, unsigned int r_edx@<edx>, unsigned int r_esi@<esi>, unsigned int  dword  8 @<edi>)
-call_dos_int21h:
+; unsigned __int8 __usercall wcfd32_near_syscall@<cf>(unsigned int r_eax@<eax>, unsigned int r_ebx@<ebx>, unsigned int r_ecx@<ecx>, unsigned int r_edx@<edx>, unsigned int r_esi@<esi>, unsigned int  dword  8 @<edi>)
+wcfd32_near_syscall:
 		push edi
 		push esi
 		push edx
@@ -1049,7 +1049,7 @@ call_dos_int21h:
 		push ebx
 		push eax	     ; regs
 		mov eax, esp	    ; regs
-		call call_dos_int21h_low
+		call wcfd32_near_syscall_low
 		sahf
 		pop eax
 		pop ebx
@@ -1627,8 +1627,8 @@ dos_syscall_handlers:
 
 section .text
 ; Returns flags in AH. Modifies regs in place.
-; unsigned __int8 __usercall call_dos_int21h_low@<ah>(struct dos_int21h_regs *regs@<eax>)
-call_dos_int21h_low:
+; unsigned __int8 __usercall wcfd32_near_syscall_low@<ah>(struct dos_int21h_regs *regs@<eax>)
+wcfd32_near_syscall_low:
 		push ebx
 		push ecx
 		push edx
