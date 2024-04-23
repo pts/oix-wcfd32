@@ -343,6 +343,7 @@ pop_esi_edx_ecx_ebx_ret:
 
 %define CONFIG_LOAD_SINGLE_READ
 %define CONFIG_LOAD_INT21H call call_dos_int21h
+%undef  CONFIG_LOAD_MALLOC_EAX
 %undef  CONFIG_LOAD_MALLOC_EBX
 
 ; load_error_t __usercall load_wcfd32_program_image@<eax>(const char *filename@<eax>)
@@ -400,8 +401,13 @@ found_cf_header:  ; The CF header (18h bytes) is now at EDI, and it will remain 
 %ifdef CONFIG_LOAD_MALLOC_EBX
 		CONFIG_LOAD_MALLOC_EBX
 %else
-		mov ah, INT21H_FUNC_48H_ALLOCATE_MEMORY  ; r_eax
+  %ifdef CONFIG_LOAD_MALLOC_EAX
+		xchg eax, ebx  ; EAX := EBX: EBX := junk.
+		CONFIG_LOAD_MALLOC_EAX
+  %else
+		mov ah, INT21H_FUNC_48H_ALLOCATE_MEMORY
 		CONFIG_LOAD_INT21H
+  %endif
 %endif
 		pop ebx  ; Restore DOS filehandle.
 		jc .oom
