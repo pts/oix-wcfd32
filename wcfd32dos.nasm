@@ -207,6 +207,8 @@ malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conve
 		push esi
 		push edi
 		push ebp
+		add eax,  3  ; Part of the align fix to dword.
+		and eax, ~3  ; Part of the align fix to dword.
 		xchg ebp, eax  ; EBP := EAX; EAX := junk.
 		; We need to allocate EBP bytes of memory here. With WASM,
 		; EBP (new_amount) is typically 0x30000 for the CF image

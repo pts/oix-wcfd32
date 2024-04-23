@@ -1842,7 +1842,10 @@ handle_INT21H_FUNC_42H_SEEK_IN_FILE:
 		inc ebp  ; Force success.
 .done:		jmp loc_410EFA  ; Success or error.
 handle_INT21H_FUNC_48H_ALLOCATE_MEMORY:
-		mov ebp, [esi+4]    ; jumptable 00410ED7 case 18
+		mov eax, [esi+4]    ; jumptable 00410ED7 case 18
+		add eax,  3  ; Part of the align fix to dword.
+		and eax, ~3  ; Part of the align fix to dword.
+		xchg ebp, eax  ; EBP := EAX; EAX := junk.
 		;
 		; We need to allocate EBP bytes of memory here. With WASM,
 		; EBP (new_amount) is typically 0x30000 for the CF image

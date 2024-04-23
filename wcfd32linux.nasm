@@ -276,6 +276,8 @@ print_crlf:  ; !! Prints a CRLF ("\r", "\n") to stdout.
 ; !! TODO(pts): Align to 4 bytes, all implementations. Then remove align fixes.
 malloc:  ; Allocates EAX bytes of memory. On success, returns starting address. On failure, returns NULL.
 		push ebx
+		add eax,  3  ; Part of the align fix to dword.
+		and eax, ~3  ; Part of the align fix to dword.
 		test eax, eax
 		jle .18  ; If allocating zero bytes, return NULL.
 		mov ebx, eax
@@ -553,8 +555,6 @@ concatenate_argv:
 		jmp .22
 .23:		xchg eax, edx  ; EAX := EDX; EDX := junk.
 		inc eax
-		add eax, 3  ; Part of the align fix to dword.
-		and eax, ~3  ; Part of the align fix to dword.
 		call malloc
 		test eax, eax
 		jz pop_edx_ecx_ebx_ret
@@ -620,9 +620,7 @@ concatenate_env:
 		add eax, edx
 .29:		add ecx, 0x4
 		jmp .27
-.30:		add eax, 3  ; Part of the align fix to dword.
-		and eax, ~3  ; Part of the align fix to dword.
-		call malloc
+.30:		call malloc
 		test eax, eax
 		jz strict short pop_edx_ecx_ebx_ret  ; Returns.
 		push eax  ; Save return value.
