@@ -77,13 +77,45 @@ WCFD32_OS_WIN32 equ 2  ; !! Use it.
 
 NULL equ 0
 
-_start:  ; Program entry point.
-		pop eax  ; argc.
-		mov edx, esp  ; argv.
-		lea ecx, [edx+eax*4+4]  ; envp.
+EXIT_SUCCESS equ 0
+EXIT_FAILURE equ 1
 
+_start:  ; Program entry point.
+		pop edx  ; argc.
+%ifdef RUNPROG
+		pop eax  ; Ignore argv[0].
+		dec edx
+		jnz .have_argv1
+		mov eax, msg_usage
+		call print_str  ; !! Print to stderr.
+		mov al, EXIT_FAILURE
+		jmp handle_INT21H_FUNC_4CH_EXIT_PROCESS
+
+.have_argv1:
+%endif
+		pop edi  ; argv[0]: program invocation name. !! Replace it with "/proc/self/exe" in open, if it doesn't contain a slash, but on macOS in Docker: https://github.com/pts/staticpython/blob/1bc021851823cbbc38c0dbd0790a252b760e9beb/calculate_path.2.7.c#L71-L75
+		mov eax, esp  ; argv.
+		lea ecx, [eax+edx*4]  ; envp.
+		call concatenate_args
+		xchg ebp, eax  ; EBP := EAX (command-line arguments terimated by NUL); EAX := junk.
+		xchg eax, ecx  ; EAX := ECX (env); ECX := junk.
+		call concatenate_env
+		xchg ecx, eax  ; ECX := EAX (DOS environment variable strings); EAX := junk.
+		; Now: EBP: command-line arguments terminated by NUL; ECX: DOS environment variable strings; EDI: full program pathname terminated by NUL.
+%if 0  ; Debug: print program pathname and environment variables.
+		mov eax, edi
+		call print_str
+		mov al, ':'
+		call print_chr
+		call print_crlf
+		mov eax, ebp
+		call print_str
+		mov al, '<'
+		call print_chr
+		call print_crlf
+%endif
+%if 0  ; Debug: print environment variables.
 		mov eax, ecx
-		call concatenate_env  ; !! Segfault when printed.
 .next_envvar:	call print_str
 		call print_crlf
 .skip:		inc eax
@@ -91,20 +123,9 @@ _start:  ; Program entry point.
 		jne .skip
 		cmp byte [eax], 0
 		jne .next_envvar
-
-%if 0
-		mov eax, edx
-		call concatenate_argv
-		call print_str
-		mov al, '<'
-		call print_chr
-		call print_crlf
 %endif
-
-		xor eax, eax
-		inc eax  ; SYS_exit.
-		xor ebx, ebx  ; EXIT_SUCCESS.
-		int 0x80  ; Linux i386 syscall.
+		mov al, EXIT_SUCCESS
+		jmp handle_INT21H_FUNC_4CH_EXIT_PROCESS
 		; Not reached.
 
 wcfd32_near_syscall:
@@ -277,11 +298,8 @@ handle_INT21H_FUNC_44H_IOCTL_IN_FILE:  ; EBX is the file descriptor. AL is the i
 handle_unimplemented:
 		mov eax, msg_unimplemented
 		call print_str  ; !! Print to stderr.
-		xor eax, eax
-		inc eax  ; SYS_exit.
-		push 120  ; Exit code.
-		pop ebx
-		int 0x80  ; Linux i386 syscall.
+		mov al, 120  ; Exit code.
+		jmp strict short handle_INT21H_FUNC_4CH_EXIT_PROCESS
 		; Not reached.
 
 handle_INT21H_FUNC_48H_ALLOCATE_MEMORY:
@@ -497,20 +515,17 @@ xmalloc:  ; !!
 		test eax, eax
 		jz .oom
 		ret
-.oom:		mov eax, oom_msg
+.oom:		mov eax, msg_oom
 		call print_str
-		xor eax, eax
-		inc eax  ; SYS_exit.
-		mov ebx, eax  ; EXIT_FAILURE.
-		int 0x80  ; Linux i386 syscall.
+		mov al, 121  ; Exit code.
+		jmp handle_INT21H_FUNC_4CH_EXIT_PROCESS
 		; Not reached.
 
-oom_msg:	db 'fatal: out of memory', 13, 10, 0
 
-; /* Returns the number of bytes needed by append_argv_quoted(arg).
+; /* Returns the number of bytes needed by append_arg_quoted(arg).
 ;  * Based on https://learn.microsoft.com/en-us/archive/blogs/twistylittlepassagesallalike/everyone-quotes-command-line-arguments-the-wrong-way
 ;  */
-; static size_t __watcall get_argv_quoted_size(const char *arg) {
+; static size_t __watcall get_arg_quoted_size(const char *arg) {
 ;   const char *p;
 ;   size_t size = 1;  /* It starts with space even if it's the first argument. */
 ;   size_t bsc;  /* Backslash count. */
@@ -528,7 +543,7 @@ oom_msg:	db 'fatal: out of memory', 13, 10, 0
 ;   }
 ;   return size;
 ; }
-get_argv_quoted_size:
+get_arg_quoted_size:
 		push ebx
 		push ecx
 		push edx
@@ -586,10 +601,10 @@ get_argv_quoted_size:
 
 ; /* Appends the quoted (escaped) arg to pout, always starting with a space, and returns the new pout.
 ;  * Implements the inverse of parts of CommandLineToArgvW(...).
-;  * Implementation corresponds to get_argv_quoted_size(arg).
+;  * Implementation corresponds to get_arg_quoted_size(arg).
 ;  * Based on https://learn.microsoft.com/en-us/archive/blogs/twistylittlepassagesallalike/everyone-quotes-command-line-arguments-the-wrong-way
 ;  */
-; static char * __watcall append_argv_quoted(const char *arg, char *pout) {
+; static char * __watcall append_arg_quoted(const char *arg, char *pout) {
 ;   const char *p;
 ;   size_t bsc;  /* Backslash count. */
 ;   *pout++ = ' ';  /* It starts with space even if it's the first argument. */
@@ -611,7 +626,7 @@ get_argv_quoted_size:
 ;   *pout++ = '"';
 ;   return pout;
 ; }
-append_argv_quoted:
+append_arg_quoted:
 		push ebx
 		push ecx
 		mov byte [edx], ' '
@@ -688,31 +703,31 @@ append_argv_quoted:
 		pop ebx
 		ret
 
-; char * __watcall concatenate_argv(char **argv) {
+; char * __watcall concatenate_args(char **args) {
 ;   char **argp, *result, *pout;
 ;   size_t size = 1;  /* Trailing '\0'. */
-;   for (argp = argv + 1; *argp; size += get_argv_quoted_size(*argp++)) {}
+;   for (argp = args; *argp; size += get_arg_quoted_size(*argp++)) {}
 ;   ++size;
 ;   result = malloc(size);  /* Will never be freed. */
 ;   if (result) {
 ;     pout = result;
-;     for (pout = result, argp = argv + 1; *argp; pout = append_argv_quoted(*argp++, pout)) {}
+;     for (pout = result, argp = args; *argp; pout = append_arg_quoted(*argp++, pout)) {}
 ;     *pout = '\0';
 ;   }
 ;   return result;
 ; }
-concatenate_argv:
+concatenate_args:
 		push ebx
 		push ecx
 		push edx
 		mov ebx, eax
-		mov edx, 0x1
-		lea ecx, [eax+0x4]
+		mov edx, 1
+		mov ecx, eax
 .22:		mov eax, [ecx]
 		test eax, eax
 		je .23
 		add ecx, 0x4
-		call get_argv_quoted_size
+		call get_arg_quoted_size
 		add edx, eax
 		jmp .22
 .23:		xchg eax, edx  ; EAX := EDX; EDX := junk.
@@ -721,14 +736,14 @@ concatenate_argv:
 		test eax, eax
 		jz pop_edx_ecx_ebx_ret
 		push eax  ; Save return value.
-		lea ecx, [ebx+0x4]
+		mov ecx, ebx
 .24:		cmp dword [ecx], 0x0
 		je .25
 		mov ebx, [ecx]
 		add ecx, 0x4
 		mov edx, eax
 		mov eax, ebx
-		call append_argv_quoted
+		call append_arg_quoted
 		jmp .24
 .25:		mov byte [eax], 0x0
 pop_eax_edx_ecx_ebx_ret:
@@ -803,7 +818,11 @@ concatenate_env:
 .34:		and dword [eax], 0
 		jmp strict short pop_eax_edx_ecx_ebx_ret
 
-msg_unimplemented: db 'fatal: unimplemented syscall', 13, 10, 0  ; !! Display which.
+msg_unimplemented: db 'fatal: unimplemented syscall', 13, 10, 0  ; !! Display what is unimplemented.
+msg_oom:	db 'fatal: out of memory', 13, 10, 0
+%ifdef RUNPROG
+msg_usage:	db 'Usage: wcfd32linux <wcfd32-prog-file> [<arg> ...]', 13, 10, 0
+%endif
 
 prebss:
 		bss_align equ ($$-$)&3

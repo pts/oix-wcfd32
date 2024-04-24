@@ -41,7 +41,7 @@ nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o wcfd32stub.bin wcfd32stub.na
 # Final output: wcfd32stub.bin.
 
 rm -f wcfd32linux  # For correct permissions.
-nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -DLINUXPROG -o wcfd32linux wcfd32linux.nasm
+nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -DRUNPROG -o wcfd32linux wcfd32linux.nasm
 chmod +x wcfd32linux
 
 #nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o wasm106.exe wasm106.nasm
