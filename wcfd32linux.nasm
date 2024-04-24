@@ -66,12 +66,6 @@ INT21H_FUNC_56H_RENAME_FILE     equ 0x56
 INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME equ 0x57
 INT21H_FUNC_60H_GET_FULL_FILENAME equ 0x60
 
-LOAD_ERROR_SUCCESS       equ 0x0
-LOAD_ERROR_OPEN_ERROR    equ 0x1
-LOAD_ERROR_INVALID_EXE   equ 0x2
-LOAD_ERROR_READ_ERROR    equ 0x3
-LOAD_ERROR_OUT_OF_MEMORY equ 0x4
-
 WCFD32_OS_DOS equ 1
 WCFD32_OS_WIN32 equ 2  ; !! Use it.
 
@@ -79,6 +73,7 @@ NULL equ 0
 
 EXIT_SUCCESS equ 0
 EXIT_FAILURE equ 1
+
 
 _start:  ; Program entry point.
 		pop edx  ; argc.
@@ -124,9 +119,55 @@ _start:  ; Program entry point.
 		cmp byte [eax], 0
 		jne .next_envvar
 %endif
-		mov al, EXIT_SUCCESS
-		jmp handle_INT21H_FUNC_4CH_EXIT_PROCESS
+		mov eax, edi
+		call load_wcfd32_program_image
+		cmp eax, -10
+		jb .load_ok
+		neg eax  ; EAX := load_error_code.
+		push eax
+		mov eax, [load_errors+4*eax]
+		call print_str  ; !! Report filename etc. on file open error.
+		pop eax
+		jmp .exit ; exit(load_error_code).
+.load_ok:	; Now we call the entry point.
+		;
+		; Input: AH: operating system (WCFD32_OS_DOS or WCFD32_OS_WIN32).
+		; Input: BX: segment of the call_far_dos_int21h syscall.
+		; Input: EDX: offset of the call_far_dos_int21h syscall.
+		; Input: ECX: must be 0 (unknown parameter).
+		; Input: EDI: wcfd32_param_struct
+		; Input: dword [wcfd32_param_struct]: program filename (ASCIIZ)
+		; Input: dword [wcfd32_param_struct+4]: command-line (ASCIIZ)
+		; Input: dword [wcfd32_param_struct+8]: environment variables (each ASCIIZ, terminated by a final NUL)
+		; Input: dword [wcfd32_param_struct+0xc]: 0 (unknown parameter)
+		; Input: dword [wcfd32_param_struct+0x10]: 0 (unknown parameter)
+		; Input: dword [wcfd32_param_struct+0x14]: 0 (unknown parameter)
+		; Input: dword [wcfd32_param_struct+0x18]: 0 (unknown parameter)
+		; Call: far call.
+		; Output: EAX: exit code (0 for EXIT_SUCCESS).
+		mov [wcfd32_program_filename], edi
+		mov [wcfd32_command_line], ebp
+		mov [wcfd32_env_strings], ecx
+		sub ecx, ecx  ; This is an unknown parameter, which we always set to 0.
+		mov edx, wcfd32_far_syscall
+		mov edi, wcfd32_param_struct
+		mov bx, cs  ; Segment of wcfd32_far_syscall for the far call.
+		xchg eax, esi  ; ESI := (entry point address); EAX := junk.
+		mov ah, WCFD32_OS_WIN32  ; !! TODO(pts): Is there an OS_LINUX constant to use?
+		push cs  ; For the `retf' of the far call.
+		call esi
+.exit:		jmp handle_INT21H_FUNC_4CH_EXIT_PROCESS  ; Exit with exit code in AL.
 		; Not reached.
+
+%undef  CONFIG_LOAD_TRY_CF_AT_HDRSIZE
+%ifdef RUNPROG
+  %define CONFIG_LOAD_TRY_CF_AT_HDRSIZE
+%endif
+%define CONFIG_LOAD_SINGLE_READ
+%define CONFIG_LOAD_INT21H call wcfd32_near_syscall
+%define CONFIG_LOAD_MALLOC_EAX call malloc
+%undef  CONFIG_LOAD_MALLOC_EBX
+%include "wcfd32load.inc.nasm"
 
 wcfd32_near_syscall:
 		push cs
@@ -148,7 +189,6 @@ wcfd32_far_syscall: ; proc far
 .do_handle:	call esi
 		pop esi
 		retf
-; !! WASM by default needs: 3C, 3D, 3E, 3F, 40, 41, 42, 44, 48, 4C  ; !! Check WASM and WLIB code, all versions.
 
 handle_INT21H_FUNC_3DH_OPEN_FILE:  ; Open file. AL is access mode (0, 1 or 2). EDX points to the filename. Returns: CF indicating failure; EAX (if CF=0) is the filehandle (high word is 0). EAX (if CF=1) is DOS error code (high word is 0).
 		push ebx
@@ -337,6 +377,7 @@ handlers_3CH:
 		dd handle_unimplemented  ; 4BH
 		dd handle_INT21H_FUNC_4CH_EXIT_PROCESS
 ; !! Implement these, but only if needed by WASM or WLIB.
+; !! WASM by default needs: 3C, 3D, 3E, 3F, 40, 41, 42, 44, 48, 4C  ; !! Check WASM and WLIB code, all versions.
 ;INT21H_FUNC_06H_DIRECT_CONSOLE_IO equ 0x6
 ;INT21H_FUNC_08H_WAIT_FOR_CONSOLE_INPUT equ 0x8
 ;INT21H_FUNC_19H_GET_CURRENT_DRIVE equ 0x19
@@ -824,6 +865,8 @@ msg_oom:	db 'fatal: out of memory', 13, 10, 0
 msg_usage:	db 'Usage: wcfd32linux <wcfd32-prog-file> [<arg> ...]', 13, 10, 0
 %endif
 
+emit_load_errors
+
 prebss:
 		bss_align equ ($$-$)&3
 section .bss  ; We could use `absolute $' here instead, but that's broken (breaks address calculation in program_end-bss+prebss-file_header) in NASM 0.95--0.97.
@@ -832,5 +875,13 @@ section .bss  ; We could use `absolute $' here instead, but that's broken (break
 _malloc_simple_base	resd 1  ; char *base;
 _malloc_simple_free	resd 1  ; char *free;
 _malloc_simple_end	resd 1  ; char *end;
+wcfd32_param_struct:  ; Contains 7 dd fields, see below.
+  wcfd32_program_filename resd 1  ; dd empty_str  ; ""
+  wcfd32_command_line resd 1  ; dd empty_str  ; ""
+  wcfd32_env_strings resd 1  ; dd empty_env
+  wcfd32_unknown_param3 resd 1
+  wcfd32_unknown_param4 resd 1
+  wcfd32_unknown_param5 resd 1
+  wcfd32_unknown_param6 resd 1
 
 program_end:
