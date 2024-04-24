@@ -13,21 +13,33 @@ file_header:	db 0x7F,'ELF',1,1,1,OSABI_Linux,0,0,0,0,0,0,0,0,2,0,3,0
 program_header:	dd 1, 0, file_header, file_header
 		dd prebss-file_header, program_end-bss+prebss-file_header, RWX, 0x1000
 
+; Linux i386 syscall numbers.
 SYS_exit equ 1
 SYS_read equ 3
 SYS_write equ 4
 SYS_open equ 5
 SYS_close equ 6
+SYS_unlink equ 10
 SYS_lseek equ 19
 SYS_brk equ 45
+SYS_ioctl equ 54
+SYS_ftruncate equ 93
 
 SEEK_SET equ 0
+SEEK_CUR equ 1
+SEEK_END equ 2
 
 O_RDONLY equ 0
 O_WRONLY equ 1
 O_RDWR   equ 2
-O_CREAT  equ 100q
-O_TRUNC  equ 1000q
+O_CREAT  equ 100q  ; Linux-specific.
+O_TRUNC  equ 1000q  ; Linux-specific.
+
+; Linux errno error codes.
+ENOENT equ 2	; No such file or directory.
+EACCES equ 13	; Permission denied.
+ENOTDIR equ 20	; Not a directory.
+ENOTTY equ 25  ; Not a typewriter.
 
 INT21H_FUNC_06H_DIRECT_CONSOLE_IO equ 0x6
 INT21H_FUNC_08H_WAIT_FOR_CONSOLE_INPUT equ 0x8
@@ -61,13 +73,11 @@ LOAD_ERROR_READ_ERROR    equ 0x3
 LOAD_ERROR_OUT_OF_MEMORY equ 0x4
 
 WCFD32_OS_DOS equ 1
-WCFD32_OS_WIN32 equ 2
+WCFD32_OS_WIN32 equ 2  ; !! Use it.
 
 NULL equ 0
 
-_start:		;mov eax, msg
-		;call print_str
-		;call print_crlf
+_start:  ; Program entry point.
 		pop eax  ; argc.
 		mov edx, esp  ; argv.
 		lea ecx, [edx+eax*4+4]  ; envp.
@@ -99,9 +109,12 @@ _start:		;mov eax, msg
 
 wcfd32_near_syscall:
 		push cs
-		; Fall through to wcfd32_far_syscall.
+		call wcfd32_far_syscall
+		ret
 
-wcfd32_far_syscall:  ; proc far
+; !! It differs from the DOS syscall API in some register sizes (e.g. uses
+; EDX instead of DX), and it may change some flags not in the documentation.
+wcfd32_far_syscall: ; proc far
 		;call debug_syscall  ; !!
 		push esi
 		mov esi, handle_unimplemented
@@ -110,45 +123,178 @@ wcfd32_far_syscall:  ; proc far
 		cmp ah, 0x3c + ((handlers_3CH.end-handlers_3CH)>>2)
 		jnb .do_handle
 		movzx esi, ah
-		lea esi, [handlers_3CH-4*0x3c+4*esi]
+		mov esi, [handlers_3CH-4*0x3c+4*esi]
 .do_handle:	call esi
 		pop esi
 		retf
 ; !! WASM by default needs: 3C, 3D, 3E, 3F, 40, 41, 42, 44, 48, 4C  ; !! Check WASM and WLIB code, all versions.
+
+handle_INT21H_FUNC_3DH_OPEN_FILE:  ; Open file. AL is access mode (0, 1 or 2). EDX points to the filename. Returns: CF indicating failure; EAX (if CF=0) is the filehandle (high word is 0). EAX (if CF=1) is DOS error code (high word is 0).
+		push ebx
+		push ecx
+		push edx
+		xchg ecx, eax  ; ECX := EAX; EAX := junk.
+		and ecx, 3
+		jmp strict short handle_common.both
+		; Not reached.
+
+handle_INT21H_FUNC_3EH_CLOSE_FILE:  ; Close file. EBX is the file descriptor to close. Returns: CF=1 indicating failure, and on failure sets the DOS error code in EAX (high word is 0).
+		push eax  ; Save EAX.
+		push SYS_close
+		pop eax
+		int 0x80  ; Linux i386 syscall.
+		test eax, eax
+		pop eax  ; Restore EAX.
+		jmp strict short handle_common.xret  ; Treat any negative values as error. This effectively limits the usable file size to <2 GiB (7fffffffh bytes). That's fine, Linux won't give us more without O_LARGEFILE anyway.
+
+handle_INT21H_FUNC_3FH_READ_FROM_FILE:  ; Read from file. EBX is the file descriptor. ECX is the number of bytes to read. EDX is the data pointer. Returns: CF indicating failure; EAX (if CF=0) is the filehandle (high word is 0). EAX (if CF=1) is DOS error code (high word is 0).
+		push ebx
+		push ecx
+		push edx
+		push SYS_read
+.do:		xchg edx, ecx
+		jmp strict short handle_common.cax
+		; Not reached.
+
+handle_INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE:  ; Write to or truncate file. EBX is the file descriptor. ECX is the number of bytes to read. EDX is the data pointer. Returns: CF indicating failure; EAX (if CF=0) is the filehandle (high word is 0). EAX (if CF=1) is DOS error code (high word is 0).
+		push ebx
+		push ecx
+		push edx
+		jecxz .truncate
+.write:		push SYS_write
+		jmp strict short handle_INT21H_FUNC_3FH_READ_FROM_FILE.do
+		; Not reached.
+.truncate:	push SYS_lseek
+		pop eax
+		xor ecx, ecx  ; Seek to offset 0, relative to SEEK_CUR.
+		push SEEK_CUR
+		pop edx
+		int 0x80  ; Linux i386 syscall.
+		test eax, eax
+		js strict short handle_common.pop_xret
+		xchg ecx, eax  ; ECX := EAX (file position); EAX := junk.
+		push SYS_ftruncate
+		jmp strict short handle_common.cax  ; Returns 0 in EAX on error.
+		; Not reached.
+
+handle_INT21H_FUNC_3CH_CREATE_FILE:  ; Create file. CX is file attribute (ignored), EDX points to the filename. Returns: CF indicating failure; EAX (if CF=0) is the filehandle (high word is 0). EAX (if CF=1) is DOS error code (high word is 0).
+		push ebx
+		push ecx
+		push edx
+		mov ecx, O_RDWR|O_CREAT|O_TRUNC
+handle_common:
+.both:		mov ebx, edx
+		mov edx, 666q
+		push SYS_open  ; This push-pop technique works as long as 0 <= SYS_* < 0x80.
+.cax:		pop eax
+		int 0x80  ; Linux i386 syscall.
+.test_pop_xret:	test eax, eax
+.pop_xret:	pop edx
+		pop ecx
+		pop ebx
+.xret:		js .badret  ; Treat any negative values as error. This effectively limits the usable file size to <2 GiB (7fffffffh bytes). That's fine, Linux won't give us more without O_LARGEFILE anyway.
+		clc
+		ret
+.badret:	mov ah, 2  ; DOS error: File not found. https://stanislavs.org/helppc/dos_error_codes.html TODO(pts): Add better error mapping.
+		cmp eax, -ENOENT
+		je .err_found
+		cmp eax, -ENOTDIR
+		je .err_found
+		mov ah, 5  ; DOS error: Access denied.
+		cmp eax, -EACCES
+		je .err_found
+		mov ah, 0xb ; Fallback DOS error: Invalid format.
+.err_found:	shr eax, 8
+		stc
+		ret
+
+handle_INT21H_FUNC_41H_DELETE_NAMED_FILE:  ; Open file. EDX points to the filename. Returns: CF indicating failure; EAX (if CF=1) is DOS error code (high word is 0).
+		push eax  ; Save.
+		push SYS_unlink
+		pop eax
+		xchg ebx, edx
+		int 0x80  ; Linux i386 syscall.
+		xchg ebx, edx  ; Restore EBX and EDX.
+		test eax, eax
+		pop eax  ; Restore.
+		jmp strict short handle_common.xret
+		; Not reached.
+
+handle_INT21H_FUNC_42H_SEEK_IN_FILE:  ; Seek in file. EBX is the file descriptor. AL is whence (0 for SEEK_SET, 1 for SEEK_CUR, 2 for SEEK_END). CX is the high word of the offset. DX is the low word of the offset. Returns: CF indicating failure; EAX (if CF=0) is the low word of the position (high word is 0); EDX (if CF=0) is the high word of the position (high word of EDX is 0). EAX (if CF=1) is DOS error code (high word is 0).
+		push ebx
+		push ecx
+		push edx
+		shl ecx, 16
+		mov cx, dx
+		movzx edx, al
+		;call handle_unimplemented
+		push SYS_lseek  ; Only 32-bit offsets.
+		pop eax
+		int 0x80  ; Linux i386 syscall.
+		test eax, eax
+		js strict short handle_common.pop_xret
+		ror eax, 16
+		movzx edx, ax
+		shr eax, 16
+		clc
+		pop ecx  ; Just pop it, but don't overwrite EDX.
+		pop ecx
+		pop ebx
+		ret
+
+handle_INT21H_FUNC_44H_IOCTL_IN_FILE:  ; EBX is the file descriptor. AL is the ioctl number (we support only 0). Returns: CF indicating failure; EDX (if CF=0) contains the device information bits (high word is 0). EAX (if CF=1) is DOS error code (high word is 0).
+		cmp al, 0  ; Get device information.
+		jne strict short handle_unimplemented
+		; In EDX, we return 0x80 for TTY, 0 for anything else.
+		; !! TODO(pts): Should we return 0x80 for character devices other than a TTY?
+		; https://stanislavs.org/helppc/int_21-44-0.html
+		push ebx
+		push ecx
+		push edx
+		push eax  ; Save.
+		sub esp, strict byte 0x24  ; Output buffer of tcgets.
+		push SYS_ioctl
+		pop eax
+		mov ecx, 0x5401  ; TCGETS.
+		mov edx, esp  ; 3rd argument (data) of ioctl TCGETS.
+		int 0x80  ; Linux i386 syscall.
+		add esp, strict byte 0x24  ; Clean up output buffer of tcgets.
+		xor edx, edx
+		cmp eax, -ENOTTY
+		jne .not_enotty
+		pop eax
+		mov dl, 0  ; Indicated disk file to DOS.
+		jmp .ret_edx
+.not_enotty:	test eax, eax
+		pop eax
+		js strict short handle_common.pop_xret
+		mov dl, 0x80  ; Indicate character device to DOS.
+.ret_edx:	pop ecx  ; Ignore saved EDX.
+		pop ecx
+		pop ebx
+		ret
 
 handle_unimplemented:
 		mov eax, msg_unimplemented
 		call print_str  ; !! Print to stderr.
 		xor eax, eax
 		inc eax  ; SYS_exit.
-		mov al, 120  ; Exit code.
+		push 120  ; Exit code.
+		pop ebx
 		int 0x80  ; Linux i386 syscall.
 		; Not reached.
-
-handle_INT21H_FUNC_3CH_CREATE_FILE:
-handle_INT21H_FUNC_3DH_OPEN_FILE:
-handle_INT21H_FUNC_3EH_CLOSE_FILE:
-handle_INT21H_FUNC_3FH_READ_FROM_FILE:
-handle_INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE:
-handle_INT21H_FUNC_41H_DELETE_NAMED_FILE:
-handle_INT21H_FUNC_42H_SEEK_IN_FILE:
-handle_INT21H_FUNC_44H_IOCTL_IN_FILE:
-; !! Implement these.
-		call debug_syscall  ; !!
-		jmp handle_unimplemented
 
 handle_INT21H_FUNC_48H_ALLOCATE_MEMORY:
 		mov eax, ebx
 		call malloc
 		cmp eax, 1
 		jnc .done  ; Success with CF=0.
-		mov al, 8  ; DOS error: insufficient memory.
-		jmp .done  ; Keep CF=1 for indicating error.
+		mov al, 8  ; DOS error: Insufficient memory. https://stanislavs.org/helppc/dos_error_codes.html
+		; Keep CF=1 for indicating error.
 .done:		ret
 
 handle_INT21H_FUNC_4CH_EXIT_PROCESS:
-		and eax, 0xff
-		xchg ebx, eax  ; EBX := (exit code); EAX := junk.
+		movzx ebx, al
 		xor eax, eax
 		inc eax  ; SYS_exit.
 		int 0x80  ; Linux i386 syscall.
@@ -160,7 +306,6 @@ handlers_3CH:
 		dd handle_INT21H_FUNC_3EH_CLOSE_FILE
 		dd handle_INT21H_FUNC_3FH_READ_FROM_FILE
 		dd handle_INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE
-		dd handle_unimplemented  ; 41H
 		dd handle_INT21H_FUNC_41H_DELETE_NAMED_FILE
 		dd handle_INT21H_FUNC_42H_SEEK_IN_FILE
 		dd handle_unimplemented  ; dd handle_INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES  ; WASM doesn't need it.
@@ -173,6 +318,19 @@ handlers_3CH:
 		dd handle_unimplemented  ; 4AH
 		dd handle_unimplemented  ; 4BH
 		dd handle_INT21H_FUNC_4CH_EXIT_PROCESS
+; !! Implement these, but only if needed by WASM or WLIB.
+;INT21H_FUNC_06H_DIRECT_CONSOLE_IO equ 0x6
+;INT21H_FUNC_08H_WAIT_FOR_CONSOLE_INPUT equ 0x8
+;INT21H_FUNC_19H_GET_CURRENT_DRIVE equ 0x19
+;INT21H_FUNC_1AH_SET_DISK_TRANSFER_ADDRESS equ 0x1A
+;INT21H_FUNC_2AH_GET_DATE        equ 0x2A
+;INT21H_FUNC_2CH_GET_TIME        equ 0x2C
+;INT21H_FUNC_3BH_CHDIR           equ 0x3B
+;INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE equ 0x4E
+;INT21H_FUNC_4FH_FIND_NEXT_MATCHING_FILE equ 0x4F
+;INT21H_FUNC_56H_RENAME_FILE     equ 0x56
+;INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME equ 0x57
+;INT21H_FUNC_60H_GET_FULL_FILENAME equ 0x60
 .end:
 
 debug_syscall:	push eax
@@ -204,8 +362,8 @@ print_str:  ; !! Prints the ASCIIZ string (NUL-terminated) at EAX to stdout.
 .next:		inc edx
 		cmp byte [ecx+edx], 0  ; TODO(pts): rep scasb.
 		jne .next
-		xor eax, eax
-		mov al, SYS_write
+		push SYS_write
+		pop eax
 		xor ebx, ebx
 		inc ebx  ; STDOUT_FILENO.
 		int 0x80  ; Linux i386 syscall.
@@ -221,8 +379,8 @@ print_chr:  ; !! Prints single byte in AL to stdout.
                 push ecx
                 push edx
                 push eax
-                xor eax, eax
-                mov al, SYS_write
+                push SYS_write
+                pop eax
                 xor ebx, ebx
                 inc ebx  ; STDOUT_FILENO.
                 mov ecx, esp
@@ -276,6 +434,8 @@ print_crlf:  ; !! Prints a CRLF ("\r", "\n") to stdout.
 ; !! TODO(pts): Align to 4 bytes, all implementations. Then remove align fixes.
 malloc:  ; Allocates EAX bytes of memory. On success, returns starting address. On failure, returns NULL.
 		push ebx
+		push ecx
+		push edx
 		add eax,  3  ; Part of the align fix to dword.
 		and eax, ~3  ; Part of the align fix to dword.
 		test eax, eax
@@ -286,8 +446,8 @@ malloc:  ; Allocates EAX bytes of memory. On success, returns starting address. 
 		xor eax, eax
 		push ebx  ; Save.
 		xchg ebx, eax ; EBX := EAX (argument of sys_brk(2)); EAX := junk.
-		xor eax, eax
-		mov al, SYS_brk
+		push SYS_brk
+		pop eax
 		int 0x80  ; Linux i386 syscall.
 		pop ebx  ; Restore.
 		mov [_malloc_simple_free], eax
@@ -300,8 +460,8 @@ malloc:  ; Allocates EAX bytes of memory. On success, returns starting address. 
 		push eax  ; Save, will be restored to EDX.
 		push ebx  ; Save.
 		xchg ebx, eax ; EBX := EAX (argument of sys_brk(2)); EAX := junk.
-		xor eax, eax
-		mov al, SYS_brk  ; __NR_brk.
+		push SYS_brk  ; __NR_brk.
+		pop eax
 		int 0x80  ; Linux i386 syscall.
 		pop ebx  ; Restore.
 		pop edx  ; This (and the next line) could be ECX instead.
@@ -327,7 +487,9 @@ malloc:  ; Allocates EAX bytes of memory. On success, returns starting address. 
 		test eax, eax  ; ZF=..., SF=..., OF=0.
 		jg .9  ; Jump iff ZF=0 and SF=OF=0. Why is this correct?
 .18:		xor eax, eax  ; NULL.
-.17:		pop ebx
+.17:		pop edx
+		pop ecx
+		pop ebx
 		ret
 
 xmalloc:  ; !!
@@ -605,8 +767,8 @@ concatenate_env:
 		push ecx
 		push edx
 		xchg ebx, eax  ; EBX := EAX; EAX := junk.
-		xor eax, eax
-		mov al, 4
+		push 4
+		pop eax
 		mov ecx, ebx
 .27:		mov edx, [ecx]
 		test edx, edx

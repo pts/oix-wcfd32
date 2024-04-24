@@ -1042,12 +1042,12 @@ wcfd32_far_syscall:  ; proc far
 
 ; unsigned __int8 __usercall wcfd32_near_syscall@<cf>(unsigned int r_eax@<eax>, unsigned int r_ebx@<ebx>, unsigned int r_ecx@<ecx>, unsigned int r_edx@<edx>, unsigned int r_esi@<esi>, unsigned int  dword  8 @<edi>)
 wcfd32_near_syscall:
-		push edi
-		push esi
-		push edx
-		push ecx
-		push ebx
-		push eax	     ; regs
+		push edi  ; [esi+0x14] in wcfd32_near_syscall_low.
+		push esi  ; [esi+0x10] in wcfd32_near_syscall_low.
+		push edx  ; [esi+0xc] in wcfd32_near_syscall_low.
+		push ecx  ; [esi+8] in wcfd32_near_syscall_low.
+		push ebx  ; [esi+4] in wcfd32_near_syscall_low.
+		push eax  ; [esi in wcfd32_near_syscall_low.
 		mov eax, esp	    ; regs
 		call wcfd32_near_syscall_low
 		sahf

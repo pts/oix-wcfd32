@@ -495,10 +495,6 @@ return:
 		pop ebx
 		ret
 
-wcfd32_near_syscall:
-		push cs
-		; Fall through to wcfd32_far_syscall.
-
 wcfd32_far_syscall:  ; proc far
 		;call debug_syscall  ; !!
 		cmp ah, INT21H_FUNC_48H_ALLOCATE_MEMORY
