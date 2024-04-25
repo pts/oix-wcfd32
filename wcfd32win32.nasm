@@ -35,6 +35,7 @@
 ;    Maybe some resoure file bug? Maybe some offsets there?
 ; !! Remove trailing NUL bytes.
 ; !! memset(0) .bss after load on DOS. _cstart_ does it between _edata and _end.
+; !! Source: bld/w32loadr (OSI)
 ;
 ; TODO(pts): Use a single section, create the PE with NASM (and 208
 ; relocations).

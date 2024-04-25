@@ -327,6 +327,10 @@ malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conve
 
 wcfd32_far_syscall:  ; proc far
 		;call debug_syscall  ; !!
+		cmp ah, INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE
+		je strict short .handle_INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE
+		cmp ah, INT21H_FUNC_4FH_FIND_NEXT_MATCHING_FILE
+		je strict short .handle_INT21H_FUNC_4FH_FIND_NEXT_MATCHING_FILE
 		cmp ah, INT21H_FUNC_48H_ALLOCATE_MEMORY
 		jne .not_48h
 		mov eax, ebx
@@ -337,6 +341,25 @@ wcfd32_far_syscall:  ; proc far
 		jmp .done  ; Keep CF=1 for indicating error.
 .not_48h:	int 21h  ; !! TODO(pts): Which PMODE/W DOS extended syscalls are also incorrect for the WCFD32 ABI?
 .done:		retf
+.handle_INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE:  ; Based on OpenWatcom 1.0 bld/w32loadr/int21dos.asm
+		push edx		; save filename address
+		mov edx,ebx		; get DTA address
+		mov ah, 1ah		; set DTA address
+		int 21h			; ...
+		pop edx			; restore filename address
+		mov ah, 4eh		; find first
+		int 21h			; ...
+		jmp strict short .done
+.handle_INT21H_FUNC_4FH_FIND_NEXT_MATCHING_FILE:  ; Based on OpenWatcom 1.0 bld/w32loadr/int21dos.asm
+		cmp AL,0		; if not FIND NEXT
+		jne strict short .done  ; then return
+		push edx		; save EDX
+		mov ah, 1ah		; set DTA address
+		int 21h			; ...
+		mov ah, 4fh		; find next
+		int 21h			; ...
+		pop edx			; restore EDX
+		jmp strict short .done
 
 debug_syscall:	push eax
 		mov al, ah
