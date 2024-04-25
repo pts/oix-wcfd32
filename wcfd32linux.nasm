@@ -1,4 +1,6 @@
 ; by pts@fazekas.hu at Tue Apr 23 14:15:16 CEST 2024
+;
+; !! Make it work on FreeBSD as well as Linux.
 
 org 0x8048000  ; Typical Linux i386 executable program.
 bits 32
@@ -178,6 +180,7 @@ _start:  ; Program entry point.
 %define CONFIG_LOAD_INT21H call wcfd32_near_syscall
 %define CONFIG_LOAD_MALLOC_EAX call malloc
 %undef  CONFIG_LOAD_MALLOC_EBX
+%undef  CONFIG_LOAD_CLEAR_BSS  ; sbrk(...) already returns 0 bytes.
 %include "wcfd32load.inc.nasm"
 
 wcfd32_near_syscall:

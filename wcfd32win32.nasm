@@ -31,7 +31,6 @@
 ; * 32 stands for 32-bit protected mode on i386.
 ;
 ; !! Remove trailing NUL bytes.
-; !! memset(0) .bss after load on DOS. _cstart_ does it between _edata and _end.
 ; !! Source: bld/w32loadr (OSI)
 ;
 ; TODO(pts): Use a single section, create the PE with NASM (and 208
@@ -343,6 +342,7 @@ pop_esi_edx_ecx_ebx_ret:
 %define CONFIG_LOAD_INT21H call wcfd32_near_syscall
 %undef  CONFIG_LOAD_MALLOC_EAX
 %undef  CONFIG_LOAD_MALLOC_EBX
+%undef  CONFIG_LOAD_CLEAR_BSS  ; VirtualAlloc(...) already returns 0 bytes.
 %include "wcfd32load.inc.nasm"
 
 DumpEnvironment:

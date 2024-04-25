@@ -13,7 +13,6 @@
 ;    write it to video memory.
 ; !! TODO(pts): Implement Ctrl-<C> and Ctrl-<Break>.
 ; !! TODO(pts): Set up some exception handlers such as division by zero.
-; !! memset(0) .bss after load on DOS.
 ;
 
 bits 32
@@ -325,6 +324,7 @@ malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conve
 %define CONFIG_LOAD_INT21H int 21h
 %define CONFIG_LOAD_MALLOC_EAX call malloc
 %undef  CONFIG_LOAD_MALLOC_EBX
+%define CONFIG_LOAD_CLEAR_BSS
 %include "wcfd32load.inc.nasm"
 
 wcfd32_far_syscall:  ; proc far

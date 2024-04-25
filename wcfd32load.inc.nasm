@@ -70,10 +70,10 @@ load_wcfd32_program_image:
 		pop ebx  ; Restore DOS filehandle.
 		jc .oom
 		test eax, eax
-		jnz .loc_410362
+		jnz .malloc_ok
 .oom:		mov eax, -LOAD_ERROR_OUT_OF_MEMORY  ; error_code
 		jmp .close_return
-.loc_410362:
+.malloc_ok:
 		mov esi, eax  ; ESI := image_base.
 		; Read the entire image in one big chunk.
 		mov edx, esi  ; EDX := image_base.
@@ -126,6 +126,25 @@ load_wcfd32_program_image:
 		jmp .loc_4103D4
 %endif
 .image_read_ok:
+%ifdef CONFIG_LOAD_CLEAR_BSS
+		push ecx
+		push edi
+		push eax
+		mov ecx, [edi+0x10]  ; mem_size.
+		mov edi, [edi+8]  ; load_size.
+		sub ecx, edi
+		add edi, esi  ; image_base.
+		xor eax, eax
+		push ecx
+		shr ecx, 2
+		rep stosd
+		pop ecx
+		and ecx, 3
+		rep stosb
+		pop eax
+		pop edi
+		pop ecx
+%endif
 		mov edx, [edi+0Ch]  ; cf_header.reloc_rva.
 		push ebx  ; Save DOS filehandle.
 		xchg esi, edx
