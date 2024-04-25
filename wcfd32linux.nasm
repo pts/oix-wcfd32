@@ -339,7 +339,19 @@ handle_INT21H_FUNC_44H_IOCTL_IN_FILE:  ; EBX is the file descriptor. AL is the i
 		ret
 
 handle_unimplemented:
-		mov eax, msg_unimplemented
+		mov al, ah
+		aam 0x10  ; AH := high nibble; AL := low nibble
+		cmp ah, 10
+		jb .ah
+		add ah, 'a'-'0'-10
+.ah:		cmp al, 10
+		jb .al
+		add al, 'a'-'0'-10
+.al		add ax, '0'<<8|'0'
+		xchg al, ah
+		mov ebp, msg_unimplemented
+		mov word [ebp+msg_unimplemented.hexdigits-msg_unimplemented], ax
+		xchg eax, ebp  ; EAX := EBP; EBP := junk.
 		call print_str  ; !! Print to stderr.
 		mov al, 120  ; Exit code.
 		jmp strict short handle_INT21H_FUNC_4CH_EXIT_PROCESS
@@ -862,11 +874,15 @@ concatenate_env:
 .34:		and dword [eax], 0
 		jmp strict short pop_eax_edx_ecx_ebx_ret
 
-msg_unimplemented: db 'fatal: unimplemented syscall', 13, 10, 0  ; !! Display what is unimplemented.
 msg_oom:	db 'fatal: out of memory', 13, 10, 0
 %ifdef RUNPROG
 msg_usage:	db 'Usage: wcfd32linux <wcfd32-prog-file> [<arg> ...]', 13, 10, 0
 %endif
+
+;section .data
+
+msg_unimplemented: db 'fatal: unimplemented syscall 0x',
+.hexdigits:	db '??', 13, 10, 0  ; The '??' part is read-write.
 
 emit_load_errors
 
