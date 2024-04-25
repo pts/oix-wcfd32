@@ -128,37 +128,29 @@ load_wcfd32_program_image:
 .image_read_ok:
 		mov edx, [edi+0Ch]  ; cf_header.reloc_rva.
 		push ebx  ; Save DOS filehandle.
+		xchg esi, edx
 .apply_relocations:
 		; Apply relocations.
-		; Input: ESI: image_base; EDX: reloc_rva.
-		; Spoils: EAX, EBX, ECX, EDX.
-		add edx, esi  ; EDX := image_base + cf_header.reloc_rva (old EDX).
-.next_block:	movzx ebx, word [edx]
-		inc edx
-		inc edx
-		test ebx, ebx
-		jz strict short .rdone
-		movzx eax, word [edx]
-		inc edx
-		inc edx
-		shl eax, 0x10
-		movzx ecx, word [edx]
-		or eax, ecx
-		inc edx
-		inc edx
-		add eax, esi
-.next_reloc:	add [eax], esi
-		dec ebx
-		jz strict short .next_block
-		movzx ecx, word [edx]
-		inc edx
-		inc edx
-		add eax, ecx
-		jmp strict short .next_reloc
-.rdone:		;
-		mov edx, esi  ; Return image_base in EDX.
-		mov eax, [edi+14h]
-		add eax, esi
+		; Input: EDX: image_base; ESI: reloc_rva.
+		; Spoils: EAX, EBX, ECX, ESI.
+		add esi, edx  ; ESI := image_base + cf_header.reloc_rva (old EDX).
+		jmp strict short .next_block
+.next_reloc:	lodsw
+		add ebx, eax
+.first_reloc:	add [ebx], edx
+		loop .next_reloc
+.next_block:	lodsw
+		movzx ecx, ax
+		jecxz .rdone
+		lodsd
+		xchg ebx, eax  ; EBX := EAX; EAX := junk.
+		ror ebx, 16
+		add ebx, edx
+		xor eax, eax
+		jmp strict short .first_reloc
+.rdone:		; Return image_base in EDX.
+		mov eax, [edi+14h]  ; cf_header.entry_rva.
+		add eax, edx
 		; Now: EAX: entry point address. It will be returned.
 .close_return:
 		pop ebx  ; Restore DOS filehandle.
