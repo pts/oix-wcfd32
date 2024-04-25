@@ -154,16 +154,20 @@ _start:  ; Program entry point.
 		; Call: far call.
 		; Output: EAX: exit code (0 for EXIT_SUCCESS).
 		push 0  ; Simulate that the break flag is always 0. WLIB needs it.
-		mov [wcfd32_break_flag_ptr], esp
-		mov [wcfd32_program_filename], edi
-		mov [wcfd32_command_line], ebp
-		mov [wcfd32_env_strings], ecx
+		mov esi, esp
+		push 0  ; wcfd32_max_handle_for_os2.
+		push 0  ; wcfd32_is_japanese.
+		push 0  ; wcfd32_copyright.
+		push esi  ; wcfd32_break_flag_ptr.
+		push ecx  ; wcfd32_env_strings.
+		push ebp  ; wcfd32_command_line.
+		push edi  ; wcfd32_program_filename.
+		mov edi, esp  ; wcfd32_param_struct.
 		xor ebx, ebx  ; Not needed by the ABI, just make it deterministic.
 		xor esi, esi  ; Not needed by the ABI, just make it deterministic.
 		xor ebp, ebp  ; Not needed by the ABI, just make it deterministic.
 		sub ecx, ecx  ; Stack limit, which we always set to 0.
 		mov edx, wcfd32_far_syscall
-		mov edi, wcfd32_param_struct
 		mov bx, cs  ; Segment of wcfd32_far_syscall for the far call.
 		xchg eax, esi  ; ESI := (entry point address); EAX := junk.
 		mov ah, WCFD32_OS_WIN32  ; !! TODO(pts): Is there an OS_LINUX constant to use?
@@ -969,13 +973,5 @@ section .bss  ; We could use `absolute $' here instead, but that's broken (break
 _malloc_simple_base	resd 1  ; char *base;
 _malloc_simple_free	resd 1  ; char *free;
 _malloc_simple_end	resd 1  ; char *end;
-wcfd32_param_struct:  ; Contains 7 dd fields, see below.
-  wcfd32_program_filename resd 1  ; dd empty_str  ; ""
-  wcfd32_command_line resd 1  ; dd empty_str  ; ""
-  wcfd32_env_strings resd 1  ; dd empty_env
-  wcfd32_break_flag_ptr resd 1  ; !! Set.
-  wcfd32_copyright resd 1
-  wcfd32_is_japanese resd 1
-  wcfd32_max_handle_for_os2 resd 1
 
 program_end:
