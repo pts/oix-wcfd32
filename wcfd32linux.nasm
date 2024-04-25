@@ -268,16 +268,19 @@ handle_common:
 .xret:		js .badret  ; Treat any negative values as error. This effectively limits the usable file size to <2 GiB (7fffffffh bytes). That's fine, Linux won't give us more without O_LARGEFILE anyway.
 		clc
 		ret
-.badret:	mov ah, 2  ; DOS error: File not found. https://stanislavs.org/helppc/dos_error_codes.html TODO(pts): Add better error mapping.
-		cmp eax, -ENOENT
+.badret:	push ebx
+		xor ebx, ebx
+		mov bl, 2  ; DOS error: File not found. https://stanislavs.org/helppc/dos_error_codes.html TODO(pts): Add better error mapping.
+		cmp eax, -ENOENT  ; This is important, _sopen in Watcom libc relies on error code 2 before attempting to create a file.
 		je .err_found
 		cmp eax, -ENOTDIR
 		je .err_found
-		mov ah, 5  ; DOS error: Access denied.
+		mov bl, 5  ; DOS error: Access denied.
 		cmp eax, -EACCES
 		je .err_found
-		mov ah, 0xb ; Fallback DOS error: Invalid format.
-.err_found:	shr eax, 8
+		mov bl, 0xb ; Fallback DOS error: Invalid format.
+.err_found:	xchg eax, ebx  ; EAX := EBX (DOS error code); EBX := junk.
+		pop ebx
 		stc
 		ret
 
