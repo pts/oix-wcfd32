@@ -854,6 +854,9 @@ loc_4108FB:
 		; Input: dword [wcfd32_param_struct+0x18]: 0 (wcfd32_max_handle_for_os2)
 		; Call: far call.
 		; Output: EAX: exit code (0 for EXIT_SUCCESS).
+		pop esi  ; Entry point address.
+		push 0  ; Simulate that the break flag is always 0. WLIB needs it.
+		mov [wcfd32_break_flag_ptr], esp
 		xor ebx, ebx  ; Not needed by the ABI, just make it deterministic.
 		xor eax, eax  ; Not needed by the ABI, just make it deterministic.
 		xor ebp, ebp  ; Not needed by the ABI, just make it deterministic.
@@ -862,7 +865,6 @@ loc_4108FB:
 		mov edi, wcfd32_param_struct
 		mov bx, cs  ; Segment of wcfd32_far_syscall for the far call.
 		mov ah, WCFD32_OS_WIN32  ; The LX program in the DOS version sets this to WCFD32_OS_DOS.
-		pop esi  ; Entry point address.
 		push cs  ; For the `retf' of the far call.
 		call esi
 		;lea eax, [esp+13Ch-1Ch]

@@ -135,6 +135,8 @@ _start:
 		; Input: dword [wcfd32_param_struct+0x18]: 0 (wcfd32_max_handle_for_os2)
 		; Call: far call.
 		; Output: EAX: exit code (0 for EXIT_SUCCESS).
+		push 0  ; Simulate that the break flag is always 0. WLIB needs it.
+		mov [wcfd32_break_flag_ptr], esp
 		mov [wcfd32_program_filename], edi
 		mov [wcfd32_command_line], ebp
 		mov [wcfd32_env_strings], ecx
