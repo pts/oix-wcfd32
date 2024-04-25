@@ -30,9 +30,6 @@
 ; * D stands for DOS, because the syscall numbers are the same as in DOS.
 ; * 32 stands for 32-bit protected mode on i386.
 ;
-; !! wlib105.exe and wlib106.exe fail with `Wlib abort.' on mwperun.exe.
-;    The corresponding *x*.exe do work with w32run.exe. Debug and fix.
-;    Maybe some resoure file bug? Maybe some offsets there?
 ; !! Remove trailing NUL bytes.
 ; !! memset(0) .bss after load on DOS. _cstart_ does it between _edata and _end.
 ; !! Source: bld/w32loadr (OSI)

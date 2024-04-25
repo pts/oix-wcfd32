@@ -193,6 +193,8 @@ wcfd32_far_syscall: ; proc far
 		je strict short handle_far_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO
 		cmp ah, INT21H_FUNC_56H_RENAME_FILE
 		je strict short handle_far_INT21H_FUNC_56H_RENAME_FILE
+		cmp ah, INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME
+		je strict short handle_far_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME
 		push esi
 		mov esi, handle_unimplemented
 		cmp ah, 0x3c
@@ -245,6 +247,20 @@ handle_far_INT21H_FUNC_56H_RENAME_FILE:  ; EDX: old filename, EDI: new filename.
 		pop eax
 .good:		retf
 
+handle_far_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME:
+		cmp al, 0
+		jne handle_unimplemented
+		; Not reached.
+.get:		; !! Use the real stat(...).
+		; !! Don't lose the last bit of seconds precision.
+		; It looks like that for .lib file creation with WLIB
+		; (default OMF LIBHEAD format) only the getter has to be
+		; implemented. But we fake that one as well. We could use
+		; our own gmtime(2), but not localtime(2) like DOSBox.
+		xor ecx, ecx  ; Fake file time.
+		mov edx, 1<<5|1  ; Fake file date.
+		clc
+		retf
 
 handle_INT21H_FUNC_3DH_OPEN_FILE:  ; Open file. AL is access mode (0, 1 or 2). EDX points to the filename. Returns: CF indicating failure; EAX (if CF=0) is the filehandle (high word is 0). EAX (if CF=1) is DOS error code (high word is 0).
 		push ebx
@@ -459,7 +475,6 @@ handlers_3CH:
 ;INT21H_FUNC_3BH_CHDIR           equ 0x3B
 ;INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE equ 0x4E
 ;INT21H_FUNC_4FH_FIND_NEXT_MATCHING_FILE equ 0x4F
-;INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME equ 0x57
 ;INT21H_FUNC_60H_GET_FULL_FILENAME equ 0x60
 .end:
 
