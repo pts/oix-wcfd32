@@ -42,7 +42,7 @@ ENOTDIR equ 20	; Not a directory.
 ENOTTY equ 25  ; Not a typewriter.
 
 INT21H_FUNC_06H_DIRECT_CONSOLE_IO equ 0x6
-INT21H_FUNC_08H_WAIT_FOR_CONSOLE_INPUT equ 0x8
+INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO equ 0x8
 INT21H_FUNC_19H_GET_CURRENT_DRIVE equ 0x19
 INT21H_FUNC_1AH_SET_DISK_TRANSFER_ADDRESS equ 0x1A
 INT21H_FUNC_2AH_GET_DATE        equ 0x2A
@@ -182,6 +182,9 @@ wcfd32_near_syscall:
 wcfd32_far_syscall: ; proc far
 		;call debug_syscall  ; !!
 		push esi
+		mov esi, handle_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO
+		cmp ah, INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO
+		je .do_handle
 		mov esi, handle_unimplemented
 		cmp ah, 0x3c
 		jb .do_handle
@@ -373,6 +376,26 @@ handle_INT21H_FUNC_4CH_EXIT_PROCESS:
 		int 0x80  ; Linux i386 syscall.
 		; Not reached.
 
+handle_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO:
+		; !! TODO(pts): Disable line buffering and echo; tio.c_lflag &= ~(ICANON | ECHO);
+		; However, the default behavior is good enough, WASM only waits for <Enter>.
+		push ebx
+		push ecx
+		push edx
+		push eax  ; Just leave room for 1 byte on the stack.
+		push SYS_read
+		pop eax
+		xor ebx, ebx  ; STDIN_FILENO.
+		mov ecx, esp
+		xor edx, edx
+		inc edx
+		int 0x80  ; Linux i386 syscall.
+		pop eax  ; AL contains the byte read.
+		pop edx
+		pop ecx
+		pop ebx
+		ret
+
 handlers_3CH:
 		dd handle_INT21H_FUNC_3CH_CREATE_FILE
 		dd handle_INT21H_FUNC_3DH_OPEN_FILE
@@ -392,9 +415,8 @@ handlers_3CH:
 		dd handle_unimplemented  ; 4BH
 		dd handle_INT21H_FUNC_4CH_EXIT_PROCESS
 ; !! Implement these, but only if needed by WASM or WLIB.
-; !! WASM by default needs: 3C, 3D, 3E, 3F, 40, 41, 42, 44, 48, 4C  ; !! Check WASM and WLIB code, all versions.
+; !! WASM by default needs: 3C, 3D, 3E, 3F, 40, 41, 42, 44, 48, 4C, also the help needs 08  ; !! Check WASM and WLIB code, all versions.
 ;INT21H_FUNC_06H_DIRECT_CONSOLE_IO equ 0x6
-;INT21H_FUNC_08H_WAIT_FOR_CONSOLE_INPUT equ 0x8
 ;INT21H_FUNC_19H_GET_CURRENT_DRIVE equ 0x19
 ;INT21H_FUNC_1AH_SET_DISK_TRANSFER_ADDRESS equ 0x1A
 ;INT21H_FUNC_2AH_GET_DATE        equ 0x2A
@@ -407,7 +429,8 @@ handlers_3CH:
 ;INT21H_FUNC_60H_GET_FULL_FILENAME equ 0x60
 .end:
 
-debug_syscall:	push eax
+debug_syscall:  ; !!
+		push eax
 		mov al, ah
 		shr al, 4
 		add al, '0'

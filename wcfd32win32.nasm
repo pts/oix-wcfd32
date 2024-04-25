@@ -107,7 +107,7 @@ STD_OUTPUT_HANDLE equ -11
 STD_ERROR_HANDLE  equ -12
 
 INT21H_FUNC_06H_DIRECT_CONSOLE_IO equ 0x6
-INT21H_FUNC_08H_WAIT_FOR_CONSOLE_INPUT equ 0x8
+INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO equ 0x8
 INT21H_FUNC_19H_GET_CURRENT_DRIVE equ 0x19
 INT21H_FUNC_1AH_SET_DISK_TRANSFER_ADDRESS equ 0x1A
 INT21H_FUNC_2AH_GET_DATE        equ 0x2A
@@ -1018,7 +1018,7 @@ loc_410AE3:
 		pop ebx
 		ret
 
-func_INT21H_FUNC_08H_WAIT_FOR_CONSOLE_INPUT:
+func_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO:
 		push ebx
 		push ecx
 		push edx
@@ -1429,7 +1429,7 @@ dos_syscall_numbers db 60h, 57h, 56h, 4Fh, 4Eh, 4Ch, 48h, 47h, 44h, 43h, 42h
 dos_syscall_handlers:
 		dd handle_unsupported_int21h_function  ; jump table for switch statement
 		dd handle_INT21H_FUNC_06H_DIRECT_CONSOLE_IO  ; jumptable 00410ED7 case 1
-		dd handle_INT21H_FUNC_08H_WAIT_FOR_CONSOLE_INPUT  ; jumptable 00410ED7 case 2
+		dd handle_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO  ; jumptable 00410ED7 case 2
 		dd handle_INT21H_FUNC_2AH_GET_CURRENT_DRIVE  ; jumptable 00410ED7 case 3
 		dd handle_INT21H_FUNC_1AH_SET_DISK_TRANSFER_ADDRESS  ; jumptable 00410ED7 case 4
 		dd handle_INT21H_FUNC_2AH_GET_DATE  ; jumptable 00410ED7 case 5
@@ -1498,9 +1498,9 @@ dos_error_with_code:
 dos_error:
 		mov eax, 100h  ; Set CF=1 (error) in returned flags.
 		jmp loc_410BE9
-handle_INT21H_FUNC_08H_WAIT_FOR_CONSOLE_INPUT:
+handle_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO:
 		mov eax, esi	    ; jumptable 00410ED7 case 2
-		call func_INT21H_FUNC_08H_WAIT_FOR_CONSOLE_INPUT
+		call func_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO
 		jmp done_handling
 handle_INT21H_FUNC_2AH_GET_CURRENT_DRIVE:
 		call func_INT21H_FUNC_2AH_GET_CURRENT_DRIVE	     ; jumptable 00410ED7 case 3
