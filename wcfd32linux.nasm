@@ -99,7 +99,7 @@ _start:  ; Program entry point.
 		jmp handle_INT21H_FUNC_4CH_EXIT_PROCESS
 .have_argv1:
 %endif
-		pop edi  ; argv[0]: program invocation name. !! Replace it with "/proc/self/exe" in open, if it doesn't contain a slash, but on macOS in Docker: https://github.com/pts/staticpython/blob/1bc021851823cbbc38c0dbd0790a252b760e9beb/calculate_path.2.7.c#L71-L75
+		pop edi  ; argv[0]: program invocation name. No need to replace it with "/proc/self/exe" in open, if it doesn't contain a slash, but on macOS in Docker: https://github.com/pts/staticpython/blob/1bc021851823cbbc38c0dbd0790a252b760e9beb/calculate_path.2.7.c#L71-L75
 		mov eax, esp  ; argv.
 		lea ecx, [eax+edx*4]  ; envp.
 		call concatenate_args
@@ -108,7 +108,7 @@ _start:  ; Program entry point.
 		call concatenate_env
 		xchg ecx, eax  ; ECX := EAX (DOS environment variable strings); EAX := junk.
 		; Now: EBP: command-line arguments terminated by NUL; ECX: DOS environment variable strings; EDI: full program pathname terminated by NUL.
-%if 0  ; Debug: print program pathname and environment variables.
+%ifdef DEBUG  ; Debug: print program pathname and environment variables.
 		mov eax, edi
 		call print_str
 		mov al, ':'
@@ -120,7 +120,7 @@ _start:  ; Program entry point.
 		call print_chr
 		call print_crlf
 %endif
-%if 0  ; Debug: print environment variables.
+%ifdef DEBUG  ; Debug: print environment variables.
 		mov eax, ecx
 .next_envvar:	call print_str
 		call print_crlf
@@ -178,7 +178,7 @@ _start:  ; Program entry point.
 		mov edx, wcfd32_far_syscall
 		mov bx, cs  ; Segment of wcfd32_far_syscall for the far call.
 		xchg eax, esi  ; ESI := (entry point address); EAX := junk.
-		mov ah, WCFD32_OS_WIN32  ; !! TODO(pts): Is there an OS_LINUX constant to use?
+		mov ah, WCFD32_OS_WIN32
 		push cs  ; For the `retf' of the far call.
 		call esi
 .exit:		jmp handle_INT21H_FUNC_4CH_EXIT_PROCESS  ; Exit with exit code in AL.
@@ -202,7 +202,7 @@ wcfd32_near_syscall:
 ; !! It differs from the DOS syscall API in some register sizes (e.g. uses
 ; EDX instead of DX), and it may change some flags not in the documentation.
 wcfd32_far_syscall: ; proc far
-		;call debug_syscall  ; !!
+		;call debug_syscall
 		cmp ah, INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO
 		je strict short handle_far_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO
 		cmp ah, INT21H_FUNC_56H_RENAME_FILE
@@ -479,7 +479,8 @@ handlers_3CH:
 		dd handle_INT21H_FUNC_4CH_EXIT_PROCESS
 ; !! Implement these, but only if needed by WASM or WLIB.
 ; !! WLIB does a segmentation fault on Linux at startup, with a NULL pointer dereference. Why? Does it fail in Wine?
-; !! WASM by default needs: 3C, 3D, 3E, 3F, 40, 41, 42, 44, 48, 4C, also the help needs 08  ; !! Check WASM and WLIB code, all versions.
+; !! WASM by default needs: 3C, 3D, 3E, 3F, 40, 41, 42, 44, 48, 4C, also the help needs 08e
+; !! Check WASM and WLIB code, all versions. Maybe it's too much.
 ; !! (why doesn't Win32 emulate it?) INT21H_FUNC_45H_DUPLICATE_FILE_HANDLE equ 0x45
 ;INT21H_FUNC_06H_DIRECT_CONSOLE_IO equ 0x6
 ;INT21H_FUNC_19H_GET_CURRENT_DRIVE equ 0x19
@@ -492,7 +493,8 @@ handlers_3CH:
 ;INT21H_FUNC_60H_GET_FULL_FILENAME equ 0x60
 .end:
 
-debug_syscall:  ; !!
+%ifdef DEBUG
+debug_syscall:
 		push eax
 		mov al, ah
 		shr al, 4
@@ -513,7 +515,44 @@ debug_syscall:  ; !!
 		ret
 
 
-print_str:  ; !! Prints the ASCIIZ string (NUL-terminated) at EAX to stdout.
+print_chr:  ; Prints single byte in AL to stdout.
+                push ebx
+                push ecx
+                push edx
+                push eax
+                push SYS_write
+                pop eax
+                xor ebx, ebx
+                inc ebx  ; STDOUT_FILENO.
+                mov ecx, esp
+                xor edx, edx
+                inc edx  ; EDX := 1 (number of bytes to print).
+                int 0x80  ; Linux i386 syscall.
+                pop eax
+                jmp strict short print_str.pop_edx_ecx_ebx_ret
+
+print_crlf:  ; Prints a CRLF ("\r", "\n") to stdout.
+		push eax
+		push 13|10<<8  ; String.
+		mov eax, esp
+		call print_str
+		pop eax  ; String. Value ingored.
+		pop eax
+		ret
+
+xmalloc:
+		call malloc
+		test eax, eax
+		jz .oom
+		ret
+.oom:		mov eax, msg_oom
+		call print_str
+		mov al, 121  ; Exit code.
+		jmp handle_INT21H_FUNC_4CH_EXIT_PROCESS
+		; Not reached.
+%endif
+
+print_str:  ; Prints the ASCIIZ string (NUL-terminated) at EAX to stdout.
 		push ebx
 		push ecx
 		push edx
@@ -532,31 +571,6 @@ print_str:  ; !! Prints the ASCIIZ string (NUL-terminated) at EAX to stdout.
 		pop edx
 		pop ecx
 		pop ebx
-		ret
-
-print_chr:  ; !! Prints single byte in AL to stdout.
-                push ebx
-                push ecx
-                push edx
-                push eax
-                push SYS_write
-                pop eax
-                xor ebx, ebx
-                inc ebx  ; STDOUT_FILENO.
-                mov ecx, esp
-                xor edx, edx
-                inc edx  ; EDX := 1 (number of bytes to print).
-                int 0x80  ; Linux i386 syscall.
-                pop eax
-                jmp strict short print_str.pop_edx_ecx_ebx_ret
-
-print_crlf:  ; !! Prints a CRLF ("\r", "\n") to stdout.
-		push eax
-		push 13|10<<8  ; String.
-		mov eax, esp
-		call print_str
-		pop eax  ; String. Value ingored.
-		pop eax
 		ret
 
 ; Implemented using sys_brk(2). Equivalent to the following C code, but was
@@ -591,7 +605,6 @@ print_crlf:  ; !! Prints a CRLF ("\r", "\n") to stdout.
 ; }
 ;
 ; !! TODO(pts): If allocating 1 MiB more fails, type 512 KiB etc, all the way down to 64 KiB.
-; !! TODO(pts): Align to 4 bytes, all implementations. Then remove align fixes.
 malloc:  ; Allocates EAX bytes of memory. On success, returns starting address. On failure, returns NULL.
 		push ebx
 		push ecx
@@ -651,18 +664,6 @@ malloc:  ; Allocates EAX bytes of memory. On success, returns starting address. 
 		pop ecx
 		pop ebx
 		ret
-
-xmalloc:  ; !!
-		call malloc
-		test eax, eax
-		jz .oom
-		ret
-.oom:		mov eax, msg_oom
-		call print_str
-		mov al, 121  ; Exit code.
-		jmp handle_INT21H_FUNC_4CH_EXIT_PROCESS
-		; Not reached.
-
 
 ; /* Returns the number of bytes needed by append_arg_quoted(arg).
 ;  * Based on https://learn.microsoft.com/en-us/archive/blogs/twistylittlepassagesallalike/everyone-quotes-command-line-arguments-the-wrong-way
