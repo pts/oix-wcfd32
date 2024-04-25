@@ -21,6 +21,7 @@ SYS_write equ 4
 SYS_open equ 5
 SYS_close equ 6
 SYS_lseek equ 19
+SYS_brk equ 45
 
 SEEK_SET equ 0
 
@@ -78,33 +79,99 @@ _start:		pop eax  ; Skip argc.
 		mov edx, 666q  ; Permission bits (mode_t) for file creation.
 		mov al, SYS_open
 		call check_syscall_al
-		xchg ebx, eax  ; EBX := EAX (fd); EAX := junk.
 		test ebp, ebp  ; argv[3].
+		xchg ebp, eax  ; EBP := EAX (fd); EAX := junk.
 		jz .exe_output
-.elf_output:	; !! Apply relocations here instead.
+.elf_output:	; ---
 		mov eax, [cf_header.entry_rva]
-		;add eax, elf_stub_end-elf_elf_header
 		;add eax, [elf_org]
-		mov [elf_cf_entry_rva], eax
-		mov eax, [cf_header.reloc_rva]
-		mov [elf_cf_reloc_rva], eax
+		;add eax, elf_stub_end-elf_header
+		;mov [elf_cf_entry_vaddr], eax
+		mov edi, [elf_cf_entry_vaddr]  ; bss.
+		add [elf_cf_entry_vaddr], eax
 		mov eax, [cf_header.load_size]
 		add [elf_text_filesiz], eax
 		mov eax, [cf_header.mem_size]
 		add [elf_text_memsiz], eax
 		mov ecx, elf_stub
 		mov edx, elf_stub_end-elf_stub
-		jmp .write_stub
-.exe_output:	mov ecx, stub
-		mov edx, stub_end-stub
-.write_stub:	push SYS_write
+		push SYS_write
+		pop eax
+		mov ebx, ebp  ; Output filehandle.
+		call check_syscall_al
+		; Now we read the entire image, and write it at once.
+		push SYS_brk
+		pop eax
+		xor ebx, ebx
+		int 0x80  ; Linux i386 syscall.
+		test eax, eax
+		jns .brk1_ok
+.bad_alloc:	mov eax, fatal_alloc
+		jmp fatal
+.brk1_ok:	xchg ebx, eax  ; EBX := EAX; EAX := junk.
+		mov ecx, ebx  ; ECX := EBX (image base vaddr).
+		add ebx, [cf_header.load_size]
+		push SYS_brk
+		pop eax
+		int 0x80  ; Linux i386 syscall.
+		test eax, eax
+		js .bad_alloc
+		cmp eax, ebx
+		jb .bad_alloc
+		mov edx, [cf_header.load_size]
+		pop ebx  ; Input filehandle.
+		push ebx
+		push SYS_read
 		pop eax
 		call check_syscall_al
-		mov ebp, ebx  ; Save output filehandle to EBP.
-		pop ebx  ; Input filehandle.
+		cmp eax, edx
+		je .readall_ok
+		mov eax, fatal_read
+		jmp fatal
+.readall_ok:
+		mov edx, ecx  ; image_base in the stub-allocated buffer.
+		mov esi, [cf_header.reloc_rva]
+.apply_relocations_and_clear:
+		; Apply relocations and clear (set-to-zero) relocation data bytes.
+		; Input: EDX, EDI: image_base; ESI: reloc_rva.
+		; Spoils: EAX, EBX, ECX, ESI.
+		add esi, edx  ; ESI := stub-allocated image_base + cf_header.reloc_rva.
+		jmp strict short .next_block
+.next_reloc:	lodsw
+		and word [esi-2], 0  ; Clear.
+		add ebx, eax
+.first_reloc:	add [ebx], edi
+		loop .next_reloc
+.next_block:	lodsw
+		and word [esi-2], 0  ; Clear.
+		movzx ecx, ax
+		jecxz .rdone
+		lodsd
+		and dword [esi-4], 0  ; Clear.
+		xchg ebx, eax  ; EBX := EAX; EAX := junk.
+		ror ebx, 16
+		add ebx, edx
+		xor eax, eax
+		jmp strict short .first_reloc
+.rdone:		; Now: EDX: image_base; EAX, EBX, ECX, ESI: spoiled.
+		mov ebx, ebp  ; Output filehandle.
+		mov ecx, edx  ; stub-allocated image_base.
+		mov edx, [cf_header.load_size]
+		push SYS_write
+		pop eax
+		call check_syscall_al
+		jmp .pop_read_next  ; Read resources after the image.
+		; ---
+.exe_output:	mov ecx, stub
+		mov edx, stub_end-stub
+		mov ebx, ebp
+		push SYS_write
+		pop eax
+		call check_syscall_al
+.pop_read_next:	pop ebx  ; Input filehandle.
 .read_next:	call read_to_buf
 		test eax, eax
-		jz .read_done
+		jz .rw_done
 		xchg edx, eax  ; EDX := EAX (size); EAX := junk.
 		xchg ebp, ebx
 		mov al, SYS_write
@@ -115,7 +182,7 @@ _start:		pop eax  ; Skip argc.
 		jmp fatal
 .write_ok:	xchg ebp, ebx
 		jmp .read_next
-.read_done:	xor eax, eax
+.rw_done:	xor eax, eax
 		inc eax  ; SYS_exit.
 		xor ebx, ebx  ; EXIT_SUCCESS.
 		int 0x80  ; Linux i386 syscall.
@@ -185,6 +252,7 @@ fatal_lseek:	db 'fatal: error seeking', 10, 0
 fatal_syscall:	db 'fatal: error in syscall', 10, 0
 fatal_too_short: db 'fatal: file too short for CF header', 10, 0
 fatal_cf_not_found: db 'fatal: CF header not found', 10, 0
+fatal_alloc:	db 'fatal: error allocating memory', 10, 0
 %endif  ; LINUXPROG
 
 ; This is independent of `bits 16' or `bits 32'.
@@ -211,7 +279,7 @@ incbin 'wcfd32dosp.exe', 0x4f, 0x1f03-0x4f  ; wcfd32dos.exe and wcfd32dosp.exe a
 		db 0x38
 incbin 'wcfd32dosp.exe', 0x1f03+1  ; We use wcfd32dosp.exe here, because wcfd32dos.exe doesn't have the alignment of the PE header to 4.
 pe_header:
-incbin 'wcfd32win32.exe', pe_header-mz_header, 8
+incbin 'wcfd32win32.exe', pe_header-mz_header, 8  ; !! Change section name to .text.
 TimeDateStamp:	dd 0  ; Make the build reproducible by specifying a constant timestamp.
 incbin 'wcfd32win32.exe', pe_header-mz_header+0xc
 stub_end:
@@ -222,8 +290,7 @@ elf_header:
 incbin 'wcfd32linux.bin'
 elf_stub_end:
 elf_entry equ elf_header+0x54
-elf_cf_entry_rva equ elf_entry+1  ; Will be modified in place. The argument of the `push ...' instruction in wcfd32linux.nasm.
-elf_cf_reloc_rva equ elf_entry+6  ; Will be modified in place. The argument of the `mov esi, ...' instruction in wcfd32linux.nasm.
+elf_cf_entry_vaddr equ elf_entry+1  ; Will be modified in place. The argument of the `mov esi, ...' instruction in wcfd32linux.nasm.
 elf_org equ elf_header+0x54-0x14
 elf_text_filesiz equ elf_header+0x54-0x10  ; Will be modified in place.
 elf_text_memsiz  equ elf_header+0x54-0xc   ; Will be modified in place.

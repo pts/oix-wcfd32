@@ -85,33 +85,8 @@ EXIT_FAILURE equ 1
 
 _start:  ; Program entry point.
 %ifndef RUNPROG
-		push strict dword 0  ; entry_rva. Value will be patched.
-		mov esi, 0  ; reloc_rva. Value will be patched.
-		mov edx, bss  ; image_base.
-		add [esp], edx  ; Change entry_rva to entry point address.
-.apply_relocations:
-		; Apply relocations.
-		; Input: EDX: image_base; ESI: reloc_rva.
-		; Spoils: EAX, EBX, ECX, ESI.
-		add esi, edx  ; ESI := image_base + cf_header.reloc_rva (old EDX).
-		jmp strict short .next_block
-.next_reloc:	lodsw
-		add ebx, eax
-.first_reloc:	add [ebx], edx
-		loop .next_reloc
-.next_block:	lodsw
-		movzx ecx, ax
-		jecxz .rdone
-		lodsd
-		xchg ebx, eax  ; EBX := EAX; EAX := junk.
-		ror ebx, 16
-		add ebx, edx
-		xor eax, eax
-		jmp strict short .first_reloc
-.rdone:		; Now: EDX: image_base; EAX, EBX, ECX, ESI: spoiled.
-		pop esi
+		mov esi, bss  ; Value will be patched by wfcd32stub to WCFD32 program entry_vaddr during executable program file generation.
 		; Now: ESI: entry point address.
-
 %endif
 		pop edx  ; argc.
 %ifdef RUNPROG

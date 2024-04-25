@@ -52,6 +52,7 @@ for f in wasmx100a.exe wasmx105.exe wasmx106.exe wasmx110b.exe wlibx105.exe wlib
     head="${f%x*.exe}"
     tail="${f#${head}x}"
     ./wcfd32stub "$f" "$head$tail"
+    rm -f "$head${tail%.exe}"  # For correct permissions and avoiding cache problems.
     ./wcfd32stub "$f" "$head${tail%.exe}" elf
     chmod +x "$head${tail%.exe}"
   fi
