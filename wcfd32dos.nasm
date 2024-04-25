@@ -148,7 +148,7 @@ _start:
 		mov edi, wcfd32_param_struct
 		mov bx, cs  ; Segment of wcfd32_far_syscall for the far call.
 		xchg eax, esi  ; ESI := (entry point address); EAX := junk.
-		mov ah, WCFD32_OS_DOS  ; !! Why? Which of DOS or OS2?
+		mov ah, WCFD32_OS_DOS  ; !! wasmx106.exe (loader16.asm) does OS_WIN16. !! Why? Which of DOS or OS2? Double check.
 		push cs  ; For the `retf' of the far call.
 		call esi
 .exit:		mov ah, 4ch  ; Exit with exit code in AL.

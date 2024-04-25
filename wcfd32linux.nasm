@@ -57,6 +57,7 @@ INT21H_FUNC_41H_DELETE_NAMED_FILE equ 0x41
 INT21H_FUNC_42H_SEEK_IN_FILE    equ 0x42
 INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES equ 0x43
 INT21H_FUNC_44H_IOCTL_IN_FILE   equ 0x44
+INT21H_FUNC_45H_DUPLICATE_FILE_HANDLE equ 0x45
 INT21H_FUNC_47H_GET_CURRENT_DIR equ 0x47
 INT21H_FUNC_48H_ALLOCATE_MEMORY equ 0x48
 INT21H_FUNC_4CH_EXIT_PROCESS    equ 0x4C
@@ -422,6 +423,7 @@ handlers_3CH:
 ; !! Implement these, but only if needed by WASM or WLIB.
 ; !! WLIB does a segmentation fault on Linux at startup, with a NULL pointer dereference. Why? Does it fail in Wine?
 ; !! WASM by default needs: 3C, 3D, 3E, 3F, 40, 41, 42, 44, 48, 4C, also the help needs 08  ; !! Check WASM and WLIB code, all versions.
+; !! (why doesn't Win32 emulate it?) INT21H_FUNC_45H_DUPLICATE_FILE_HANDLE equ 0x45
 ;INT21H_FUNC_06H_DIRECT_CONSOLE_IO equ 0x6
 ;INT21H_FUNC_19H_GET_CURRENT_DRIVE equ 0x19
 ;INT21H_FUNC_1AH_SET_DISK_TRANSFER_ADDRESS equ 0x1A
