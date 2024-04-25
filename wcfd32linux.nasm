@@ -148,6 +148,9 @@ _start:  ; Program entry point.
 		mov [wcfd32_program_filename], edi
 		mov [wcfd32_command_line], ebp
 		mov [wcfd32_env_strings], ecx
+		xor ebx, ebx  ; Not needed by the ABI, just make it deterministic.
+		xor esi, esi  ; Not needed by the ABI, just make it deterministic.
+		xor ebp, ebp  ; Not needed by the ABI, just make it deterministic.
 		sub ecx, ecx  ; This is an unknown parameter, which we always set to 0.
 		mov edx, wcfd32_far_syscall
 		mov edi, wcfd32_param_struct

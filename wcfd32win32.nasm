@@ -848,6 +848,9 @@ loc_4108FB:
 		; Input: dword [wcfd32_param_struct+0x18]: 0 (unknown parameter)
 		; Call: far call.
 		; Output: EAX: exit code (0 for EXIT_SUCCESS).
+		xor ebx, ebx  ; Not needed by the ABI, just make it deterministic.
+		xor eax, eax  ; Not needed by the ABI, just make it deterministic.
+		xor ebp, ebp  ; Not needed by the ABI, just make it deterministic.
 		sub ecx, ecx  ; This is an unknown parameter, which we always set to 0.
 		mov edx, wcfd32_far_syscall
 		mov edi, wcfd32_param_struct
