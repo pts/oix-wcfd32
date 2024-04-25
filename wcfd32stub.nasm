@@ -1,6 +1,7 @@
 ; by pts@fazekas.hu at Mon Apr 22 17:44:31 CEST 2024
 
 %ifdef LINUXPROG
+; Usage: wcfd32stub <input.cf.exe> <output> [<indicate-elf-output>]
 org 0x8048000  ; Typical Linux i386 executable program.
 bits 32
 cpu 386
@@ -70,16 +71,34 @@ _start:		pop eax  ; Skip argc.
 		call check_syscall_al
 		pop eax  ; argv[2]: output filename.
 		call check_filename
-		push ebx
+		pop ebp  ; argv[3].
+		push ebx  ; Save input filehandle.
 		xchg ebx, eax  ; EBX := EAX; EAX := junk.
 		mov ecx, O_WRONLY|O_CREAT|O_TRUNC
 		mov edx, 666q  ; Permission bits (mode_t) for file creation.
 		mov al, SYS_open
 		call check_syscall_al
 		xchg ebx, eax  ; EBX := EAX (fd); EAX := junk.
-		mov ecx, stub
+		test ebp, ebp  ; argv[3].
+		jz .exe_output
+.elf_output:	; !! Apply relocations here instead.
+		mov eax, [cf_header.entry_rva]
+		;add eax, elf_stub_end-elf_elf_header
+		;add eax, [elf_org]
+		mov [elf_cf_entry_rva], eax
+		mov eax, [cf_header.reloc_rva]
+		mov [elf_cf_reloc_rva], eax
+		mov eax, [cf_header.load_size]
+		add [elf_text_filesiz], eax
+		mov eax, [cf_header.mem_size]
+		add [elf_text_memsiz], eax
+		mov ecx, elf_stub
+		mov edx, elf_stub_end-elf_stub
+		jmp .write_stub
+.exe_output:	mov ecx, stub
 		mov edx, stub_end-stub
-		mov al, SYS_write
+.write_stub:	push SYS_write
+		pop eax
 		call check_syscall_al
 		mov ebp, ebx  ; Save output filehandle to EBP.
 		pop ebx  ; Input filehandle.
@@ -175,11 +194,11 @@ incbin 'wcfd32dos.exe', 0, 6  ; 'MZ' signature and image size.
 incbin 'wcfd32dosp.exe', 6, 0x20-6  ; wcfd32dos.exe and wcfd32dosp.exe are identical here.
 cf_header:  ; The 32-bit DOS loader finds it at mz_header.hdrsize. Must be aligned to 0x10.
 		db 'CF', 0, 0          ; +0x00. Signature.
-		dd 0;wcfd32_load       ; +0x04. load_fofs.
-		dd 0;wcfd32_load_size  ; +0x08. load_size.
-		dd 0;wcfd32_reloc_rva  ; +0x0c. reloc_rva.
-		dd 0;wcfd32_mem_size   ; +0x10. mem_size.
-		dd 0;wcfd32_entry_rva  ; +0x14. entry_rva.
+.load:		dd 0;wcfd32_load       ; +0x04. load_fofs.
+.load_size:	dd 0;wcfd32_load_size  ; +0x08. load_size.
+.reloc_rva:	dd 0;wcfd32_reloc_rva  ; +0x0c. reloc_rva.
+.mem_size:	dd 0;wcfd32_mem_size   ; +0x10. mem_size.
+.entry_rva:	dd 0;wcfd32_entry_rva  ; +0x14. entry_rva.
 		; End.                 ; +0x18. Size.
 incbin 'wcfd32dosp.exe', 0x3c, 4  ; wcfd32dos.exe and wcfd32dosp.exe are identical here.
 		dd pe_header-mz_header  ;incbin 'wcfd32win32.exe', 0x3c, 4  ; !! TODO(pts): Check that this dword == pe_header.
@@ -198,6 +217,16 @@ incbin 'wcfd32win32.exe', pe_header-mz_header+0xc
 stub_end:
 
 %ifdef LINUXPROG
+elf_stub:
+elf_header:
+incbin 'wcfd32linux.bin'
+elf_stub_end:
+elf_entry equ elf_header+0x54
+elf_cf_entry_rva equ elf_entry+1  ; Will be modified in place. The argument of the `push ...' instruction in wcfd32linux.nasm.
+elf_cf_reloc_rva equ elf_entry+6  ; Will be modified in place. The argument of the `mov esi, ...' instruction in wcfd32linux.nasm.
+elf_org equ elf_header+0x54-0x14
+elf_text_filesiz equ elf_header+0x54-0x10  ; Will be modified in place.
+elf_text_memsiz  equ elf_header+0x54-0xc   ; Will be modified in place.
 prebss:
 		bss_align equ ($$-$)&3
 section .bss  ; We could use `absolute $' here instead, but that's broken (breaks address calculation in program_end-bss+prebss-file_header) in NASM 0.95--0.97.

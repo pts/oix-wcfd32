@@ -84,6 +84,35 @@ EXIT_FAILURE equ 1
 
 
 _start:  ; Program entry point.
+%ifndef RUNPROG
+		push strict dword 0  ; entry_rva. Value will be patched.
+		mov esi, 0  ; reloc_rva. Value will be patched.
+		mov edx, bss  ; image_base.
+		add [esp], edx  ; Change entry_rva to entry point address.
+.apply_relocations:
+		; Apply relocations.
+		; Input: EDX: image_base; ESI: reloc_rva.
+		; Spoils: EAX, EBX, ECX, ESI.
+		add esi, edx  ; ESI := image_base + cf_header.reloc_rva (old EDX).
+		jmp strict short .next_block
+.next_reloc:	lodsw
+		add ebx, eax
+.first_reloc:	add [ebx], edx
+		loop .next_reloc
+.next_block:	lodsw
+		movzx ecx, ax
+		jecxz .rdone
+		lodsd
+		xchg ebx, eax  ; EBX := EAX; EAX := junk.
+		ror ebx, 16
+		add ebx, edx
+		xor eax, eax
+		jmp strict short .first_reloc
+.rdone:		; Now: EDX: image_base; EAX, EBX, ECX, ESI: spoiled.
+		pop esi
+		; Now: ESI: entry point address.
+
+%endif
 		pop edx  ; argc.
 %ifdef RUNPROG
 		pop eax  ; Ignore argv[0].
@@ -93,7 +122,6 @@ _start:  ; Program entry point.
 		call print_str  ; !! Print to stderr.
 		mov al, EXIT_FAILURE
 		jmp handle_INT21H_FUNC_4CH_EXIT_PROCESS
-
 .have_argv1:
 %endif
 		pop edi  ; argv[0]: program invocation name. !! Replace it with "/proc/self/exe" in open, if it doesn't contain a slash, but on macOS in Docker: https://github.com/pts/staticpython/blob/1bc021851823cbbc38c0dbd0790a252b760e9beb/calculate_path.2.7.c#L71-L75
@@ -127,6 +155,7 @@ _start:  ; Program entry point.
 		cmp byte [eax], 0
 		jne .next_envvar
 %endif
+%ifdef RUNPROG
 		mov eax, edi
 		call load_wcfd32_program_image
 		cmp eax, -10
@@ -137,7 +166,11 @@ _start:  ; Program entry point.
 		call print_str  ; !! Report filename etc. on file open error.
 		pop eax
 		jmp .exit ; exit(load_error_code).
-.load_ok:	; Now we call the entry point.
+.load_ok:	; Now: EAX: entry point address.
+%else
+		xchg eax, esi  ; EAX := ESI; ESI := junk.
+%endif  ; else RUNPROG.
+		; Now we call the entry point.
 		;
 		; Input: AH: operating system (WCFD32_OS_OS2 or WCFD32_OS_WIN32).
 		; Input: BX: segment of the wcfd32_far_syscall syscall.
@@ -176,16 +209,15 @@ _start:  ; Program entry point.
 .exit:		jmp handle_INT21H_FUNC_4CH_EXIT_PROCESS  ; Exit with exit code in AL.
 		; Not reached.
 
-%undef  CONFIG_LOAD_TRY_CF_AT_HDRSIZE
 %ifdef RUNPROG
-  %define CONFIG_LOAD_TRY_CF_AT_HDRSIZE
+  %undef  CONFIG_LOAD_TRY_CF_AT_HDRSIZE
+  %define CONFIG_LOAD_SINGLE_READ
+  %define CONFIG_LOAD_INT21H call wcfd32_near_syscall
+  %define CONFIG_LOAD_MALLOC_EAX call malloc
+  %undef  CONFIG_LOAD_MALLOC_EBX
+  %undef  CONFIG_LOAD_CLEAR_BSS  ; sbrk(...) already returns 0 bytes.
+  %include "wcfd32load.inc.nasm"
 %endif
-%define CONFIG_LOAD_SINGLE_READ
-%define CONFIG_LOAD_INT21H call wcfd32_near_syscall
-%define CONFIG_LOAD_MALLOC_EAX call malloc
-%undef  CONFIG_LOAD_MALLOC_EBX
-%undef  CONFIG_LOAD_CLEAR_BSS  ; sbrk(...) already returns 0 bytes.
-%include "wcfd32load.inc.nasm"
 
 wcfd32_near_syscall:
 		push cs
@@ -963,15 +995,22 @@ msg_usage:	db 'Usage: wcfd32linux <wcfd32-prog-file> [<arg> ...]', 13, 10, 0
 msg_unimplemented: db 'fatal: unimplemented syscall 0x',
 .hexdigits:	db '??', 13, 10, 0  ; The '??' part is read-write.
 
-emit_load_errors
-
-prebss:
-		bss_align equ ($$-$)&3
-section .bss  ; We could use `absolute $' here instead, but that's broken (breaks address calculation in program_end-bss+prebss-file_header) in NASM 0.95--0.97.
-		bss resb bss_align  ; Uninitialized data follows.
-
-_malloc_simple_base	resd 1  ; char *base;
-_malloc_simple_free	resd 1  ; char *free;
-_malloc_simple_end	resd 1  ; char *end;
+%ifdef RUNPROG
+  emit_load_errors
+  prebss:
+  bss_align equ ($$-$)&3
+  section .bss  ; We could use `absolute $' here instead, but that's broken (breaks address calculation in program_end-bss+prebss-file_header) in NASM 0.95--0.97.
+  bss:		resb bss_align  ; Uninitialized data follows.
+  _malloc_simple_base resd 1  ; char *base;
+  _malloc_simple_free resd 1  ; char *free;
+  _malloc_simple_end  resd 1  ; char *end;
+%else
+		times ($$-$)&3 db 0  ; align 4.
+		_malloc_simple_base	dd 0  ; char *base;
+		_malloc_simple_free	dd 0  ; char *free;
+		_malloc_simple_end	dd 0  ; char *end;
+  prebss:
+  bss:  ; .bss must be empty so that the WCFD32 program image can be appended.
+%endif
 
 program_end:

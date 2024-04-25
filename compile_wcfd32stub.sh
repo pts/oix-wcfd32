@@ -43,6 +43,7 @@ nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o wcfd32stub.bin wcfd32stub.na
 rm -f wcfd32linux  # For correct permissions.
 nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -DRUNPROG -o wcfd32linux wcfd32linux.nasm
 chmod +x wcfd32linux
+nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o wcfd32linux.bin wcfd32linux.nasm
 
 #nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o wasm106.exe wasm106.nasm
 
@@ -51,6 +52,8 @@ for f in wasmx100a.exe wasmx105.exe wasmx106.exe wasmx110b.exe wlibx105.exe wlib
     head="${f%x*.exe}"
     tail="${f#${head}x}"
     ./wcfd32stub "$f" "$head$tail"
+    ./wcfd32stub "$f" "$head${tail%.exe}" elf
+    chmod +x "$head${tail%.exe}"
   fi
 done
 
