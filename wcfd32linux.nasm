@@ -415,6 +415,7 @@ handlers_3CH:
 		dd handle_unimplemented  ; 4BH
 		dd handle_INT21H_FUNC_4CH_EXIT_PROCESS
 ; !! Implement these, but only if needed by WASM or WLIB.
+; !! WLIB does a segmentation fault on Linux at startup, with a NULL pointer dereference. Why? Does it fail in Wine?
 ; !! WASM by default needs: 3C, 3D, 3E, 3F, 40, 41, 42, 44, 48, 4C, also the help needs 08  ; !! Check WASM and WLIB code, all versions.
 ;INT21H_FUNC_06H_DIRECT_CONSOLE_IO equ 0x6
 ;INT21H_FUNC_19H_GET_CURRENT_DRIVE equ 0x19
