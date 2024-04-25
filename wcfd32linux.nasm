@@ -21,6 +21,8 @@ SYS_open equ 5
 SYS_close equ 6
 SYS_unlink equ 10
 SYS_lseek equ 19
+SYS_utime equ 30
+SYS_rename equ 38
 SYS_brk equ 45
 SYS_ioctl equ 54
 SYS_ftruncate equ 93
@@ -187,10 +189,11 @@ wcfd32_near_syscall:
 ; EDX instead of DX), and it may change some flags not in the documentation.
 wcfd32_far_syscall: ; proc far
 		;call debug_syscall  ; !!
-		push esi
-		mov esi, handle_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO
 		cmp ah, INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO
-		je .do_handle
+		je strict short handle_far_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO
+		cmp ah, INT21H_FUNC_56H_RENAME_FILE
+		je strict short handle_far_INT21H_FUNC_56H_RENAME_FILE
+		push esi
 		mov esi, handle_unimplemented
 		cmp ah, 0x3c
 		jb .do_handle
@@ -201,6 +204,47 @@ wcfd32_far_syscall: ; proc far
 .do_handle:	call esi
 		pop esi
 		retf
+
+handle_far_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO:
+		; !! TODO(pts): Disable line buffering and echo; tio.c_lflag &= ~(ICANON | ECHO);
+		; However, the default behavior is good enough, WASM only waits for <Enter>.
+		push ebx
+		push ecx
+		push edx
+		push eax  ; Just leave room for 1 byte on the stack.
+		push SYS_read
+		pop eax
+		xor ebx, ebx  ; STDIN_FILENO.
+		mov ecx, esp
+		xor edx, edx
+		inc edx
+		int 0x80  ; Linux i386 syscall.
+		pop eax  ; AL contains the byte read.
+		pop edx
+		pop ecx
+		pop ebx
+		retf
+
+handle_far_INT21H_FUNC_56H_RENAME_FILE:  ; EDX: old filename, EDI: new filename.
+		push ebx
+		push ecx
+		push eax
+		push SYS_rename
+		pop eax
+		mov ebx, edx
+		mov ecx, edi
+		int 0x80  ; Linux i386 syscall.
+		pop eax
+		pop ecx
+		pop ebx
+		test eax, eax
+		clc
+		jns .good
+		stc
+		push 0xb  ; Fallback DOS error: Invalid format.
+		pop eax
+.good:		retf
+
 
 handle_INT21H_FUNC_3DH_OPEN_FILE:  ; Open file. AL is access mode (0, 1 or 2). EDX points to the filename. Returns: CF indicating failure; EAX (if CF=0) is the filehandle (high word is 0). EAX (if CF=1) is DOS error code (high word is 0).
 		push ebx
@@ -385,26 +429,6 @@ handle_INT21H_FUNC_4CH_EXIT_PROCESS:
 		int 0x80  ; Linux i386 syscall.
 		; Not reached.
 
-handle_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO:
-		; !! TODO(pts): Disable line buffering and echo; tio.c_lflag &= ~(ICANON | ECHO);
-		; However, the default behavior is good enough, WASM only waits for <Enter>.
-		push ebx
-		push ecx
-		push edx
-		push eax  ; Just leave room for 1 byte on the stack.
-		push SYS_read
-		pop eax
-		xor ebx, ebx  ; STDIN_FILENO.
-		mov ecx, esp
-		xor edx, edx
-		inc edx
-		int 0x80  ; Linux i386 syscall.
-		pop eax  ; AL contains the byte read.
-		pop edx
-		pop ecx
-		pop ebx
-		ret
-
 handlers_3CH:
 		dd handle_INT21H_FUNC_3CH_CREATE_FILE
 		dd handle_INT21H_FUNC_3DH_OPEN_FILE
@@ -435,7 +459,6 @@ handlers_3CH:
 ;INT21H_FUNC_3BH_CHDIR           equ 0x3B
 ;INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE equ 0x4E
 ;INT21H_FUNC_4FH_FIND_NEXT_MATCHING_FILE equ 0x4F
-;INT21H_FUNC_56H_RENAME_FILE     equ 0x56
 ;INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME equ 0x57
 ;INT21H_FUNC_60H_GET_FULL_FILENAME equ 0x60
 .end:
