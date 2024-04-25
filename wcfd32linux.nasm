@@ -66,8 +66,11 @@ INT21H_FUNC_56H_RENAME_FILE     equ 0x56
 INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME equ 0x57
 INT21H_FUNC_60H_GET_FULL_FILENAME equ 0x60
 
-WCFD32_OS_DOS equ 1
-WCFD32_OS_WIN32 equ 2  ; !! Use it.
+WCFD32_OS_DOS equ 0
+WCFD32_OS_OS2 equ 1
+WCFD32_OS_WIN32 equ 2
+WCFD32_OS_WIN16 equ 3
+WCFD32_OS_UNKNOWN equ 4  ; Anything above 3 is unknown.
 
 NULL equ 0
 
@@ -131,18 +134,18 @@ _start:  ; Program entry point.
 		jmp .exit ; exit(load_error_code).
 .load_ok:	; Now we call the entry point.
 		;
-		; Input: AH: operating system (WCFD32_OS_DOS or WCFD32_OS_WIN32).
-		; Input: BX: segment of the call_far_dos_int21h syscall.
-		; Input: EDX: offset of the call_far_dos_int21h syscall.
+		; Input: AH: operating system (WCFD32_OS_OS2 or WCFD32_OS_WIN32).
+		; Input: BX: segment of the wcfd32_far_syscall syscall.
+		; Input: EDX: offset of the wcfd32_far_syscall syscall.
 		; Input: ECX: must be 0 (unknown parameter).
 		; Input: EDI: wcfd32_param_struct
 		; Input: dword [wcfd32_param_struct]: program filename (ASCIIZ)
 		; Input: dword [wcfd32_param_struct+4]: command-line (ASCIIZ)
 		; Input: dword [wcfd32_param_struct+8]: environment variables (each ASCIIZ, terminated by a final NUL)
-		; Input: dword [wcfd32_param_struct+0xc]: 0 (unknown parameter)
-		; Input: dword [wcfd32_param_struct+0x10]: 0 (unknown parameter)
-		; Input: dword [wcfd32_param_struct+0x14]: 0 (unknown parameter)
-		; Input: dword [wcfd32_param_struct+0x18]: 0 (unknown parameter)
+		; Input: dword [wcfd32_param_struct+0xc]: 0 (wcfd32_break_flag_ptr)
+		; Input: dword [wcfd32_param_struct+0x10]: 0 (wcfd32_copyright)
+		; Input: dword [wcfd32_param_struct+0x14]: 0 (wcfd32_is_japanese)
+		; Input: dword [wcfd32_param_struct+0x18]: 0 (wcfd32_max_handle_for_os2)
 		; Call: far call.
 		; Output: EAX: exit code (0 for EXIT_SUCCESS).
 		mov [wcfd32_program_filename], edi
@@ -151,7 +154,7 @@ _start:  ; Program entry point.
 		xor ebx, ebx  ; Not needed by the ABI, just make it deterministic.
 		xor esi, esi  ; Not needed by the ABI, just make it deterministic.
 		xor ebp, ebp  ; Not needed by the ABI, just make it deterministic.
-		sub ecx, ecx  ; This is an unknown parameter, which we always set to 0.
+		sub ecx, ecx  ; Stack limit, which we always set to 0.
 		mov edx, wcfd32_far_syscall
 		mov edi, wcfd32_param_struct
 		mov bx, cs  ; Segment of wcfd32_far_syscall for the far call.
@@ -922,9 +925,9 @@ wcfd32_param_struct:  ; Contains 7 dd fields, see below.
   wcfd32_program_filename resd 1  ; dd empty_str  ; ""
   wcfd32_command_line resd 1  ; dd empty_str  ; ""
   wcfd32_env_strings resd 1  ; dd empty_env
-  wcfd32_unknown_param3 resd 1
-  wcfd32_unknown_param4 resd 1
-  wcfd32_unknown_param5 resd 1
-  wcfd32_unknown_param6 resd 1
+  wcfd32_break_flag_ptr resd 1  ; !! Set.
+  wcfd32_copyright resd 1
+  wcfd32_is_japanese resd 1
+  wcfd32_max_handle_for_os2 resd 1
 
 program_end:

@@ -33,6 +33,8 @@
 ; !! wlib105.exe and wlib106.exe fail with `Wlib abort.' on mwperun.exe.
 ;    The corresponding *x*.exe do work with w32run.exe. Debug and fix.
 ;    Maybe some resoure file bug? Maybe some offsets there?
+; !! Remove trailing NUL bytes.
+; !! memset(0) .bss after load on DOS. _cstart_ does it between _edata and _end.
 ;
 ; TODO(pts): Use a single section, create the PE with NASM (and 208
 ; relocations).
@@ -99,8 +101,11 @@ NULL equ 0
 LANG_ENGLISH  equ 0x0
 LANG_JAPANESE equ 0x1
 
-WCFD32_OS_DOS equ 1
+WCFD32_OS_DOS equ 0
+WCFD32_OS_OS2 equ 1
 WCFD32_OS_WIN32 equ 2
+WCFD32_OS_WIN16 equ 3
+WCFD32_OS_UNKNOWN equ 4  ; Anything above 3 is unknown.
 
 STD_INPUT_HANDLE  equ -10
 STD_OUTPUT_HANDLE equ -11
@@ -842,10 +847,10 @@ loc_4108FB:
 		; Input: dword [wcfd32_param_struct]: program filename (ASCIIZ)
 		; Input: dword [wcfd32_param_struct+4]: command-line (ASCIIZ)
 		; Input: dword [wcfd32_param_struct+8]: environment variables (each ASCIIZ, terminated by a final NUL)
-		; Input: dword [wcfd32_param_struct+0xc]: 0 (unknown parameter)
-		; Input: dword [wcfd32_param_struct+0x10]: 0 (unknown parameter)
-		; Input: dword [wcfd32_param_struct+0x14]: 0 (unknown parameter)
-		; Input: dword [wcfd32_param_struct+0x18]: 0 (unknown parameter)
+		; Input: dword [wcfd32_param_struct+0xc]: 0 (wcfd32_break_flag_ptr)
+		; Input: dword [wcfd32_param_struct+0x10]: 0 (wcfd32_copyright)
+		; Input: dword [wcfd32_param_struct+0x14]: 0 (wcfd32_is_japanese)
+		; Input: dword [wcfd32_param_struct+0x18]: 0 (wcfd32_max_handle_for_os2)
 		; Call: far call.
 		; Output: EAX: exit code (0 for EXIT_SUCCESS).
 		xor ebx, ebx  ; Not needed by the ABI, just make it deterministic.
@@ -2157,10 +2162,10 @@ wcfd32_param_struct:  ; Contains 7 dd fields, see below.
   wcfd32_program_filename dd empty_str  ; ""
   wcfd32_command_line dd empty_str  ; ""
   wcfd32_env_strings dd empty_env
-  wcfd32_unknown_param3 dd 0
-  wcfd32_unknown_param4 dd 0
-  wcfd32_unknown_param5 dd 0
-  wcfd32_unknown_param6 dd 0
+  wcfd32_break_flag_ptr dd 0  ; !! Set.
+  wcfd32_copyright dd 0
+  wcfd32_is_japanese dd 0
+  wcfd32_max_handle_for_os2 dd 0
 
 section .bss
 

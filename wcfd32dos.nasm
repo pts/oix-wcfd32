@@ -11,9 +11,9 @@
 ; !! Implement it properly.
 ; !! TODO(pts): How do I get an exception dump in dosbox --cmd? pmodew.exe seems to
 ;    write it to video memory.
-; !! Do we need to pass a space in front of command-line arguments?
 ; !! TODO(pts): Implement Ctrl-<C> and Ctrl-<Break>.
 ; !! TODO(pts): Set up some exception handlers such as division by zero.
+; !! memset(0) .bss after load on DOS.
 ;
 
 bits 32
@@ -59,8 +59,11 @@ INT21H_FUNC_56H_RENAME_FILE     equ 0x56
 INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME equ 0x57
 INT21H_FUNC_60H_GET_FULL_FILENAME equ 0x60
 
-WCFD32_OS_DOS equ 1
+WCFD32_OS_DOS equ 0
+WCFD32_OS_OS2 equ 1
 WCFD32_OS_WIN32 equ 2
+WCFD32_OS_WIN16 equ 3
+WCFD32_OS_UNKNOWN equ 4  ; Anything above 3 is unknown.
 
 NULL equ 0
 
@@ -126,10 +129,10 @@ _start:
 		; Input: dword [wcfd32_param_struct]: program filename (ASCIIZ)
 		; Input: dword [wcfd32_param_struct+4]: command-line (ASCIIZ)
 		; Input: dword [wcfd32_param_struct+8]: environment variables (each ASCIIZ, terminated by a final NUL)
-		; Input: dword [wcfd32_param_struct+0xc]: 0 (unknown parameter)
-		; Input: dword [wcfd32_param_struct+0x10]: 0 (unknown parameter)
-		; Input: dword [wcfd32_param_struct+0x14]: 0 (unknown parameter)
-		; Input: dword [wcfd32_param_struct+0x18]: 0 (unknown parameter)
+		; Input: dword [wcfd32_param_struct+0xc]: 0 (wcfd32_break_flag_ptr)
+		; Input: dword [wcfd32_param_struct+0x10]: 0 (wcfd32_copyright)
+		; Input: dword [wcfd32_param_struct+0x14]: 0 (wcfd32_is_japanese)
+		; Input: dword [wcfd32_param_struct+0x18]: 0 (wcfd32_max_handle_for_os2)
 		; Call: far call.
 		; Output: EAX: exit code (0 for EXIT_SUCCESS).
 		mov [wcfd32_program_filename], edi
@@ -143,7 +146,7 @@ _start:
 		mov edi, wcfd32_param_struct
 		mov bx, cs  ; Segment of wcfd32_far_syscall for the far call.
 		xchg eax, esi  ; ESI := (entry point address); EAX := junk.
-		mov ah, WCFD32_OS_DOS
+		mov ah, WCFD32_OS_DOS  ; !! Why? Which of DOS or OS2?
 		push cs  ; For the `retf' of the far call.
 		call esi
 .exit:		mov ah, 4ch  ; Exit with exit code in AL.
@@ -377,7 +380,7 @@ wcfd32_param_struct:  ; Contains 7 dd fields, see below.
   wcfd32_program_filename resd 1  ; dd empty_str  ; ""
   wcfd32_command_line resd 1  ; dd empty_str  ; ""
   wcfd32_env_strings resd 1  ; dd empty_env
-  wcfd32_unknown_param3 resd 1
-  wcfd32_unknown_param4 resd 1
-  wcfd32_unknown_param5 resd 1
-  wcfd32_unknown_param6 resd 1
+  wcfd32_break_flag_ptr resd 1  ; !! Set.
+  wcfd32_copyright resd 1
+  wcfd32_is_japanese resd 1
+  wcfd32_max_handle_for_os2 resd 1
