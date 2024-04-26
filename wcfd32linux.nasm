@@ -177,7 +177,7 @@ _start:  ; Program entry point.
 		sub ecx, ecx  ; Stack limit, which we always set to 0.
 		mov edx, wcfd32_far_syscall
 		mov bx, cs  ; Segment of wcfd32_far_syscall for the far call.
-		xchg eax, esi  ; ESI := (entry point address); EAX := junk.
+		xchg esi, eax  ; ESI := (entry point address); EAX := junk.
 		mov ah, WCFD32_OS_WIN32
 		push cs  ; For the `retf' of the far call.
 		call esi
