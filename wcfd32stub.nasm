@@ -1,7 +1,9 @@
 ; by pts@fazekas.hu at Mon Apr 22 17:44:31 CEST 2024
 
 %ifdef LINUXPROG
-; Usage: wcfd32stub <input.cf.exe> <output> [<indicate-elf-output>]
+; Usage for .exe output: wcfd32stub <input.cf.exe> <output.exe>
+; Usage for ELF executable output: wcfd32stub <input.cf.exe> <output>
+; !! Remove the ELF output file and chmod +x it.
 org 0x8048000  ; Typical Linux i386 executable program.
 bits 32
 cpu 386
@@ -15,6 +17,7 @@ file_header:	db 0x7F,'ELF',1,1,1,OSABI_Linux,0,0,0,0,0,0,0,0,2,0,3,0
 program_header:	dd 1, 0, file_header, file_header
 		dd prebss-file_header, program_end-bss+prebss-file_header, RWX, 0x1000
 
+; All specific to Linux i386.
 SYS_exit equ 1
 SYS_read equ 3
 SYS_write equ 4
@@ -28,8 +31,8 @@ SEEK_SET equ 0
 O_RDONLY equ 0
 O_WRONLY equ 1
 O_RDWR   equ 2
-O_CREAT  equ 100q
-O_TRUNC  equ 1000q
+O_CREAT  equ 100q   ; Linux-specific (not the same on FreeBSD).
+O_TRUNC  equ 1000q  ; Linux-specific (not the same on FreeBSD).
 
 _start:		pop eax  ; Skip argc.
 		pop eax  ; Skip argv[0].
@@ -293,9 +296,15 @@ incbin 'wcfd32dosp.exe', 0x4f, 0x1f03-0x4f  ; wcfd32dos.exe and wcfd32dosp.exe a
 		db 0x38
 incbin 'wcfd32dosp.exe', 0x1f03+1  ; We use wcfd32dosp.exe here, because wcfd32dos.exe doesn't have the alignment of the PE header to 4.
 pe_header:
-incbin 'wcfd32win32.exe', pe_header-mz_header, 8  ; !! Change section name to .text.
+; TODO(pts): Build the PE manually (with relocations!). Merge .idata and .reloc to .data. Exclude trailing NUL bytes from .data. Overlap .text and .data.
+incbin 'wcfd32win32.exe', pe_header-mz_header, 8
 TimeDateStamp:	dd 0  ; Make the build reproducible by specifying a constant timestamp.
-incbin 'wcfd32win32.exe', pe_header-mz_header+0xc
+incbin 'wcfd32win32.exe', pe_header-mz_header+0xc, 0xf8-0xc
+db '.text', 0, 0, 0  ; Overwrite 'AUTO' PE section name.
+incbin 'wcfd32win32.exe', pe_header-mz_header+0xf8+8, 0x50-8
+db '.data', 0, 0, 0  ; Overwrite 'DGROUP' PE section name.
+incbin 'wcfd32win32.exe', pe_header-mz_header+0xf8+0x50+8
+
 stub_end:
 
 %ifdef LINUXPROG
