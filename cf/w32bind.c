@@ -36,13 +36,57 @@
 #include <io.h>
 #include <fcntl.h>
 #include <stdarg.h>
-#include <dos.h>
-#include "watcom.h"
+//#include <dos.h>
+//#include "watcom.h"
 //#include "tinyio.h"
 
 typedef unsigned short  WORD;
 typedef unsigned long   DWORD;
-#include "loader.h"
+
+//#include "loader.h"
+#pragma pack(1)
+
+typedef struct {
+    DWORD off;
+    WORD seg;
+} addr_48;
+
+typedef struct rex_hdr {
+    char    sig[2];
+    WORD    file_size1;
+    WORD    file_size2;
+    WORD    reloc_cnt;
+    WORD    file_header;
+    WORD    min_data;
+    WORD    max_data;
+    DWORD   initial_esp;
+    WORD    checksum;
+    DWORD   initial_eip;
+    WORD    first_reloc;
+    WORD    overlay_number;
+    WORD    one;
+} rex_exe;
+
+typedef struct dos_hdr {
+    WORD        sig;
+    WORD        len_of_load_mod;
+    WORD        x;
+    WORD        reloc_count;
+    WORD        size_of_DOS_header_in_paras;
+} dos_hdr;
+
+typedef struct w32_hdr {
+    DWORD       sig;
+    DWORD       start_of_W32_file;
+    DWORD       size_of_W32_file;
+    DWORD       offset_to_relocs;
+    DWORD       memory_size;
+    DWORD       initial_EIP;
+} w32_hdr;
+
+#pragma pack()
+
+//---
 
 #define FALSE   0
 #define TRUE    1
