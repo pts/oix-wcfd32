@@ -46,7 +46,7 @@ _start:		push bx  ; Segment of the wcfd32_far_syscall syscall.
 
 prebss:
 bss_align equ (text-$)&3
-section .bss  ; We could use `absolute $' here instead, but that's broken (breaks address calculation in program_end-bss+prebss-file_header) in NASM 0.95--0.97.
+section .bss align=1  ; We could use `absolute $' here instead, but that's broken (breaks address calculation in program_end-bss+prebss-file_header) in NASM 0.95--0.97.
 bss:		resb bss_align  ; Uninitialized data follows.
 
 program_end:

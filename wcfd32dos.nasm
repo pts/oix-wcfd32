@@ -393,10 +393,10 @@ emit_load_errors
 ;section .data
 
 
-;.data?  ; section .bss
+;.data?  ; section .bss align=1
 ;db (62 shl 10) dup (?)  ; DOS/32A: Making this 62 KiB will still keep it `BC', but 63 KiB won't.
 
-section .bss
+section .bss align=1
 
 malloc_base	resd 1  ; Address of the currently allocated block.
 malloc_capacity	resd 1  ; Total number of bytes in the currently allocated block.
