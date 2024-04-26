@@ -192,15 +192,13 @@ PrintMsg:
 		push edx
 		push esi
 		push edi
-		push ebp
 		sub esp, 80h	    ; printf output buffer: 80h bytes on stack.
-		lea edi, [esp+98h+8]  ;  dword  8 
+		lea edi, [esp-4+98h+8]
 		xor ecx, ecx	    ; r_ecx
-		mov ebp, 0Ah
 loc_410130:
-		mov eax, dword [esp+98h+4]
+		mov eax, dword [esp-4+98h+4]
 		lea edx, [eax+1]
-		mov dword [esp+98h+4], edx
+		mov dword [esp-4+98h+4], edx
 		mov al, [eax]
 		test al, al
 		jz end_of_fmt
@@ -208,9 +206,9 @@ loc_410130:
 		mov dl, al
 		cmp edx, '%'
 		jnz literal_char_in_fmt
-		mov eax, dword [esp+98h+4]
+		mov eax, dword [esp-4+98h+4]
 		lea ebx, [eax+1]
-		mov dword [esp+98h+4], ebx
+		mov dword [esp-4+98h+4], ebx
 		mov al, [eax]
 		and eax, 0FFh
 		lea edx, [edi+4]
@@ -232,7 +230,8 @@ loc_41018B:
 		mov edi, edx
 		mov eax, [edx-4]
 		mov edx, esp
-		mov ebx, ebp
+		push 10
+		pop ebx
 		add edx, ecx
 		call itoa
 loc_4101A0:
@@ -283,8 +282,6 @@ end_of_fmt:
 		rcl eax, 1
 		ror eax, 1
 		add esp, 80h
-pop_ebp_edi_esi_edx_ecx_ebx_ret:
-		pop ebp
 pop_edi_esi_edx_ecx_ebx_ret:
 		pop edi
 pop_esi_edx_ecx_ebx_ret:
@@ -779,11 +776,11 @@ loc_4109FC:
 loc_410A00:
 		push ebp	     ; hTemplateFile
 		mov ebp, dword [esp+14h+4]
-		push ebp	     ;  dword ptr	 4 
+		push ebp	     ;  dword ptr	 4
 		push ecx	     ; dwCreationDisposition
 		push 0		     ; lpSecurityAttributes
 		mov eax, dword [esp+20h-10h]
-		push eax	     ;  dword -10h 
+		push eax	     ;  dword -10h
 		push edx	     ; dwDesiredAccess
 		mov edx, [edi+0Ch]
 		push edx	     ; lpFileName
@@ -823,7 +820,7 @@ loc_410A5C:
 		or dl, 4
 loc_410A65:
 		mov ecx, 2	    ; dwCreationDisposition
-		push edx	     ;  dword ptr	 4 
+		push edx	     ;  dword ptr	 4
 		xor ebx, ebx
 		mov edx, esi	    ; dwDesiredAccess
 		call __open_file
@@ -895,7 +892,7 @@ func_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO:
 		mov ebx, [stdin_handle]
 		push ebx	     ; hConsoleHandle
 		call [__imp__GetConsoleMode]
-		push 0		     ;  dword -18h 
+		push 0		     ;  dword -18h
 		push ebx	     ; hConsoleHandle
 		call [__imp__SetConsoleMode]
 		push 0		     ; lpOverlapped
@@ -906,7 +903,7 @@ func_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO:
 		push ebx	     ; hFile
 		call [__imp__ReadFile]
 		mov edx, dword [esp+18h-18h]
-		push edx	     ;  dword -18h 
+		push edx	     ;  dword -18h
 		push ebx	     ; hConsoleHandle
 		mov esi, eax
 		call [__imp__SetConsoleMode]
@@ -1690,7 +1687,9 @@ handle_unsupported_int21h_function:
 		push aUnsupportedInt  ; "Unsupported int 21h function AH=%h\r\n"
 		call PrintMsg
 		add esp, 8
-		jmp dos_error
+		push 2
+		pop eax
+		jmp dos_error_with_code
 
 populate_stdio_handles:
 		push ecx
@@ -1708,12 +1707,7 @@ populate_stdio_handles:
 		pop ecx
 		ret
 
-section .rodata
-
-a0123456789abcde db '0123456789abcdefghijklmnopqrstuvwxyz',0
-
-section .text
-
+; This supports only bases 1..10.
 utoa:
 		push ecx
 		push esi
@@ -1721,20 +1715,16 @@ utoa:
 		push ebp
 		sub esp, 28h
 		mov ebp, edx
-		mov edi, ebx
+		mov edi, ebx  ; Base.
 		mov esi, edx
 		xor dl, dl
 		lea ecx, [esp+38h-37h]
 		mov byte [esp+38h-38h], dl
 loc_411233:
-		lea ebx, [esp+38h-14h]
-		mov dword [esp+38h-14h], edi
 		xor edx, edx
-		div dword [ebx]
-		mov [ebx], eax
-		mov al, [a0123456789abcde+edx]
-		mov [ecx], al
-		mov eax, dword [esp+38h-14h]
+		div edi
+		add dl, '0'  ; If larger than '9', it should be 'a' or more.
+		mov [ecx], dl
 		inc ecx
 		test eax, eax
 		jnz loc_411233
@@ -1753,6 +1743,7 @@ loc_411253:
 		pop ecx
 		ret
 
+; This supports only bases 1..10.
 itoa:
 		push ecx
 		mov ecx, edx
