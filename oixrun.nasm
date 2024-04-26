@@ -19,7 +19,6 @@ relocations:	dw 0  ; End of relocations. It would be hard to generate them from 
 
 ; WCFD32 ABI constants.
 INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE equ 0x40
-INT21H_FUNC_4CH_EXIT_PROCESS equ 0x4C
 STDOUT_FILENO equ 1
 EXIT_SUCCESS equ 0
 
@@ -33,7 +32,12 @@ org $$-.vcont  ; Position independent code (PIC): from now all global variables 
 		mov [ebp+wcfd32_far_syscall_segment], bx
 		mov eax, [edi+4]  ; dword [wcfd32_param_struct+4]: command-line (ASCIIZ).
 		call parse_first_arg
-		xchg eax, [edi+4]
+		cmp eax, [edi+4]
+		jne .found_arg
+		push 1  ; Exit code.
+		lea eax, [ebp+msg_usage]
+		jmp .print_exit
+.found_arg:	xchg eax, [edi+4]
 		mov [edi], eax  ; dword [wcfd32_param_struct]: program filename (ASCIIZ).
 		; Now: EAX: filename of the WCFD32 executable program to load.
 		call load_wcfd32_program_image  ; Also modifies EDX.
@@ -43,7 +47,7 @@ org $$-.vcont  ; Position independent code (PIC): from now all global variables 
 		push eax
 		mov eax, [ebp+load_errors+4*eax]
 		add eax, ebp  ; For PIC.
-		call print_str  ; !! Report filename etc. on file open error.
+.print_exit:	call print_str  ; !! Report filename etc. on file open error.
 		pop eax
 		pop ebx  ; Ignore saved EAX.
 		pop edx  ; Ignore saved EDX.
@@ -249,6 +253,8 @@ parse_first_arg:
 %ifdef DEBUG
 msg:		db 'Hello, World!', 13, 10, 0
 %endif
+
+msg_usage:	db 'Usage: oixrun <oixprog> [<arg> ...]', 13, 10, 0
 
 emit_load_errors
 
