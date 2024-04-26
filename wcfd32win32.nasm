@@ -1,5 +1,5 @@
 ;
-; wcfd32win32.nasm: WCFD32 program runner for Win32
+; wcfd32win32.nasm: WCFD32 program runner stub for Win32
 ; by pts@fazekas.hu at Sat Apr 20 07:12:49 CEST 2024
 ;
 ; This is Win32 program which loads a WCFD32 program (from the same .exe
@@ -12,23 +12,6 @@
 ; sources (https://openwatcom.org/ftp/source/open_watcom_1.0.0-src.zip), and
 ; partially it has been reverse engineered from binw/wasm.exe in Watcom
 ; C/C++ 10.6.
-;
-; WCFD32 is an unofficial name for an ABI for i386 32-bit protected mode
-; programs. It was used by some tools in Watcom C/C++ compiler, and the
-; corresponding DOS extender was implemented in binw/w32run.exe. Watcom
-; versions:
-;
-; * binw/wasm.exe in 10.0a, 10.5, 10.6, 11.0b.
-; * binw/wlib.exe in 10.5, 10.6 and 11.0b. (In 10.0a, it was a 16-bit DOS
-;   program.)
-; * binw/wlink.exe never used WCFD32, it had its own DOS extender built in.
-;
-; In the name WCFD32:
-;
-; * W stands for Watcom.
-; * CF stands for the signature of CF header describing the program image.
-; * D stands for DOS, because the syscall numbers are the same as in DOS.
-; * 32 stands for 32-bit protected mode on i386.
 ;
 ; !! Remove trailing NUL bytes.
 ; !! Source: bld/w32loadr (OSI)
