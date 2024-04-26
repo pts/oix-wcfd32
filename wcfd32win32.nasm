@@ -14,7 +14,6 @@
 ; C/C++ 10.6.
 ;
 ; !! Remove trailing NUL bytes.
-; !! Source: bld/w32loadr (OSI)
 ;
 ; TODO(pts): Use a single section, create the PE with NASM (and 208
 ; relocations).
@@ -603,66 +602,6 @@ loc_4107BE:
 		pop ebx
 		ret 4
 
-%if 0  ; Unused. !!
-; void __usercall change_binnt_to_binw_in_full_pathname(char *filename@<eax>)
-change_binnt_to_binw_in_full_pathname:
-		push ebx
-		push edx
-next_pathname_component:
-		cmp byte [eax], 0
-		jz after_backslash
-		xor edx, edx
-		mov dl, [eax]
-		cmp edx, '\'
-		jz after_backslash
-		inc eax
-		jmp next_pathname_component
-after_backslash:
-		cmp byte [eax], 0
-		jz pop_edx_ebx_ret
-		inc eax
-		mov dl, [eax]
-		or dl, 20h
-		and edx, 0FFh
-		cmp edx, 'b'
-		jnz next_pathname_component
-		mov dl, [eax+1]
-		or dl, 20h
-		and edx, 0FFh
-		cmp edx, 'i'
-		jnz next_pathname_component
-		mov dl, [eax+2]
-		or dl, 20h
-		and edx, 0FFh
-		cmp edx, 'n'
-		jnz next_pathname_component
-		mov dl, [eax+3]
-		or dl, 20h
-		and edx, 0FFh
-		cmp edx, 'n'
-		jnz next_pathname_component
-		mov dl, [eax+4]
-		or dl, 20h
-		and edx, 0FFh
-		cmp edx, 't'
-		jnz next_pathname_component
-		xor edx, edx
-		mov dl, [eax+5]
-		cmp edx, '\'
-		jnz next_pathname_component
-		mov bl, [eax+3]
-		add eax, 4
-		add bl, 9	    ; Change "binnt\\" to "binw\\" . In this step, change 'n' to 'w'.
-		mov [eax-1], bl	    ; Change 'n' to 'w' in place.
-copy_next_byte:
-		mov dl, [eax+1]
-		mov [eax], dl
-		test dl, dl
-		jz pop_edx_ebx_ret
-		inc eax
-		jmp copy_next_byte
-%endif
-
 ; void __usercall add_seh_frame(void *frame@<eax>)
 add_seh_frame:
 		push ebx
@@ -679,17 +618,6 @@ pop_edx_ebx_ret:
 		pop edx
 		pop ebx
 		ret
-
-%if 0  ; Unused.
-; void __usercall set_seh_frame_ref(void **frame_ref)
-set_seh_frame_ref:
-		push edx
-		mov eax, [eax]
-		xor edx, edx
-		mov [fs:edx], eax   ; Set SEH frame (thread-local).
-		pop edx
-		ret
-%endif
 
 ; Attributes: noreturn
 global _start
@@ -1986,7 +1914,7 @@ wcfd32_param_struct:  ; Contains 7 dd fields, see below.
   wcfd32_program_filename dd empty_str  ; ""
   wcfd32_command_line dd empty_str  ; ""
   wcfd32_env_strings dd empty_env
-  wcfd32_break_flag_ptr dd 0  ; !! Set.
+  wcfd32_break_flag_ptr dd 0  ; !! TODO(pts): Set it on Ctrl-<Break>.
   wcfd32_copyright dd 0
   wcfd32_is_japanese dd 0
   wcfd32_max_handle_for_os2 dd 0
