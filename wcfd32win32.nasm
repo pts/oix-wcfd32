@@ -1769,78 +1769,22 @@ loc_411279:
 		pop ecx
 		ret
 
-; !! Make it much shorter!
-strcmp:
-		push ebx
-		push ecx
-		mov ebx, eax
-		cmp eax, edx
-		jz loc_411304
-loc_411298:
-		mov eax, [ebx]
-		mov ecx, [edx]
-		cmp ecx, eax
-		jnz loc_411309
-		not ecx
-		add eax, 0FEFEFEFFh
-		and eax, ecx
-		and eax, 80808080h
-		jnz loc_411304
-		mov eax, [ebx+4]
-		mov ecx, [edx+4]
-		cmp ecx, eax
-		jnz loc_411309
-		not ecx
-		add eax, 0FEFEFEFFh
-		and eax, ecx
-		and eax, 80808080h
-		jnz loc_411304
-		mov eax, [ebx+8]
-		mov ecx, [edx+8]
-		cmp ecx, eax
-		jnz loc_411309
-		not ecx
-		add eax, 0FEFEFEFFh
-		and eax, ecx
-		and eax, 80808080h
-		jnz loc_411304
-		mov eax, [ebx+0Ch]
-		mov ecx, [edx+0Ch]
-		cmp ecx, eax
-		jnz loc_411309
-		add ebx, 10h
-		add edx, 10h
-		not ecx
-		add eax, 0FEFEFEFFh
-		and eax, ecx
-		and eax, 80808080h
-		jz loc_411298
-loc_411304:
-		sub eax, eax
-		pop ecx
-		pop ebx
-		ret
-loc_411309:
-		cmp al, cl
-		jnz loc_41132A
+strcmp:  ; int __watcall strcmp(const void *s1, const void *s2);
+		push esi
+		push edi
+		mov esi, eax  ; s1.
+		mov edi, edx  ; s2.
+.5:		lodsb
+		scasb
+		jne .6
 		cmp al, 0
-		jz loc_411304
-		cmp ah, ch
-		jnz loc_41132A
-		cmp ah, 0
-		jz loc_411304
-		shr eax, 10h
-		shr ecx, 10h
-		cmp al, cl
-		jnz loc_41132A
-		cmp al, 0
-		jz loc_411304
-		cmp ah, ch
-loc_41132A:
-		sbb eax, eax
+		jne .5
+		xor eax, eax
+		jmp short .7
+.6:		sbb eax, eax
 		or al, 1
-		pop ecx
-		pop ebx
+.7:		pop edi
+		pop esi
 		ret
 
 strncpy:  ; char* __watcall strncpy(char *dest, const char *src, size_t n);
