@@ -2,8 +2,10 @@
 eval 'PERL_BADLANG=x;export PERL_BADLANG;exec perl -x "$0" "$@";exit 1'
 #!perl  # Start marker used by perl -x.
 +0 if 0;eval("\n\n\n\n".<<'__END__');die$@if$@;__END__
-
+#
+# oix2nasm.pl: convert an OIX program to NASM source, keeping relocations
 # by pts@fazekas.hu at Thu Apr 25 04:11:23 CEST 2024
+#
 
 BEGIN { $^W = 1 }
 use integer;
