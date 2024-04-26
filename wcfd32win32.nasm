@@ -78,9 +78,6 @@ extern __imp__VirtualAlloc  ; LPVOID __stdcall VirtualAlloc(LPVOID lpAddress, SI
 
 NULL equ 0
 
-LANG_ENGLISH  equ 0x0
-LANG_JAPANESE equ 0x1
-
 WCFD32_OS_DOS equ 0
 WCFD32_OS_OS2 equ 1
 WCFD32_OS_WIN32 equ 2
@@ -188,28 +185,6 @@ loc_4100E4:
 loc_4100E8:
 		xor eax, eax
 		jmp pop_edi_esi_edx_ecx_ebx_ret
-
-; const char *__usercall PickMsg@<eax>(int error_code@<eax>)
-PickMsg:
-		push ebx
-		push edx
-		mov ebx, eax
-		call WResLanguage
-		mov dl, al
-		mov eax, ebx
-		shl eax, 2
-		cmp dl, LANG_JAPANESE  ; !! TODO(pts): Remove all Japanese support.
-		jnz short loc_41010D
-		mov eax, [japanese_load_errors+eax]
-		pop edx
-		pop ebx
-		ret
-loc_41010D:
-		mov eax, [load_errors+eax]  ; English.
-loc_410113:
-		pop edx
-		pop ebx
-		ret
 
 ; int PrintMsg(const char *fmt, ...)
 PrintMsg:
@@ -353,6 +328,10 @@ loc_41049A:
 loc_4104A7:
 		mov edx, eax
 		jmp loc_410484
+loc_410113:
+	       pop edx
+	       pop ebx
+	       ret
 
 ; Attributes: noreturn
 ; void __usercall __noreturn dump_registers_to_file_and_abort(void *arg1@<eax>, void *arg2@<edx>)
@@ -624,33 +603,7 @@ loc_4107BE:
 		pop ebx
 		ret 4
 
-; int __cdecl detect_code_page()
-detect_code_page:  ; !! TODO(pts): Remove all Japanese support.
-		push ecx
-		push edx
-		sub esp, 14h
-		mov eax, esp
-		push eax	     ; lpCPInfo
-		push 1		     ; CodePage
-		call [__imp__GetCPInfo]
-		test eax, eax
-		jz loc_4107F2
-		cmp byte [esp+1Ch-16h], 0  ; cpinfo.LeadByte[0]
-		jnz loc_4107EB
-		cmp byte [esp+1Ch-15h], 0  ; cpinfo.LeadByte[1]
-		jz loc_4107F2
-loc_4107EB:
-		mov eax, 1	    ; Code page has nonzero LeadByte. It's probably Japanese.
-		jmp loc_4107F4
-loc_4107F2:
-		xor eax, eax
-loc_4107F4:
-		add esp, 14h
-		pop edx
-		pop ecx
-		ret
-
-%if 0  ; Unused.
+%if 0  ; Unused. !!
 ; void __usercall change_binnt_to_binw_in_full_pathname(char *filename@<eax>)
 change_binnt_to_binw_in_full_pathname:
 		push ebx
@@ -745,9 +698,6 @@ global _mainCRTStartup
 _mainCRTStartup:
 ..start:
 		sub esp, 128h
-		call detect_code_page
-		mov [is_code_page_maybe_japanese], eax
-		mov dword [esp+13Ch-24h], eax
 		lea eax, [esp+13Ch-1Ch]  ;  frame
 		call add_seh_frame
 		call populate_stdio_handles
@@ -807,7 +757,7 @@ loc_4108FB:
 		push eax  ; Save exit code for exit_pushed.
 		push edx
 		push dword [wcfd32_program_filename]
-		call PickMsg  ; Sets EAX to the error string format.
+		mov eax, [load_errors+eax*4]  ; English.
 		push eax	     ; fmt
 		call PrintMsg
 		add esp, 0Ch  ; Clean up arguments of PrintMsg.
@@ -883,7 +833,6 @@ __open_file:
 		sub esp, 4
 		mov edi, eax
 		mov dword [esp+10h-10h], ebx
-		mov eax, [dword_420294]
 		xor esi, esi
 		xor ebx, ebx
 		shl eax, 2
@@ -893,8 +842,8 @@ loc_4109E0:
 		jz loc_410A00
 		add ebx, 4
 		inc esi
-		cmp ebx, eax
-		jnz loc_4109E0
+		cmp ebx, other_stdio_handles.end-other_stdio_handles
+		jne loc_4109E0
 		mov dword [force_last_error], ERROR_TOO_MANY_OPEN_FILES
 loc_4109FC:
 		xor eax, eax
@@ -1831,48 +1780,6 @@ populate_stdio_handles:
 		pop ecx
 		ret
 
-; language_t __usercall WResLanguage@<al.4>()
-WResLanguage:
-		push ebx
-		push edx	     ;  dword  4 
-		mov eax, envvar_name_wlang  ; "WLANG"
-		call getenv
-		mov ebx, eax
-		test eax, eax
-		jnz loc_4111C2
-		cmp dword [is_code_page_maybe_japanese], 0
-		jz loc_4111F3
-loc_4111BD:
-		mov al, LANG_JAPANESE
-		pop edx
-		pop ebx
-		ret
-loc_4111C2:
-		mov edx, aEnglish  ; "english"
-		call stricmp
-		test eax, eax
-		jz loc_4111F3
-		mov edx, aJapanese  ; "japanese"
-		mov eax, ebx	    ; s1
-		call stricmp
-		test eax, eax
-		jz loc_4111BD
-		xor eax, eax
-		mov al, [ebx]
-		cmp eax, '0'
-		jl loc_4111F3
-		cmp eax, '9'
-		jg loc_4111F3
-		sub al, '0'
-		pop edx
-		pop ebx
-		ret
-loc_4111F3:
-		xor al, al
-		pop edx
-		pop ebx
-		ret
-
 section .rodata
 
 a0123456789abcde db '0123456789abcdefghijklmnopqrstuvwxyz',0
@@ -2038,51 +1945,8 @@ loc_411351:
 		pop ecx
 		ret
 
-; int __usercall __spoils<edx> stricmp@<eax>(const char *s1@<eax>, const char *s2@<edx>)
-stricmp:
-		push ebx
-loc_4113B1:
-		mov bl, [eax]
-		mov bh, [edx]
-		cmp bl, 'A'
-		jb loc_4113C2
-		cmp bl, 'Z'
-		ja loc_4113C2
-		add bl, 20h  ; ' '
-loc_4113C2:
-		cmp bh, 'A'
-		jb loc_4113CF
-		cmp bh, 'Z'
-		ja loc_4113CF
-		add bh, 20h
-loc_4113CF:
-		cmp bl, bh
-		jnz loc_4113DB
-		test bh, bh
-		jz loc_4113DB
-		inc eax
-		inc edx
-		jmp loc_4113B1
-loc_4113DB:
-		xor edx, edx
-		xor eax, eax
-		mov dl, bl
-		mov al, bh
-		sub edx, eax
-		mov eax, edx
-		pop ebx
-		ret
-
 section .rodata
 
-aJapaneseCanTOpenSRcD db 83h,'I',81h,'[',83h,'v',83h,93h,82h,'ł',0ABh,82h,'܂',0B9h,82h,0F1h,20h,27h,25h
-		db 's',27h,'; rc=%d',0Dh,0Ah,0
-aJapaneseaInvalidExe db 95h,'s',90h,0B3h,82h,0C8h,20h,'EXE',0Dh,0Ah,0
-aJapaneseLoaderReadError db 83h,8Dh,81h,'[',83h,'_',81h,'[',93h,'ǂݍ',9Eh,82h,'݃G',83h,89h,81h,'['
-		db 0Dh,0Ah,0
-aJapaneseMemoryAllocation db 83h, 81h, 83h, 82h, 83h, 8Ah, 8Ah, 84h, 82h, 0E8h
-		db 95h, 74h, 82h, 0AFh, 82h, 0AAh, 8Eh, 0B8h, 94h
-		db 's',82h,0B5h,82h,'܂',0B5h,82h,0BDh,0Dh,0Ah,0
 ; char fmt[]
 fmt		db 'Environment Variables:',0Dh,0Ah,0
 ; char aS[]
@@ -2120,25 +1984,11 @@ aCon		db 'con',0
 aUnsupportedInt db 'Unsupported int 21h function AH=%h',0Dh,0Ah  ; Continues in empty_env.
 empty_env	db 0  ; Continues in empty_str.
 empty_str	db 0
-; char envvar_name_wlang[]
-envvar_name_wlang db 'WLANG',0
-; char aEnglish[]
-aEnglish	db 'english',0
-; char aJapanese[]
-aJapanese	db 'japanese',0
 
 emit_load_errors
-japanese_load_errors:  ; !! TODO(pts): Remove all Japanese support.
-		dd empty_str  ; ""
-		dd aJapaneseCanTOpenSRcD
-		dd aJapaneseaInvalidExe
-		dd aJapaneseLoaderReadError
-		dd aJapaneseMemoryAllocation
-dword_420294	dd 14h
 
 section .data
 
-is_code_page_maybe_japanese dd 0
 ; unsigned int MsgFileHandle
 MsgFileHandle dd FILENO_STDOUT
 wcfd32_param_struct:  ; Contains 7 dd fields, see below.
@@ -2159,6 +2009,7 @@ stdin_handle	resd 1
 stdout_handle	resd 1
 stderr_handle	resd 1
 other_stdio_handles resd 61  ; 64 in total.
+.end:
 dta_addr	resd 1
 force_last_error resd 1
 malloc_base	resd 1  ; Address of the currently allocated block.
