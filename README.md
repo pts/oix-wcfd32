@@ -1,53 +1,125 @@
-# wcfd32-port: a port of old Watcom WASM and WLIB to Linux, Win32 and 32-bit DOS
+# oix-wcfd32: revival of OIX, the Watcom i386 operating-system-independent target
 
-wcfd32-port is a port of old Watcom development tools WASM (Watcom
-Assembler) and WLIB (Watcom Library Manager) to Linux, Win32 and 32-bit DOS.
-For each tool, an .exe is provided which works on Win32 and 32-bit DOS, and
-a Linux i386 executable program is also provided. For copyright reasons, the
-programs are not distributed, but a converter is provided which converts
-*binw/wasm.exe* and *binw/wlib.exe* to those ported exectables. The converter
-runs on Linux i386.
+oix-wcfd32 contains development tools, loaders, converters and
+documentation for OIX, the Watcom i386 operating-system-independent target.
+One goal is porting, i.e. to make it possible to run some old Watcom
+programs (WASM and WLINK) using this target on more systems such as Linux
+i386 and FreeBSD i386, as well as making it more convenient to run them on
+32-bit DOS and Win32. Another goal is helping to write new C and assembly
+programs for this target by providing development tools and documentation.
 
-This port is made possible by the the OS-independent
-(operating-system-independent) target (OSI, `#if defined(__OSI__)') of the
-Watcom C/C++ compiler, still supported by OpenWatcom 1.0. The official
-binary releases of binw/wasm.exe and binw/wasm.exe in Watcom C/C++ 10.x and
-11.x contain a stub and and a program image. wcfd32-port provides stubs each
-3 supported operating system, and it provies a converter (*wcfd32stub*)
-which runs Linux i386, can extract the program image from the .exe files,
-and generate the two programs (one .exe for Win32 and 32-bit DOS, and a
-Linux i386 executable program) by combining the wcfd32-port stubs with the
-Watcom images.
+WCFD32 is additional, free and open source software (with development
+starting in 2024-04) for OIX. It's independent work not affiliated with Watcom
+or its successors. It is based on free software only (mostly OpenWatcom 1.0
+and PMODE/W 1.33). It uses the OIX design invented by Watcom in 1994. The
+undocumented parts (most of it) have been reverse engineered.
 
-WCFD32 is the unofficial name used in wcfd32-port for the OS-independent
-target of the Watcom C/C++ compiler. It is an ABI for i386 32-bit protected
-mode programs. It was used by some tools in Watcom C/C++ compiler (WASM and
-WLIB), and the corresponding DOS extender was implemented in
-binw/w32run.exe. Watcom versions using WCFD32:
+To see source code of simple programs written for OSI, look at
+*cf/example.c* and *example.nasm* in this Git repository. The compilation
+scripts (running on Linux i386) are also provided.
 
-* binw/wasm.exe in 10.0a, 10.5, 10.6, 11.0b, 11.c.
-* binw/wlib.exe in 10.5, 10.6 and 11.0b, 11.c. (In 10.0a, it was a 16-bit
-  DOS program.)
-* binw/wlink.exe never used WCFD32, it had its own DOS extender built in.
+Original OIX does, but WFCD32 doesn't support 32-bit OS/2 2.x and 32-bit
+Windows 3.x as operating systems on which OIX programs can be run. WFCD32
+adds new operating systems: Linux i386 (partial but works) and FreeBSD i386
+(not started yet).
+
+The license of WCFD32 is GNU GPL v2. All the source code is provided as part
+of the Git repository, and it is derived from free software (mostly
+OpenWatcom 1.0).
+
+Limitations of OIX (as introduced by Watcom in 1994):
+
+* Only text-mode, noninteractive console programs are supported. (No GUI
+  support, no cursor positioning or color support, no text line editing
+  support.)
+* Only the 32-bit protected mode Intel i386 architecture is supported. Thus
+  Intel CPUs earlier than the 80386 (e.g. 8086) are not supported, and the
+  64-bit (long) mode of newer Intel x86 CPUs is also not supported. Other
+  architectures such as ARM or RISC-V aren't supported either.
+* All code and data (.text, .rodata, .data, .bss and .stack sections) is
+  read-write-execute.
+* It's not possible to return unused memory to the operating system.
+* Watcom hasn't released any official documentation.
+* Watcom hasn't made available development tools (such as assemblers, C
+  compilers) neither as proprietary nor free software, so it wasn't easy for
+  anyone outside Watcom to write programs for it. (This project is an
+  attempt to change this, and provide at least some tools.)
 
 In the name WCFD32:
 
 * W stands for Watcom.
-* CF stands for the signature of CF header describing the program image.
+* CF stands for the signature in the CF header describing the program image.
 * D stands for DOS, because the syscall numbers are the same as in DOS.
 * 32 stands for 32-bit protected mode on i386.
 
-## Archeology of the Watcom OS-independent target
+Some specific goals of WCFD32 (not all of them has been achieved):
 
-Building executables for the OS-independent target is mostly undocumented in
-Watcom C/C++ and OpenWatcom. Thus there is no easy or documented way to
-rebuild the Watcom tools *binw/wasm.exe* or *binw/wlib.exe* using the
-OS-independent target.
+* Make it possible to run the precompiled old Watcom tools WASM and WLIB
+  (none of them free or open source) on more operating systems such as Linux
+  i386 or FreeBSD i386, without virtualization (such as DOSBox or QEMU) or
+  heavy and slow-to-start dependencies (such as Wine).
+* Make it easier to run the precompiled old Watcom tools on 32-bit DOS and
+  Win32.
+* Make it possible to write new OIX programs in NASM and WASM assembly language.
+* Make it possible and easy to write new OIX programs in C, compiled with
+  modern OpenWatcom v2.
+* Make it possible write new OIX programs in C using GCC and Clang.
+* Make it possible to port existing programs written in C (i.e. with C
+  source available) to OIX.
 
-The source files for building the stubs are in the `bld/w32loadr` directory
-of
+## History of the Watcom i386 operating-system-independent target
+
+The Watcom i386 operating-system-independent target (abbreviated as
+`__OSI__` by Watcom coming from `#if defined(__OSI__)`,
+also abbreviated here as OIX) is an executable file format
+and ABI for 32-bit i386 console programs introduced by Watcom in Watcom
+C/C++ 10.0 (in 1994). By writing a C or assembly program once and compiling
+it for this target, it is possible to run the same binary program on 32-bit
+DOS, 32-bit Windows 3.x
+([Win386](https://www.os2museum.com/wp/watcom-win386/), also invented by
+Watcom), 32-bit OS/2 2.x, and Win32 (Windows NT and later, Windows 95 and
+later). Some of these are supported natively, some are supported with helper
+.exe programs (such as *w32run.exe*) put next to the
+.exe program file.
+
+These are the programs officially released by Watcom (as part of Watcom
+C/C++ 10.x and 11.x) which use OIX:
+
+* WASM (Watcom Assembler) *binw/wasm.exe* in 10.0a, 10.5, 10.6, 11.0b, 11.c.
+* WLIB (Watcom Library Manager) *binw/wlib.exe* in 10.5, 10.6 and 11.0b,
+  11.c. (In 10.0a, it was a 16-bit DOS program.)
+* WLINK (Watcom Linker) *binw/wlink.exe* has never used OIX, it had its own
+  DOS extender built in. Likewise, the Watcom C and C++ had their own DOS
+  extender unrelated to OIX.
+
+Since these old Watcom programs are not free software, they are not
+distributed with WCFD32. If you want to run them, you need to purchase a copy.
+
+Watcom hasn't released development tools (such as as assemblers and C
+compilers) for writing programs targeting OIX. By looking at the disassembly
+of the programs they released, it looks like they were using the Watcom
+C/C++ compiler and WASM (Watcom Assembler) to create those programs, and
+also some unreleased custom tools and config files. Some files have been
+released as part of OpenWatcom, e.g. the source files for building the
+loaders are in the *bld/w32loadr* directory of
 [https://openwatcom.org/ftp/source/open_watcom_1.0.0-src.zip](open_watcom_1.0.0-src.zip).
-However, some key components are missing:
+Also the same source archive contains some C source files with `#if
+defined(__OSI__)` indicating that those sources have been compiled for OIX.
+The archive also contains *bld/clib/startup/a/cstrtosi.asm*, which is the
+entry point (containing the *_cstart_*) function for C programs compiled
+with the Watcom C compiler targeting OIX.
+
+However, the compilation scripts and the documentation are not provided, and
+it looks like many of the files are missing.
+
+The source code for the loaders (the native program which loads and executes
+the OIX program) has been released in the *bld/w32loadr* directory above,
+but the source of the DOS extender (needed for building *w32run.exe*) is
+missing, and it's not possible to reproduce working binaries with modern
+OpenWatcom v2.
+
+Required components (but unreleased by Watcom) for building and running new
+software targeting OIX.
 
 * The C runtime library (libc): There are no
   functions like *write(...)*, *printf(...)* or *strlen(...)*. It would be
@@ -56,7 +128,7 @@ However, some key components are missing:
   *binw/wlib.exe*, but they haven't made it available for others.
 
   We can work this around for small programs by copying a few source files
-  from OpenWatcom.h: *bld/clib/startup/a/cstrtosi.asm*,
+  from OpenWatcom: *bld/clib/startup/a/cstrtosi.asm*,
   *bld/watcom/h/watcom.h* and bld/watcom/h/tinyio.h*.
 
   *tinyio.h* contains a very small libc, whose functions were used by the
@@ -95,6 +167,53 @@ However, some key components are missing:
   I managed to figure it out by looking at the files in *bld/w32loadr* in
   OpenWatcom 1.0.
 
+## Porting tools in WCFD32
+
+WCFD32 provides the runner program *oixrun*, which can find the OIX program
+headers in a program file, load the OIX program image and execute it.
+*oixrun* is implemented for Linux i386 (it runs with both 32-bit and 64-bit
+Linux kernels), 32-bit DOS and Win32 (it runs on both 32-bit and 64-bit
+Windows). It will be implemented for FreeBSD i386.
+
+WCFD32 provides the converter program *wcfd32stub* (currently it runs only
+on Linux i386) which can extract the OIX program headers and image from a
+program file (typically an .exe, such as
+*binw/wasm.exe*), and build new program files by adding a different loader.
+
+WCFD32 provides the following loaders (and *wcfd32stub* can add them):
+
+* The MZ-flavored loader is an .exe program which works on both 32-bit DOS
+  (including emulators such as DOSBox) and Win32 (buth 32-bit and 64-bit
+  Windows). It has very little memory overhead, and on DOS it can use all
+  available conventional and high memory (transparently). The program file is
+  self-contained: with the loader and OIX program combined to a single .exe
+  file, no other files are needed on the target system to run the program.
+  The memory overhead is very small, only about 64 KiB.
+
+* The ELF-flavored loader is a Linux i386 executable program (running on
+  32-bit and 64-bit Linux kernels). In the future the same program will run
+  on FreeBSD i386 as well. The program file is self-contained: with the
+  loader and OIX program combined to a single, statically linked ELF
+  executable file, no other files are needed on the target system to run the
+  program. *qemu-i386* can be used to run it on non-x86 Linux systems.
+
+## Building OIX programs from NASM assembly source
+
+You can use the *hello.nasm*, *example.nasm* and *oixrun.nasm* NASM assembly
+source files in the Git repository can be used as tutorials and reference
+implementations to write your own programs.
+
+Please note that NASM (just like other assemblers if a linker is not
+involved) is not able to generate relocation entries, so these programs are
+written as position-independent code (PIC). Currently this means that one
+register (EBP) is used to hold the program base address, and thus it cannot
+be used for other purposes at the same time.
+
+The *compile_wcfd32stub.sh* shell script builds these programs (both with
+the MZ-flavored loader and the ELF-flavored loader) automatically.
+
+## Proof of concept for building OIX programs from C source
+
 The build process is automated in the *cf/compile.sh* shell script in
 wcfd32-port. It uses modern OpenWatcom v2 tools and source files from
 OpenWatcom 1.0 (2003-01-24). Its outline:
@@ -118,14 +237,3 @@ OpenWatcom 1.0 (2003-01-24). Its outline:
 * Run *w32bind* to generate *example.exe* from *example.rex* (containing the
   WCFD32 program image in a different format) and *wcfd32dos.exe*
   (containing the DOS extender and the OSI implementation for 32-bit DOS).
-
-The generated *example.exe* can be run on DOS and 32-bit i386 Windows
-systems or DOS emulators such as DOSBox. It's self-contained, it doesn't
-need any other files to run. It doesn't need much memory: only about 64 KiB
-more than its file size. It can run in conventional memory (no need for high
-memory). But of course it needs a 386 or newer CPU.
-
-wcfd32-port can port not only the Watcom tools, but *example.exe* (and other
-OSI programs) as well: just run *wcfd32stub* on it to generate an .exe which
-works on both 32-bit DOS and Win32, and also the generate a Linux i386
-executable program.
