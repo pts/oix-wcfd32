@@ -48,8 +48,10 @@ nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o wcfd32linux.bin wcfd32linux.
 # Example WCFD32 hello-world program.
 nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o hellox.exe hello.nasm
 
+nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o oixrunx.exe oixrun.nasm
+
 #nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o wasm106.exe wasm106.nasm
-for f in hellox.exe wasmx100a.exe wasmx105.exe wasmx106.exe wasmx110b.exe wlibx105.exe wlibx106.exe wlibx110b.exe; do
+for f in hellox.exe oixrunx.exe wasmx100a.exe wasmx105.exe wasmx106.exe wasmx110b.exe wlibx105.exe wlibx106.exe wlibx110b.exe; do
   if test -f "$f"; then
     head="${f%x*.exe}"
     tail="${f#${head}x}"

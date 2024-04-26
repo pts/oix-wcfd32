@@ -10,6 +10,12 @@
 /wcfd32win32.exe
 /wcfd32win32.obj
 /wcfd32linux
+/hello
+/hello.exe
+/hellox.exe
+/oixrun
+/oixrun.exe
+/oixrunx.exe
 /cf/cstrtosi.o
 /cf/example.exe
 /cf/example.o
