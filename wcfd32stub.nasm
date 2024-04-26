@@ -4,6 +4,8 @@
 ; Usage for .exe output: wcfd32stub <input.cf.exe> <output.exe>
 ; Usage for ELF executable output: wcfd32stub <input.cf.exe> <output>
 ; !! Remove the ELF output file and chmod +x it.
+; !! Port this stub to OIX, making it multiplatform.
+; !! Port rex2oix to OIX, making it multiplatform.
 org 0x8048000  ; Typical Linux i386 executable program.
 bits 32
 cpu 386
