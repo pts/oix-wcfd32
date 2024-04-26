@@ -19,7 +19,7 @@ relocations:	dw 0  ; End of relocations. It would be hard to generate them from 
 
 ; WCFD32 ABI constants.
 INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE equ 0x40
-INT21H_FUNC_4CH_EXIT_PROCESS equ 0x4C
+;INT21H_FUNC_4CH_EXIT_PROCESS equ 0x4C
 STDOUT_FILENO equ 1
 EXIT_SUCCESS equ 0
 
@@ -34,9 +34,15 @@ _start:		push bx  ; Segment of the wcfd32_far_syscall syscall.
 		pop ebx
 		mov ah, INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE
 		call far [esp]  ; Call wcfd32_far_syscall.
+%if 0  ;  This also works.
 		mov ax, INT21H_FUNC_4CH_EXIT_PROCESS<<8 | EXIT_SUCCESS
 		call far [esp]  ; Call wcfd32_far_syscall.
 		; Not reached.
+%else
+		add esp, 6  ; Pop offset and segment of the wcfd32_far_syscall syscall.
+		xor eax, eax  ; EXIT_SUCCESS.
+		retf
+%endif
 
 prebss:
 bss_align equ (text-$)&3
