@@ -10,3 +10,11 @@
 /wcfd32win32.exe
 /wcfd32win32.obj
 /wcfd32linux
+/cf/cstrtosi.o
+/cf/example.exe
+/cf/example.o
+/cf/example.rex
+/cf/struct.inc
+/cf/w32bind
+/cf/w32bind.exe
+/cf/w32bind.o
