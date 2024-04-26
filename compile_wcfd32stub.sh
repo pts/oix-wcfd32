@@ -46,19 +46,24 @@ chmod +x wcfd32linux
 nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o wcfd32linux.bin wcfd32linux.nasm
 
 # Example WCFD32 hello-world program.
-nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o hellox.exe hello.nasm
+nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o hello.oix hello.nasm
 
-nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o oixrunx.exe oixrun.nasm
+nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o oixrun.oix oixrun.nasm
 
 #nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o wasm106.exe wasm106.nasm
-for f in hellox.exe oixrunx.exe wasmx100a.exe wasmx105.exe wasmx106.exe wasmx110b.exe wlibx105.exe wlibx106.exe wlibx110b.exe; do
+for f in hello.oix oixrun.oix wasmx100a.exe wasmx105.exe wasmx106.exe wasmx110b.exe wlibx105.exe wlibx106.exe wlibx110b.exe; do
   if test -f "$f"; then
-    head="${f%x*.exe}"
-    tail="${f#${head}x}"
+    if test "${f%.oix}" = "$f"; then
+      head="${f%x*.exe}"
+      tail="${f#${head}x}"
+    else
+      head="${f%.oix}"
+      tail=.exe
+    fi
     ./wcfd32stub "$f" "$head$tail"
     rm -f "$head${tail%.exe}"  # For correct permissions and avoiding cache problems.
-    ./wcfd32stub "$f" "$head${tail%.exe}" elf
-    chmod +x "$head${tail%.exe}"
+    ./wcfd32stub "$f" "$head${tail%.*}" elf
+    chmod +x "$head${tail%.*}"
   fi
 done
 

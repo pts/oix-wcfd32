@@ -12,10 +12,9 @@
 /wcfd32linux
 /hello
 /hello.exe
-/hellox.exe
+/*.oix
 /oixrun
 /oixrun.exe
-/oixrunx.exe
 /cf/cstrtosi.o
 /cf/example.exe
 /cf/example.o
