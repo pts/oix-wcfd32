@@ -210,6 +210,21 @@ int CreateRelocs( DWORD *relocs, unsigned short *newrelocs, unsigned n )
 void CompressFile( int handle, DWORD filesize );
 void CompressRelocs( DWORD relocsize );
 
+static char is_all_zero_bytes(const char *p, DWORD size) {
+  for (; size != 0; ++p, --size) {
+    if (*p != '\0') return 0;
+  }
+  return 1;
+}
+
+void fix_pmode_w(char *p, DWORD size) {
+  dos_hdr *dos_header = (dos_hdr *)p;
+  char *h = p + ((DWORD)dos_header->size_of_DOS_header_in_paras << 4);
+  if (size >= 10 && dos_header->sig == 'ZM' && size >= (DWORD)(h - p) + 28 && memcmp(h + 21, "PMODE/W", 7) == 0) {
+    h[0xe] = 0;  /* Disable displaying the PMODE/W copyright message. */
+  }
+}
+
 int main( int argc, char *argv[] )
 {
     int                 handle;
@@ -365,12 +380,14 @@ int main( int argc, char *argv[] )
         printf( "Error reading '%s'\n", file );
         exit( 1 );
     }
-    size = (size + 511) & -512L;        /* round up to multiple of 512 */
+    size = (size + 3) & -4L;        /* round up to multiple of 4 */
 
     /* patch header in the loader */
     dos_header = (dos_hdr *)loader_code;
     w32_header = (w32_hdr *)
-        (loader_code + dos_header->size_of_DOS_header_in_paras * 16);
+        (size >= 0x38 && is_all_zero_bytes(loader_code + 0x20, 0x18) && dos_header->size_of_DOS_header_in_paras >= 4 ? loader_code + 0x20 :
+         loader_code + ((DWORD)dos_header->size_of_DOS_header_in_paras << 4));
+    fix_pmode_w(loader_code, size);
 
     w32_header->start_of_W32_file = size;
     w32_header->size_of_W32_file = codesize + relocsize;
