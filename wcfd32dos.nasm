@@ -320,7 +320,7 @@ malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conve
 		ret
 
 %undef  CONFIG_LOAD_TRY_CF_AT_HDRSIZE
-%define CONFIG_LOAD_SINGLE_READ
+%define CONFIG_LOAD_SINGLE_READ  ; For testing, comment it out and add `stc' where indicated to wcfd32load.inc.nasm.
 %define CONFIG_LOAD_INT21H int 21h
 %define CONFIG_LOAD_MALLOC_EAX call malloc
 %undef  CONFIG_LOAD_MALLOC_EBX

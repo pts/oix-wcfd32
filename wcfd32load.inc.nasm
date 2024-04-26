@@ -8,12 +8,12 @@ LOAD_ERROR_OUT_OF_MEMORY equ 0x4
 ; Returns:
 ; * EAX: On success, entry point address. On error, -LOAD_ERROR_*. Success iff (unsigned)EAX < (unsigned)-10.
 ; * EDX: On success, image_base (memory address). On error, file open error code.
+; This function doesn't read or write EBP (unless if configured in CONFIG_LOAD_INT21H).
 load_wcfd32_program_image:
 		push ebx
 		push ecx
 		push esi
 		push edi
-		push ebp
 		xchg edx, eax  ; EDX := EAX; EAX := junk.
 		xor eax, eax
 		mov ah, INT21H_FUNC_3DH_OPEN_FILE  ; r_eax
@@ -79,7 +79,7 @@ load_wcfd32_program_image:
 		mov edx, esi  ; EDX := image_base.
 		mov ecx, [edi+8]    ; r_ecx
 		mov ah, INT21H_FUNC_3FH_READ_FROM_FILE  ; r_eax
-		CONFIG_LOAD_INT21H
+		CONFIG_LOAD_INT21H  ; To simulate multiple reads at testing, replace this line temporarily with `stc'.
 %ifdef CONFIG_LOAD_SINGLE_READ
 		jc .read_error
 		cmp eax, ecx
@@ -87,41 +87,43 @@ load_wcfd32_program_image:
 .read_error:	mov eax, -LOAD_ERROR_READ_ERROR  ; error_code
 		jmp .close_return
 %else
+		push esi  ; Save image_base.
 		jc .read_error1
 		cmp eax, ecx
-		je .image_read_ok
-.read_error1:
-		; If reading the image in one big chunk has failed, read it in 8000h (32 KiB) increments.
-		mov edx, [edi+4]    ; r_edx
-		mov ah, INT21H_FUNC_42H_SEEK_IN_FILE  ; r_eax
+		je .image_read_ok1
+.read_error1:	; If reading the image in one big chunk has failed, read it in 8000h (32 KiB) increments.
+		mov edx, [edi+4]
+		mov ah, INT21H_FUNC_42H_SEEK_IN_FILE
 		mov al, 0  ; SEEK_SET.
 		mov ecx, edx
-		shr ecx, 10h	    ; r_ecx
+		shr ecx, 10h
 		CONFIG_LOAD_INT21H
-		jc .read_error
+		jc .read_error3
 		shl edx, 10h
 		mov dx, ax
 		mov ecx, [edi+8]  ; Number of bytes to read in total.
-		mov ebp, esi  ; Start reading to image_base.
 .read_more:	test ecx, ecx
-		jz .image_read_ok  ; No more bytes to read.
+		jz .image_read_ok1  ; No more bytes to read.
 		push ecx
 		cmp ecx, 8000h
 		jbe .got_size
-		mov ecx, 8000h	    ; r_ecx
-.got_size:	mov edx, ebp	    ; r_edx
-		mov ah, INT21H_FUNC_3FH_READ_FROM_FILE  ; r_eax
+		mov ecx, 8000h
+.got_size:	mov edx, esi
+		mov ah, INT21H_FUNC_3FH_READ_FROM_FILE
 		CONFIG_LOAD_INT21H
 		jc .read_error2
 		cmp eax, ecx
 		je .read_ok
 .read_error2:	pop ecx
+.read_error3:	pop esi  ; Restore image base.
 .read_error:	mov eax, -LOAD_ERROR_READ_ERROR  ; error_code
 		jmp .close_return
 .read_ok:	pop ecx
-		add ebp, 8000h
+		add esi, 8000h
 		sub ecx, eax
 		jmp .read_more
+.image_read_ok1:
+		pop esi
 %endif
 .image_read_ok:
 %ifdef CONFIG_LOAD_CLEAR_BSS
@@ -169,15 +171,14 @@ load_wcfd32_program_image:
 		mov eax, [edi+14h]  ; cf_header.entry_rva.
 		add eax, edx
 		; Now: EAX: entry point address. It will be returned.
-.close_return:
 		pop ebx  ; Restore DOS filehandle.
+.close_return:
 		push eax  ; Save return value.
 		mov ah, INT21H_FUNC_3EH_CLOSE_FILE  ; r_eax
 		CONFIG_LOAD_INT21H
 		pop eax  ; Restore return value.
 		add esp, 200h
 .return:
-		pop ebp
 		pop edi
 		pop esi
 		pop ecx
