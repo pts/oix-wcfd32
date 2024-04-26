@@ -4,6 +4,12 @@ LOAD_ERROR_INVALID_EXE   equ 0x2
 LOAD_ERROR_READ_ERROR    equ 0x3
 LOAD_ERROR_OUT_OF_MEMORY equ 0x4
 
+LOAD_INT21_FUNC_3DH_OPEN_FILE equ 0x3d
+LOAD_INT21_FUNC_3EH_CLOSE_FILE equ 0x3e
+LOAD_INT21_FUNC_3FH_READ_FROM_FILE equ 0x3f
+LOAD_INT21_FUNC_42H_SEEK_IN_FILE equ 0x42
+LOAD_INT21_FUNC_48H_ALLOCATE_MEMORY equ 0x48
+
 ; load_error_t __usercall load_wcfd32_program_image@<eax>(const char *filename@<eax>)
 ; Returns:
 ; * EAX: On success, entry point address. On error, -LOAD_ERROR_*. Success iff (unsigned)EAX < (unsigned)-10.
@@ -16,7 +22,7 @@ load_wcfd32_program_image:
 		push edi
 		xchg edx, eax  ; EDX := EAX; EAX := junk.
 		xor eax, eax
-		mov ah, INT21H_FUNC_3DH_OPEN_FILE  ; r_eax
+		mov ah, LOAD_INT21_FUNC_3DH_OPEN_FILE  ; r_eax
 		CONFIG_LOAD_INT21H
 		jnc .open_ok
 		mov edx, eax
@@ -27,7 +33,7 @@ load_wcfd32_program_image:
 		mov ecx, 200h	    ; r_ecx
 		xor eax, eax
 		mov edx, esp	    ; r_edx
-		mov ah, INT21H_FUNC_3FH_READ_FROM_FILE  ; r_eax
+		mov ah, LOAD_INT21_FUNC_3FH_READ_FROM_FILE  ; r_eax
 		CONFIG_LOAD_INT21H
 		jc .invalid
 		lea edi, [esp+20h]
@@ -47,7 +53,7 @@ load_wcfd32_program_image:
 .found_cf_header:  ; The CF header (18h bytes) is now at EDI, and it will remain so.
 		xor al, al	    ;  ; SEEK_SET.
 		mov edx, [edi+4]    ; r_edx
-		mov ah, INT21H_FUNC_42H_SEEK_IN_FILE  ; r_eax
+		mov ah, LOAD_INT21_FUNC_42H_SEEK_IN_FILE  ; r_eax
 		mov ecx, edx
 		shr ecx, 10h	    ; r_ecx
 		CONFIG_LOAD_INT21H
@@ -63,7 +69,7 @@ load_wcfd32_program_image:
 		xchg eax, ebx  ; EAX := EBX: EBX := junk.
 		CONFIG_LOAD_MALLOC_EAX
   %else
-		mov ah, INT21H_FUNC_48H_ALLOCATE_MEMORY
+		mov ah, LOAD_INT21_FUNC_48H_ALLOCATE_MEMORY
 		CONFIG_LOAD_INT21H
   %endif
 %endif
@@ -78,7 +84,7 @@ load_wcfd32_program_image:
 		; Read the entire image in one big chunk.
 		mov edx, esi  ; EDX := image_base.
 		mov ecx, [edi+8]    ; r_ecx
-		mov ah, INT21H_FUNC_3FH_READ_FROM_FILE  ; r_eax
+		mov ah, LOAD_INT21_FUNC_3FH_READ_FROM_FILE  ; r_eax
 		CONFIG_LOAD_INT21H  ; To simulate multiple reads at testing, replace this line temporarily with `stc'.
 %ifdef CONFIG_LOAD_SINGLE_READ
 		jc .read_error
@@ -93,7 +99,7 @@ load_wcfd32_program_image:
 		je .image_read_ok1
 .read_error1:	; If reading the image in one big chunk has failed, read it in 8000h (32 KiB) increments.
 		mov edx, [edi+4]
-		mov ah, INT21H_FUNC_42H_SEEK_IN_FILE
+		mov ah, LOAD_INT21_FUNC_42H_SEEK_IN_FILE
 		mov al, 0  ; SEEK_SET.
 		mov ecx, edx
 		shr ecx, 10h
@@ -109,7 +115,7 @@ load_wcfd32_program_image:
 		jbe .got_size
 		mov ecx, 8000h
 .got_size:	mov edx, esi
-		mov ah, INT21H_FUNC_3FH_READ_FROM_FILE
+		mov ah, LOAD_INT21_FUNC_3FH_READ_FROM_FILE
 		CONFIG_LOAD_INT21H
 		jc .read_error2
 		cmp eax, ecx
@@ -174,7 +180,7 @@ load_wcfd32_program_image:
 		pop ebx  ; Restore DOS filehandle.
 .close_return:
 		push eax  ; Save return value.
-		mov ah, INT21H_FUNC_3EH_CLOSE_FILE  ; r_eax
+		mov ah, LOAD_INT21_FUNC_3EH_CLOSE_FILE  ; r_eax
 		CONFIG_LOAD_INT21H
 		pop eax  ; Restore return value.
 		add esp, 200h
