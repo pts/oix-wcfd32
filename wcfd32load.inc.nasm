@@ -103,15 +103,13 @@ load_wcfd32_program_image:
 		mov dx, ax
 		mov ecx, [edi+8]  ; Number of bytes to read in total.
 		mov ebp, esi  ; Start reading to image_base.
-.loc_4103D4:
-		test ecx, ecx
+.read_more:	test ecx, ecx
 		jz .image_read_ok  ; No more bytes to read.
 		push ecx
 		cmp ecx, 8000h
-		jbe .loc_4103E7
+		jbe .got_size
 		mov ecx, 8000h	    ; r_ecx
-.loc_4103E7:
-		mov edx, ebp	    ; r_edx
+.got_size:	mov edx, ebp	    ; r_edx
 		mov ah, INT21H_FUNC_3FH_READ_FROM_FILE  ; r_eax
 		CONFIG_LOAD_INT21H
 		jc .read_error2
@@ -123,7 +121,7 @@ load_wcfd32_program_image:
 .read_ok:	pop ecx
 		add ebp, 8000h
 		sub ecx, eax
-		jmp .loc_4103D4
+		jmp .read_more
 %endif
 .image_read_ok:
 %ifdef CONFIG_LOAD_CLEAR_BSS
