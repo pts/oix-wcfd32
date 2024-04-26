@@ -1822,8 +1822,6 @@ aEsiXEdiXEbpXFl db 'ESI=%X EDI=%X EBP=%X FLG=%X',0Dh,0Ah,0
 aDsXEsXFsXGsX	db 'DS=%x ES=%x FS=%x GS=%x',0Dh,0Ah,0
 ; char fmt_percent_hx[]
 fmt_percent_hx	db '%X ',0
-; char str_crlf[]
-str_crlf	db 0Dh,0Ah,0
 ; char aCsEip[]
 aCsEip		db 'CS:EIP -> ',0
 ; char fmt_percent_h[]
@@ -1835,7 +1833,8 @@ aIntegerDivideB db 'Integer divide by 0',0
 aStackOverflow	db 'Stack overflow',0
 aCon		db 'con',0
 ; char aUnsupportedInt[]
-aUnsupportedInt db 'Unsupported int 21h function AH=%h',0Dh,0Ah  ; Continues in empty_env.
+aUnsupportedInt db 'Unsupported int 21h function AH=%h'  ; Continues in str_crlf.
+str_crlf	db 0Dh,0Ah  ; Continues in empty_env.
 empty_env	db 0  ; Continues in empty_str.
 empty_str	db 0
 
