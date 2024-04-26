@@ -1915,34 +1915,25 @@ loc_41132A:
 		pop ebx
 		ret
 
-; !! Make this shorter.
-strncpy:
-		push ecx
-		push esi
-		mov esi, eax
-		jmp loc_411342
-loc_411337:
-		mov cl, [edx]
-		test cl, cl
-		jz loc_411346
+strncpy:  ; char* __watcall strncpy(char *dest, const char *src, size_t n);
+		push ecx  ; Save.
+		push edi  ; Save.
+		mov edi, ebx  ; Argument dest.
+		mov ecx, edx  ; Argument n.
+		xchg edx, eax  ; EDX := EAX (Argument src); EAX := junk.
+		push edi
+.1:		test ecx, ecx
+		jz short .2
+		dec ecx
+		mov al, [edx]
+		stosb
 		inc edx
-		dec ebx
-		mov [eax], cl
-		inc eax
-loc_411342:
-		test ebx, ebx
-		jnz loc_411337
-loc_411346:
-		test ebx, ebx
-		jz loc_411351
-		dec ebx
-		mov byte [eax], 0
-		inc eax
-		jmp loc_411346
-loc_411351:
-		mov eax, esi
-		pop esi
-		pop ecx
+		test al, al
+		jnz short .1
+		rep stosb  ; Fill the rest of dest with \0.
+.2:		pop eax  ; Result: pointer to dest.
+		pop edi  ; Restore.
+		pop ecx  ; Restore.
 		ret
 
 section .rodata
