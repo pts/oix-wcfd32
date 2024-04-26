@@ -93,12 +93,6 @@ _start:		pop eax  ; Skip argc.
 		add [elf_text_filesiz], eax
 		mov eax, [cf_header.mem_size]
 		add [elf_text_memsiz], eax
-		mov ecx, elf_stub
-		mov edx, elf_stub_end-elf_stub
-		push SYS_write
-		pop eax
-		mov ebx, ebp  ; Output filehandle.
-		call check_syscall_al
 		; Now we read the entire image, and write it at once.
 		push SYS_brk
 		pop eax
@@ -154,9 +148,28 @@ _start:		pop eax  ; Skip argc.
 		xor eax, eax
 		jmp strict short .first_reloc
 .rdone:		; Now: EDX: image_base; EAX, EBX, ECX, ESI: spoiled.
-		mov ebx, ebp  ; Output filehandle.
 		mov ecx, edx  ; stub-allocated image_base.
 		mov edx, [cf_header.load_size]
+		mov edi, edx
+		; Strip trailing NULs (0 bytes) from the image.
+.strip0:	test edx, edx
+		jz .done_strip0
+		cmp byte [ecx+edx-1], 0
+		jne .done_strip0
+		dec edx
+		jmp .strip0
+.done_strip0:	mov ebx, ebp  ; Output filehandle.
+		sub edi, edx
+		sub [elf_text_filesiz], edi
+		push ecx
+		push edx
+		mov ecx, elf_stub
+		mov edx, elf_stub_end-elf_stub
+		push SYS_write
+		pop eax
+		call check_syscall_al
+		pop edx
+		pop ecx
 		push SYS_write
 		pop eax
 		call check_syscall_al
@@ -168,6 +181,7 @@ _start:		pop eax  ; Skip argc.
 		push SYS_write
 		pop eax
 		call check_syscall_al
+		; !! Also strip trailing NULs here (needs big rewrite).
 .pop_read_next:	pop ebx  ; Input filehandle.
 .read_next:	call read_to_buf
 		test eax, eax
