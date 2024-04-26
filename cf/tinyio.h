@@ -38,7 +38,13 @@
 
 #include <dosfunc.h>
 #include <errno.h>
-#include <watcom.h>
+#include <stdint.h>
+
+typedef uint8_t uint_8;
+typedef uint16_t uint_16;
+typedef uint32_t uint_32;
+typedef unsigned uint;
+typedef int32_t int_32;
 
 #pragma pack(1);
 
