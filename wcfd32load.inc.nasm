@@ -36,17 +36,36 @@ load_wcfd32_program_image:
 		mov ah, LOAD_INT21_FUNC_3FH_READ_FROM_FILE  ; r_eax
 		CONFIG_LOAD_INT21H
 		jc .invalid
-		lea edi, [esp+20h]
-		cmp dword [edi], 4643h  ; "CF\0\0"
-		je .found_cf_header
-%ifdef CONFIG_LOAD_TRY_CF_AT_HDRSIZE  ; Not needed for the WCFD32 .exe files we create.
+		; Now find the CF header in ESP[0 : 200h]. This logic is duplicated in wcfd32stub.nasm.
+		sub eax, 18h
+		jb .invalid
+%ifdef CONFIG_LOAD_FIND_CF_HEADER  ; Not needed by the WCFD32 .exe files we create.
+		mov edx, 'CF'  ; "CF\0\0". CF header signature.
+  %define CF_SIGNATURE edx
+		jb .invalid
 		mov edi, esp
-		xor eax, eax
-		mov ax, word [esp+8]  ; mz_header.hdrsize.
-		shl eax, 4  ; Convert paragraph count to byte count.
-		add edi, eax
-		cmp dword [edi], 4643h  ; "CF\0\0"
+		cmp dword [edi], CF_SIGNATURE
 		je .found_cf_header
+%else
+  %define CF_SIGNATURE 'CF'  ; Used only once, inline it.
+%endif
+		cmp eax, 20h
+		jb .not_at_20h
+		lea edi, [esp+20h]  ; Without CONFIG_LOAD_FIND_CF_HEADER, we only try at offset 20h, that's the self-offset for the MZ-flavored wcfd32stub.
+		cmp dword [edi], CF_SIGNATURE
+		je .found_cf_header
+.not_at_20h:
+%ifdef CONFIG_LOAD_FIND_CF_HEADER  ; Not needed by the WCFD32 .exe files we create.
+		mov edi, esp
+		xor ecx, ecx
+		mov cx, word [edi+8]  ; mz_header.hdrsize.
+		shl ecx, 4  ; Convert paragraph count to byte count.
+		cmp eax, ecx
+		jb .hdrsize_too_large
+		add edi, ecx
+		cmp dword [edi], CF_SIGNATURE
+		je .found_cf_header
+.hdrsize_too_large:
 %endif
 .invalid:	mov eax, -LOAD_ERROR_INVALID_EXE  ; error_code
 		jmp .close_return

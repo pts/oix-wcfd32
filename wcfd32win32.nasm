@@ -291,7 +291,7 @@ pop_esi_edx_ecx_ebx_ret:
 		pop ebx
 		ret
 
-%undef  CONFIG_LOAD_TRY_CF_AT_HDRSIZE
+%undef  CONFIG_LOAD_FIND_CF_HEADER
 %define CONFIG_LOAD_SINGLE_READ
 %define CONFIG_LOAD_INT21H call wcfd32_near_syscall
 %undef  CONFIG_LOAD_MALLOC_EAX

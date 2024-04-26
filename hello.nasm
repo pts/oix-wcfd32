@@ -3,12 +3,9 @@
 bits 32
 cpu 386
 
-mz_header:  ; This is not valid DOS MZ header, but it's good enough for wcfd32stub and others to find the CF header.
-		dw 'MZ', 0, 0, 0, (cf_header-mz_header)>>4, 0, 0, 0
-		times 8 dw 0
 cf_header:  ; The 32-bit DOS loader finds it at mz_header.hdrsize. Must be aligned to 0x10.
 .signature:	dd 'CF'                ; +0x00. Signature.
-.load:		dd text-mz_header      ; +0x04. load_fofs.
+.load:		dd text-$$             ; +0x04. load_fofs.
 .load_size:	dd prebss-text         ; +0x08. load_size.
 .reloc_rva:	dd relocations-text    ; +0x0c. reloc_rva.
 .mem_size:	dd program_end-bss+prebss-text  ; +0x10. mem_size.

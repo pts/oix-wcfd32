@@ -3,12 +3,14 @@
 bits 32
 cpu 386
 
+%if 0  ; This is optional. wcfd32stub and others now find the CF header without it.
 mz_header:  ; This is not valid DOS MZ header, but it's good enough for wcfd32stub and others to find the CF header.
-		dw 'MZ', 0, 0, 0, (cf_header-mz_header)>>4, 0, 0, 0
-		times 8 dw 0
+               dw 'MZ', 0, 0, 0, (cf_header-mz_header)>>4, 0, 0, 0
+               times 8 dw 0
+%endif
 cf_header:  ; The 32-bit DOS loader finds it at mz_header.hdrsize. Must be aligned to 0x10.
 .signature:	dd 'CF'                ; +0x00. Signature.
-.load:		dd text-mz_header      ; +0x04. load_fofs.
+.load:		dd text-$$             ; +0x04. load_fofs.
 .load_size:	dd prebss-text         ; +0x08. load_size.
 .reloc_rva:	dd relocations-text    ; +0x0c. reloc_rva.
 .mem_size:	dd program_end-bss+prebss-text  ; +0x10. mem_size.
@@ -61,7 +63,7 @@ org $$-.vcont  ; Position independent code (PIC): from now all global variables 
 		call esi  ; Run the loaded program, starting at its entry point.
 		retf
 
-%define CONFIG_LOAD_TRY_CF_AT_HDRSIZE
+%define CONFIG_LOAD_FIND_CF_HEADER
 %define CONFIG_LOAD_SINGLE_READ
 %define CONFIG_LOAD_INT21H call far [ebp+wcfd32_far_syscall_offset]
 %undef  CONFIG_LOAD_MALLOC_EAX

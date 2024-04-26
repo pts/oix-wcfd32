@@ -44,26 +44,31 @@ _start:		pop eax  ; Skip argc.
 		call check_syscall_al
 		xchg ebx, eax  ; EBX := EAX (fd); EAX := junk.
 		call read_to_buf
-		cmp eax, 0x38
+		; Now find the CF header in read_buf[:]. This logic is duplicated in wcfd32load.inc.nasm.
+		sub eax, 0x18
 		jnb .s1
 		mov eax, fatal_too_short
 		jmp fatal
-.s1:		lea ecx, [eax-0x18]
-		mov edx, 'CF'
-		mov eax, read_buf+0x20
-		cmp dword [eax], edx
+.s1:		mov edx, 'CF'  ; "CF\0\0". CF header signature.
+		mov esi, read_buf
+		cmp dword [esi], edx
 		je .cf_found
-		movzx eax, word [read_buf+8]  ; mz_haader.hdrsize field.
-		shl eax, 4
-		cmp eax, ecx
-		jna .s2
+		cmp eax, 0x20
+		jb .s3
+		add esi, 0x20
+		cmp dword [esi], edx
+		je .cf_found
+.s3:		movzx esi, word [read_buf+8]  ; mz_haader.hdrsize field.
+		shl esi, 4
+		cmp eax, esi
+		jb .s2
+		add esi, read_buf
+		cmp dword [esi], edx
+		je .cf_found
+.s2:
 .cf_not_found:	mov eax, fatal_cf_not_found
 		jmp fatal
-.s2:		add eax, read_buf
-		cmp dword [eax], edx
-		jne .cf_not_found
-.cf_found:	; CF header found at file offset EAX, at [esp+eax].
-		xchg esi, eax  ; ESI := EAX (CF header offset); EAX := junk.
+.cf_found:	; CF header found at file offset ESI-ESP, at [esi].
 		mov edi, cf_header
 		movsd  ; Signature.
 		mov ecx, [esi]  ; wcfd32_load_fofs.
