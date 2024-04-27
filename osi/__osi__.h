@@ -221,4 +221,8 @@ static int memcmp_inline(const void *s1, const void *s2, size_t n);
 static int memcmp(const void *s1, const void *s2, size_t n) { return memcmp_inline(s1, s2, n); }
 #pragma aux memcmp_inline = "xor eax, eax" "jecxz done" "repz cmpsb" "je done" "inc eax" "jnc done" "neg eax" "done:" __value [__eax] __parm [__esi] [__edi] [__ecx] __modify [__esi __edi __ecx]
 
+static void *memset_inline(void *s, int c, size_t n);
+static void *memset(void *s, int c, size_t n) { return memset_inline(s, c, n); }
+#pragma aux memset_inline = "push edi" "rep stosb" "pop eax" __value [__eax] __parm [__edi] [__eax] [__ecx] __modify [__edi __ecx]
+
 #endif  /* _OSI_H */
