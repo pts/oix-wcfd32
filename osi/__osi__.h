@@ -208,8 +208,8 @@ static void *memcpy_newdest_inline(void *dest, const void *src, size_t n);
 
 #define CONFIG_USE_MEMCPY_INLINE 1
 
-static int __watcall strcmp_inline(const char *s1, const char *s2);
-static int __watcall strcmp(const char *s1, const char *s2) { return strcmp_inline(s1, s2); }
+static int strcmp_inline(const char *s1, const char *s2);
+static int strcmp(const char *s1, const char *s2) { return strcmp_inline(s1, s2); }
 /* This is much shorter than in OpenWatcom libc and shorter than QLIB 2.12.1 and Zortech C++. */
 #pragma aux strcmp_inline = "xchg esi, eax"  "xor eax, eax"  "xchg edi, edx"  "next: lodsb"  "scasb"  "jne short diff"  "cmp al, 0"  "jne short next"  "jmp short done"  "diff: mov al, 1"  "jnc short done"  "neg eax"  "done: xchg edi, edx" __value [__eax] __parm [__eax] [__edx] __modify [__esi]
 
