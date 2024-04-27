@@ -31,6 +31,14 @@ void print_strs(const char *str, ...) {
   } while ((str = va_arg(ap, const char *)) != NULL);
 }
 
+off_t filelength(int fd) {
+  off_t old, pos;
+  if ((old = lseek(fd, 0, SEEK_CUR)) < 0) return old;
+  pos = lseek(fd, 0, SEEK_END);
+  (void)!lseek(fd, old, SEEK_SET);
+  return pos;
+}
+
 typedef unsigned short  WORD;
 typedef unsigned long   DWORD;
 
@@ -239,6 +247,7 @@ int main( int argc, char *argv[] )
         print_strs("Error opening file '", file, "'\r\n", NULL);
         exit( 1 );
     }
+    /*printf("filelength=%d\n", (int)filelength(handle));*/
 
     exelen = 0;
     /*
@@ -340,7 +349,7 @@ int main( int argc, char *argv[] )
         size = 0x18;
         if ((loader_code = calloc(size, 1)) == 0) goto oom;
         w32_header = (w32_hdr *)loader_code;
-    } else {
+    } else {  /* TODO(pts): Remove this branch entirely? */
         dos_hdr *dos_header;
         loader_handle = open( file, O_RDONLY | O_BINARY );
         if( loader_handle < 0 ) {
