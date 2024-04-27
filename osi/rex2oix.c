@@ -406,7 +406,8 @@ int main( int argc, char *argv[] )
     file = argv[argc++];
     if (file == NULL) {
         size = 0x18;
-        if ((loader_code = (char*)calloc(size, 1)) == 0) goto oom;
+        if ((loader_code = (char*)malloc(size)) == 0) goto oom;
+        memset(loader_code, '\0', size);
         w32_header = (w32_hdr *)loader_code;
     } else {  /* TODO(pts): Remove this branch entirely? */
         dos_hdr *dos_header;
@@ -416,11 +417,13 @@ int main( int argc, char *argv[] )
             exit( 1 );
         }
         size = filelength( loader_handle );
-        loader_code = (char*)calloc( (size + 3) & -4L, 1 );
+        loader_code = (char*)malloc((size + 3) & -4L);
+        memset(loader_code, '\0', (size + 3) & -4L);
         if( loader_code == NULL ) { oom:
             print_str( "Out of memory\r\n" );
             return( -1 );
         }
+        memset(loader_code, '\0', (size + 3) & -4L);
         len = read( loader_handle, loader_code, size );
         close( loader_handle );
         if( len != size ) {
