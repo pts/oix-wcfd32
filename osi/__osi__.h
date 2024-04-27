@@ -165,6 +165,8 @@ int __watcall close(int fd);
 void * __watcall malloc(size_t size);
 #pragma aux malloc = "mov ah, 48h" _INT_21 "sbb ebx, ebx" "not ebx" "and eax, ebx" __parm [__ebx] __value [__eax] __modify __exact [__eax __ebx]
 
+#define CONFIG_NO_FREE 1  /* free(3) is not implemented in the libc. */
+
 int __watcall unlink(const char *pathname);
 int __watcall remove(const char *pathname);
 #pragma aux unlink = "mov ah, 41h" _INT_21 "sbb eax, eax" __parm [__edx] __value [__eax]
