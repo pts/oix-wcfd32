@@ -225,4 +225,54 @@ static void *memset_inline(void *s, int c, size_t n);
 static void *memset(void *s, int c, size_t n) { return memset_inline(s, c, n); }
 #pragma aux memset_inline = "push edi" "rep stosb" "pop eax" __value [__eax] __parm [__edi] [__eax] [__ecx] __modify [__edi __ecx]
 
+/* Not a standard C function, but useful. */
+static void memswap_inline(void *a, void *b, size_t size);
+static void memswap(void *a, void *b, size_t size) { memswap_inline(a, b, size); }
+#pragma aux memswap_inline = "jecxz done" "again: mov al, [edi]" "xchg al, [edx]" "stosb" "inc edx" "loop again" "done:" __parm [__edi] [__edx] [__ecx] __modify _exact [__al __edi __edx __ecx]
+
+/* Same signature as qsort(3), but it implements the fast-in-worst-case
+ * heapsort. It is not stable. For a stable but very slow
+ * qsort(3) implementation, see fyi/c_qsort.c.
+ *
+ * Worst case execution time: O(n*log(n)): less than 3*n*log_2(n)
+ * comparisons and swaps. (The number of swaps is usually a bit smaller than
+ * the number of comparisons.) The average number of comparisons is
+ * 2*n*log_2(n)-O(n). It is very fast if all values are the same (but still
+ * does lots of comparisons and swaps). It is not especially faster than
+ * average if the input is already ascending or descending (with unique
+ * values),
+ *
+ * Uses a constant amount of memory in addition to the input/output array.
+ *
+ * Based on heapsort algorithm H from Knuth TAOCP 5.2.3. The original uses a
+ * temporary variable (of `size' bytes) and copies elements between it and
+ * the array. That code was changed to swaps within the original array.
+ */
+static void qsort(void *base, size_t n, size_t size,
+                  int __watcall (*cmp)(const void*, const void*)) {
+  char *ap = (char*)base, *lp = ap + size * (n >> 1);
+  char *rp = ap + size * (n - 1), *tp, *ip, *jp;
+  if (n < 2) return;
+  for (;;) {
+    if (lp != ap) {
+      tp = lp -= size;
+    } else {
+      memswap(ap, rp, size);
+      if ((rp -= size) == ap) break;
+      tp = ap;
+    }
+    jp = lp;
+    for (;;) {
+      ip = jp;
+      jp += (jp - ap) + size;
+      if (jp > rp) break;
+      if (jp < rp && cmp(jp, jp + size) < 0) jp += size;
+      if (!(cmp(tp, jp) < 0)) break;
+      memswap(ip, jp, size);
+      tp = jp;
+    }
+    memswap(ip, tp, size);
+  }
+}
+
 #endif  /* _OSI_H */
