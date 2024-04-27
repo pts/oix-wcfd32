@@ -8,6 +8,17 @@
 #include <fcntl.h>
 #include <stdarg.h>
 
+#if defined(O_BINARY) && !(O_BINARY)
+#  undef O_BINARY
+#endif
+#ifndef O_BINARY
+#  define O_BINARY 0
+#endif
+
+#ifdef CONFIG_USE_OPEN2
+#  define open(filename, flags) open2(filename, flags)
+#endif
+
 void print_str(const char *str) {
   (void)!write(STDOUT_FILENO, str, strlen(str));
 }
@@ -224,7 +235,7 @@ int main( int argc, char *argv[] )
     file = argv[argc];
     ++argc;
     handle = open( file, O_RDONLY | O_BINARY );
-    if( handle == -1 ) {
+    if( handle < 0 ) {
         print_strs("Error opening file '", file, "'\n", NULL);
         exit( 1 );
     }
@@ -316,12 +327,14 @@ int main( int argc, char *argv[] )
     CreateRelocs( relocs, RelocBuffer, relsize / sizeof(DWORD) );
 
     file = argv[argc++];
-    newfile = open( file, O_WRONLY | O_BINARY | O_CREAT | O_TRUNC,
-                        S_IREAD | S_IWRITE | S_IEXEC );
-    if( newfile == -1 ) {
+    newfile = creat(file, 0666);
+    if( newfile < 0 ) {
         print_strs("Error opening file '", file, "'\n", NULL);
         exit( 1 );
     }
+#if O_BINARY
+    setmode(newfile, O_BINARY);
+#endif
     file = argv[argc++];
     if (file == NULL) {
         size = 0x18;
@@ -330,7 +343,7 @@ int main( int argc, char *argv[] )
     } else {
         dos_hdr *dos_header;
         loader_handle = open( file, O_RDONLY | O_BINARY );
-        if( loader_handle == -1 ) {
+        if( loader_handle < 0 ) {
             print_strs("Error opening file '", file, "'\n", NULL);
             exit( 1 );
         }
@@ -358,7 +371,7 @@ int main( int argc, char *argv[] )
     w32_header->start_of_W32_file = size;
     w32_header->size_of_W32_file = codesize + relocsize;
     w32_header->offset_to_relocs = codesize;
-    maxmem = max( w32_header->size_of_W32_file, maxmem );
+    if (w32_header->size_of_W32_file > maxmem) maxmem = w32_header->size_of_W32_file;
     maxmem = Align4K( maxmem );
     w32_header->memory_size = maxmem;
     w32_header->initial_EIP = exehdr.hdr.initial_eip;
