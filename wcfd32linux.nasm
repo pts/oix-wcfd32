@@ -1,6 +1,8 @@
 ; by pts@fazekas.hu at Tue Apr 23 14:15:16 CEST 2024
 ;
 ; !! Make it work on FreeBSD as well as Linux.
+; !! Add O_LARGEFILE, make it work with large files (even if seeking doesn't work).
+;
 
 org 0x8048000  ; Typical Linux i386 executable program.
 bits 32

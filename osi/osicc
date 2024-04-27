@@ -1,0 +1,43 @@
+#! /bin/sh --
+#
+# osicc: OpenWatcom C compiler fronted for the Watcom OS-independent target (OIX, __OSI__)
+# by pts@fazekas.hu at Sat Apr 27 05:15:07 CEST 2024
+#
+
+osidir=.
+test "${0%/*}" = "$0" || osidir="${0%/*}"
+
+unset WLANG LANG LANGUAGE LC_ALL LC_CTYPE
+
+if test $# = 0; then
+  echo "Usage: $0 <source.c> [...]" >&2
+  exit 1
+fi
+
+basefn="${1%.*}"
+if test "$basefn" = "$1"; then
+  echo "fatal: source filename with extension expected: $1" >&2
+  exit 2
+fi
+
+if ! type owcc >/dev/null 2>&1; then
+  echo "fatal: compiler command not found: owcc" >&2
+fi
+
+# !! TODO(pts): Make -W... configurable.
+# !! TODO(pts): Add -o flag etc.
+# !! TODO(pts): Don't create temporary .o files in the current directory (there is owcc flag, we have to run wcc386 and wlink, and manage manually). Also clean up.
+INCLUDE="$osidir/h_empty" owcc -bwin386 -Wl,op -Wl,start=_cstart_ -Wl,op -Wl,dosseg -Wl,disable -Wl,1014 -Wno-n202 -D__OSI__ -Wc,-fi="$osidir/__osi__.h" -fnostdlib -fno-stack-check -Os -s -march=i386 -Wall -Wextra -Werror -o "$basefn.rex" "$@" "$osidir/osi_start.c" || exit "$?"
+
+if ! test -f "$osidir/rex2oix" || ! test -x "$osidir/rex2oix"; then
+  # !! TODO(pts): Don't create temporary .o files in the current directory. Also clean up.
+  owcc -blinux -Os -s -march=i386 -I"$WATCOM/lh" -Wall -Wextra -Werror -o "$osidir/rex2oix" "$osidir/rex2oix.c" || exit "$?"
+  if ! test -f "$osidir/rex2oix" || ! test -x "$osidir/rex2oix"; then
+    echo "fatal: error building: $osidir/rex2oix"
+  fi
+fi
+
+# !! TODO(pts): Remove temporary file "$basefn.rex".
+"$osidir/rex2oix" "$basefn.rex" "$basefn.oix" || exit "$?"
+
+: "$0" OK.

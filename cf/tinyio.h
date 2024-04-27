@@ -829,11 +829,13 @@ uint_32                 _TinyMemAlloc( uint_32 __size );
 #define _JMP_SHORT      0xeb
 
 #define _INT            0xcd
+#if !defined(_INT_21)
 #if (defined(__WINDOWS_386__)  ||  defined(__OSI__) || defined(__CALL21__))  &&  !defined(__NOCALL21__)
  extern  void   __Int21();
  #define _INT_21        "call __Int21"
 #else
  #define _INT_21        _INT 0x21
+#endif
 #endif
 #define _GET_           0x00
 #define _SET_           0x01

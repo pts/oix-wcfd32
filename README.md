@@ -39,6 +39,7 @@ Limitations of OIX (as introduced by Watcom in 1994):
 * All code and data (.text, .rodata, .data, .bss and .stack sections) is
   read-write-execute.
 * It's not possible to return unused memory to the operating system.
+* It suppots only file seek offsets less than 2 GiB.
 * Watcom hasn't released any official documentation.
 * Watcom hasn't made available development tools (such as assemblers, C
   compilers) neither as proprietary nor free software, so it wasn't easy for
@@ -51,6 +52,9 @@ In the name WCFD32:
 * CF stands for the signature in the CF header describing the program image.
 * D stands for DOS, because the syscall numbers are the same as in DOS.
 * 32 stands for 32-bit protected mode on i386.
+
+The name OIX is an abvreviation of Operating-system-Independent-eXecutable.
+the filename extension is also `.oix`.
 
 Some specific goals of WCFD32 (not all of them has been achieved):
 
@@ -102,7 +106,8 @@ C/C++ compiler and WASM (Watcom Assembler) to create those programs, and
 also some unreleased custom tools and config files. Some files have been
 released as part of OpenWatcom, e.g. the source files for building the
 loaders are in the *bld/w32loadr* directory of
-[https://openwatcom.org/ftp/source/open_watcom_1.0.0-src.zip](open_watcom_1.0.0-src.zip).
+[https://openwatcom.org/ftp/source/open_watcom_1.0.0-src.zip](open_watcom_1.0.0-src.zip)
+(2003-01-24).
 Also the same source archive contains some C source files with `#if
 defined(__OSI__)` indicating that those sources have been compiled for OIX.
 The archive also contains *bld/clib/startup/a/cstrtosi.asm*, which is the
@@ -129,7 +134,7 @@ software targeting OIX.
 
   We can work this around for small programs by copying a few source files
   from OpenWatcom: *bld/clib/startup/a/cstrtosi.asm*,
-  *bld/watcom/h/watcom.h* and bld/watcom/h/tinyio.h*.
+  *bld/watcom/h/watcom.h* and *bld/watcom/h/tinyio.h*.
 
   *tinyio.h* contains a very small libc, whose functions were used by the
   Watcom tools *binw/wasm.exe* and binw/wlib.exe*, but it is incomplete,
@@ -143,8 +148,7 @@ software targeting OIX.
   OpenWatcom 1.0 *bld/w32loadr*: *loader.c* (for *x32run.obj*), *cmain32.asm*,
   *x32start.asm*, but the *x32fix* program is not provided.
 
-  We can work this around by using PMODE/W 1.33 and *wcfd32dos.exe* from
-  wcfd32-port instead.
+  We can work this around by using PMODE/W 1.33 and *wcfd32dos.exe* instead.
 
 * The OSI implementation for OS/2 and DOS loader (which loads *w32run.exe*):
   It can be grabbed from the first 0x2800 bytes of *binw/wasm.exe* and
@@ -212,28 +216,60 @@ be used for other purposes at the same time.
 The *compile_wcfd32stub.sh* shell script builds these programs (both with
 the MZ-flavored loader and the ELF-flavored loader) automatically.
 
-## Proof of concept for building OIX programs from C source
+## Building OIX programs from C source
 
-The build process is automated in the *cf/compile.sh* shell script in
-wcfd32-port. It uses modern OpenWatcom v2 tools and source files from
-OpenWatcom 1.0 (2003-01-24). Its outline:
+This is very experimental, but it works for a few test programs including
+the assembler [mininasm](https://github.com/pts/mininasm). The most severe
+limitation is that the libc (C runtime library) is very small, only a
+few dozen functions are implemented.
 
-* Build *wcfd32dos.exe*.
+Only the OpenWatcom v2 C compiler (with the *owcc* frontend) can be used for
+compilation, and compilation only works on Linux i386. You have to install
+OpenWatcom v2 and set your `$PATH` and `$WATCOM` environment variables.
 
-* Compile *cstrtosi.asm* with modern OpenWatcom v2 WASM.
+There is an example program source *cf/example2.c*, you can compile it to a
+OIX program by running the command `osi/osicc cf/example2.c` on Linux i386.
+It generates the file `cf/example2.oix` (and a few intermediate files as
+well), Which you can run with `./oixrun cf/example2.oix`. If you don't have
+the *oixrun* program yet, run `./compile_wcfd32stub.sh` to build it.
 
-* Compile *example.c* with modern OpenWatcom v2 *owcc*. It uses code in
-  *tinyio.h* and *watcom.h*. *example.c* also contains the required
-  scaffolding missing from *cstrtosi.asm*. Otherwise it just prints its
-  command-line arguments and environment variables.
+You can then use *wcfd32stub* to create executable programs from
+*cf/example2.oix*. `./wcfd32stub cf/example2.oix cf/example2.exe` creates
+the program with the MZ-flavored loader, and `./wcfd32stub cf/example2.oux
+cf/example2` creates a Linux i386 executable. Run `chmod +x cf/example2`,
+and then you can run it as `cf/example2`.
 
-* Link *cstrtosi.o* and *example.o* together using WLINK *system win386*
-  (which uses *format pharlap rex*), producing .rex (Pharlap relocatable
-  executable) file *example.rex*.
+The *osicc* libc is based on the following files:
 
-* Compile the modified *w32bind.c* for the host system to the *w32bind*
-  program with modern OpenWatcom v2 *owcc*.
+* *osi/os_start.c* (program entry point written in assembler, it sets some
+  variables and prepares argv and environ) is based on
+  *bld/clib/startup/a/cstrtosi.asm* in OpenWatcom 1.0.
 
-* Run *w32bind* to generate *example.exe* from *example.rex* (containing the
-  WCFD32 program image in a different format) and *wcfd32dos.exe*
-  (containing the DOS extender and the OSI implementation for 32-bit DOS).
+* The I/O function implementations (e.g. *write(...)*, *exit(...)* and
+  **malloc(...)*) in *osi/__os__.h* are based on bld/watcom/h/tinyio.h*
+  in OpenWatcom 1.0. Only a tiny fraction of *tinyio.h* was used.
+
+* Other functions (such as *strlen(...)*) are based on earlier work of the
+  author of WCFD32.
+
+* *osi/rex2oix.c* (relocatable executable file format converter) is based on
+  *bld/w32loadr/w32bind.c* in OpenWatcom 1.0.
+
+The build process of an OIX program from C source:
+
+* The OpenWatcom v2 C compiler *wcc386* is used to convert the C sources
+  (program and libc) to OMF .obj files (with the `.o` extension).
+
+* The OpenWatcom v2 linker WLINK is used to convert the OMF .obj files
+  to a Pharlap relocatable executable .rex file. The required directives
+  are *system win386* or *format pharlap rex*. The filename extension
+  is `.rex`.
+
+* The custom tool *rex2oix* (source code in *osi/rex2oix.c*) is used to
+  convert the Pharalap relocatable executable to a OIX program.
+
+* Up to this point everything is automated by *osi/osicc*.
+
+* The OIX program can be run with *oixrun* or converted to combined 32-bit
+  DOS and Win32 .exe program with MZ-flavored loader or to Linux i386
+  executable (of ELF format), both using the *wcfd32stub* tool.
