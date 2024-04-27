@@ -54,6 +54,10 @@
 #  error This program requires a little-endian system. Endianness not detected by C macros.
 #endif
 
+#ifdef CONFIG_NO_FREE
+#  define free(ptr) do { (void)ptr; } while (0)
+#endif
+
 void print_str(const char *str) {
   (void)!write(STDOUT_FILENO, (void*)str, strlen(str));
 }
@@ -171,34 +175,27 @@ int CmpReloc( const void *_p, const void *_q )
 }
 
 
+char copy_buf[BUFSIZE];
+
 int CopyRexFile( int handle, int newfile, DWORD filesize )
 {
-    char *buf;
     DWORD amt1, len;
 
-    buf = (char*)malloc( BUFSIZE );
-    if( buf == NULL ) {
-        print_str( "Out of memory\r\n" );
-        return( -1 );
-    }
     for(;;) {
         len = filesize;
         if( len > BUFSIZE )  len = BUFSIZE;
-        amt1 = read( handle, buf, len );
+        amt1 = read( handle, copy_buf, len );
         if( amt1 != len ) {
             print_str( "Error reading REX file\r\n" );
-            free( buf );
             return( -1 );
         }
-        if( (DWORD)write( newfile, buf, len ) != len ) {
+        if( (DWORD)write( newfile, copy_buf, len ) != len ) {
             print_str( "Error writing file\r\n" );
-            free( buf );
             return( -1 );
         }
         filesize -= len;
         if( filesize == 0 ) break;
     }
-    free( buf );
     return( 0 );
 }
 
