@@ -137,6 +137,8 @@ ssize_t __watcall write(int fd, const void *buf, size_t count);
 /* We need to check for ECX == 0 to prevent truncation. */
 #pragma aux write = "test ecx, ecx" "xchg eax, ecx" "jz skip" "xchg eax, ecx" "mov ah, 40h" _INT_21 "skip: rcl eax, 1" "ror eax, 1" __parm [__ebx] [__edx] [__ecx] __value [__eax]
 
+#define CONFIG_USE_FTRUNCATE_HERE 1
+
 /* Same as: ftruncate(fd, lseek(fd, 0, SEEK_CUR)); */
 int __watcall ftruncate_here(int fd);
 #pragma aux ftruncate_here = "xor ecx, ecx" "mov ah, 40h" _INT_21 "sbb eax, eax" __parm [__ebx] __value [__eax] __modify __exact [__ecx]
@@ -168,6 +170,8 @@ int __watcall remove(const char *pathname);
 #pragma aux unlink = "mov ah, 41h" _INT_21 "sbb eax, eax" __parm [__edx] __value [__eax]
 /*#pragma alias(remove, unlink)*/  /* Creates an invalid object file. */
 #pragma aux remove = "mov ah, 41h" _INT_21 "sbb eax, eax" __parm [__edx] __value [__eax]  /* Same as unlink(). */
+
+static __inline int setmode(int fd, mode_t mode) { (void)fd; (void)mode; return 0; }  /* All I/O is binary, no need for setmode9fd, O_BINARY). */
 
 /* --- <ctype.h> */
 
