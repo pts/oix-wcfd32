@@ -213,4 +213,8 @@ static int strcmp(const char *s1, const char *s2) { return strcmp_inline(s1, s2)
 /* This is much shorter than in OpenWatcom libc and shorter than QLIB 2.12.1 and Zortech C++. */
 #pragma aux strcmp_inline = "xchg esi, eax"  "xor eax, eax"  "xchg edi, edx"  "next: lodsb"  "scasb"  "jne short diff"  "cmp al, 0"  "jne short next"  "jmp short done"  "diff: mov al, 1"  "jnc short done"  "neg eax"  "done: xchg edi, edx" __value [__eax] __parm [__eax] [__edx] __modify [__esi]
 
+static int memcmp_inline(const void *s1, const void *s2, size_t n);
+static int memcmp(const void *s1, const void *s2, size_t n) { return memcmp_inline(s1, s2, n); }
+#pragma aux memcmp_inline = "xor eax, eax" "jecxz done" "repz cmpsb" "je done" "inc eax" "jnc done" "neg eax" "done:" __value [__eax] __parm [__esi] [__edi] [__ecx] __modify [__esi __edi __ecx]
+
 #endif  /* _OSI_H */
