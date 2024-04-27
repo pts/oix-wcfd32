@@ -119,7 +119,7 @@ int CopyRexFile( int handle, int newfile, DWORD filesize )
 
     buf = malloc( BUFSIZE );
     if( buf == NULL ) {
-        print_str( "Out of memory\n" );
+        print_str( "Out of memory\r\n" );
         return( -1 );
     }
     for(;;) {
@@ -127,12 +127,12 @@ int CopyRexFile( int handle, int newfile, DWORD filesize )
         if( len > BUFSIZE )  len = BUFSIZE;
         amt1 = read( handle, buf, len );
         if( amt1 != len ) {
-            print_str( "Error reading REX file\n" );
+            print_str( "Error reading REX file\r\n" );
             free( buf );
             return( -1 );
         }
         if( write( newfile, buf, len ) != len ) {
-            print_str( "Error writing file\n" );
+            print_str( "Error writing file\r\n" );
             free( buf );
             return( -1 );
         }
@@ -180,7 +180,7 @@ int CreateRelocs( DWORD *relocs, unsigned short *newrelocs, unsigned n )
             if( (relocs[j] & 0x7FFF0000) != page ) break;
             j++;
         }
-        //printf( "Page: %4.4x  Count: %u\n", page >> 16, j - i );
+        //printf( "Page: %4.4x  Count: %u\r\n", page >> 16, j - i );
         newrelocs[k++] = j - i;
         newrelocs[k++] = page >> 16;
         newrelocs[k++] = (unsigned short)relocs[i];
@@ -228,7 +228,7 @@ int main( int argc, char *argv[] )
     struct padded_hdr   exehdr;
 
     if( argc != 3 && argc != 4 ) {
-        print_str( "Usage: rex2oix <input.rex> <output.oix> [<mz-stub.exe>]\n" );
+        print_str( "Usage: rex2oix <input.rex> <output.oix> [<mz-stub.exe>]\r\n" );
         exit( 1 );
     }
     argc = 1;
@@ -236,7 +236,7 @@ int main( int argc, char *argv[] )
     ++argc;
     handle = open( file, O_RDONLY | O_BINARY );
     if( handle < 0 ) {
-        print_strs("Error opening file '", file, "'\n", NULL);
+        print_strs("Error opening file '", file, "'\r\n", NULL);
         exit( 1 );
     }
 
@@ -246,7 +246,7 @@ int main( int argc, char *argv[] )
      */
     read( handle, &exehdr, sizeof( rex_exe ) );
     if( !(exehdr.hdr.sig[0] == 'M' && exehdr.hdr.sig[1] == 'Q') ) {
-        print_str( "Invalid EXE\n" );
+        print_str( "Invalid EXE\r\n" );
         exit( 1 );
     }
     file_header_size = (DWORD) exehdr.hdr.file_header * 16L;
@@ -281,10 +281,10 @@ int main( int argc, char *argv[] )
     if( minmem > maxmem ) {
         maxmem = minmem;
     }
-    //printf( "minmem = %lu, maxmem = %lu\n", minmem, maxmem );
-    //printf( "size = %lu, file_header_size = %lu\n", size, file_header_size );
+    //printf( "minmem = %lu, maxmem = %lu\r\n", minmem, maxmem );
+    //printf( "size = %lu, file_header_size = %lu\r\n", size, file_header_size );
     codesize = size - file_header_size;
-    //printf( "code+data size = %lu\n", codesize );
+    //printf( "code+data size = %lu\r\n", codesize );
 
     /*
      * get and apply relocation table
@@ -299,29 +299,29 @@ int main( int argc, char *argv[] )
         relsize += kcnt * (0x10000L*sizeof(DWORD));
     }
     //printf( "relocation size = %lu", relsize );
-    //printf( " => %lu relocation entries\n", relsize / sizeof(DWORD) );
+    //printf( " => %lu relocation entries\r\n", relsize / sizeof(DWORD) );
     lseek( handle, exelen + (DWORD) exehdr.hdr.first_reloc, SEEK_SET );
     if( relsize != 0 ) {
         relocs = (DWORD *)malloc( relsize );
         if( relocs == NULL ) {
-            print_str( "Out of memory\n" );
+            print_str( "Out of memory\r\n" );
             return( -1 );
         }
         len = read( handle, relocs, relsize );
         if( len != relsize ) {
-            print_str( "Error reading relocation information\n" );
+            print_str( "Error reading relocation information\r\n" );
             exit( 1 );
         }
         qsort( relocs, relsize / sizeof(DWORD), sizeof(DWORD), CmpReloc );
         if( relocs[0] < 0x80000000 ) {
-            print_str( "REX file contains 16-bit relocations\n" );
+            print_str( "REX file contains 16-bit relocations\r\n" );
             exit( 1 );
         }
     }
     relocsize = RelocSize( relocs, relsize / sizeof(DWORD) );
     RelocBuffer = (unsigned short *)malloc( relocsize );
     if( RelocBuffer == NULL ) {
-        print_str( "Out of memory\n" );
+        print_str( "Out of memory\r\n" );
         exit( 1 );
     }
     CreateRelocs( relocs, RelocBuffer, relsize / sizeof(DWORD) );
@@ -329,7 +329,7 @@ int main( int argc, char *argv[] )
     file = argv[argc++];
     newfile = creat(file, 0666);
     if( newfile < 0 ) {
-        print_strs("Error opening file '", file, "'\n", NULL);
+        print_strs("Error opening file '", file, "'\r\n", NULL);
         exit( 1 );
     }
 #if O_BINARY
@@ -344,19 +344,19 @@ int main( int argc, char *argv[] )
         dos_hdr *dos_header;
         loader_handle = open( file, O_RDONLY | O_BINARY );
         if( loader_handle < 0 ) {
-            print_strs("Error opening file '", file, "'\n", NULL);
+            print_strs("Error opening file '", file, "'\r\n", NULL);
             exit( 1 );
         }
         size = filelength( loader_handle );
         loader_code = calloc( (size + 3) & -4L, 1 );
         if( loader_code == NULL ) { oom:
-            print_str( "Out of memory\n" );
+            print_str( "Out of memory\r\n" );
             return( -1 );
         }
         len = read( loader_handle, loader_code, size );
         close( loader_handle );
         if( len != size ) {
-            print_strs("Error reading '", file, "'\n", NULL);
+            print_strs("Error reading '", file, "'\r\n", NULL);
             exit( 1 );
         }
         size = (size + 3) & -4L;        /* round up to multiple of 4 */
@@ -378,7 +378,7 @@ int main( int argc, char *argv[] )
     w32_header->sig = 'FC';
     len = write( newfile, loader_code, size );
     if( len != size ) {
-        print_str( "Error writing output file\n" );
+        print_str( "Error writing output file\r\n" );
         close( newfile );
         close( handle );
         exit( 1 );
@@ -388,7 +388,7 @@ int main( int argc, char *argv[] )
     close( handle );
     len = write( newfile, RelocBuffer, relocsize );
     if( len != relocsize ) {
-        print_str( "Error writing output file\n" );
+        print_str( "Error writing output file\r\n" );
         close( newfile );
         exit( 1 );
     }
