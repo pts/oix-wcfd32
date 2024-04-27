@@ -241,7 +241,7 @@ and then you can run it as `cf/example2`.
 
 The *osicc* libc is based on the following files:
 
-* *osi/os_start.c* (program entry point written in assembler, it sets some
+* *osi/osi_start.c* (program entry point written in assembler, it sets some
   variables and prepares argv and environ) is based on
   *bld/clib/startup/a/cstrtosi.asm* in OpenWatcom 1.0.
 
