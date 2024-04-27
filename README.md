@@ -273,3 +273,21 @@ The build process of an OIX program from C source:
 * The OIX program can be run with *oixrun* or converted to combined 32-bit
   DOS and Win32 .exe program with MZ-flavored loader or to Linux i386
   executable (of ELF format), both using the *wcfd32stub* tool.
+
+## Running OIX programs on Linux directly
+
+The *binfmt_misc* Linux kernel module makes the kernel able to run any
+program files, by using a configured set of userspace helpers. On
+Debian-based Linux distributions it's possible to use the *update-binfmts*
+program to configure the Linux kernel to run OIX programs directly. Do it
+like this:
+
+* Run `./compile_wcfd32stub.sh`. It generates the *oixrun* ELF executable
+  program.
+
+* Run `sudo chown root. oixrun`, and then run `sudo mv oixrun
+  /usr/local/bin/`.
+
+* Run: `sudo update-binfmts --install oixcf /usr/local/bin/oixrun --magic 'CF\x00\x00'`
+
+* Run: `sudo update-binfmts --install oixmz /usr/local/bin/oixrun --magic 'MZ\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00CF\x00\x00' --mask '\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff\xff\xff'`
