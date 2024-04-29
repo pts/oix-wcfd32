@@ -93,8 +93,8 @@ C/C++ 10.x and 11.x) which use OIX:
 * WLIB (Watcom Library Manager) *binw/wlib.exe* in 10.5, 10.6 and 11.0b,
   11.0c. (In 10.0a, it was a 16-bit DOS program.)
 * WLINK (Watcom Linker) *binw/wlink.exe* has never used OIX, it had its own
-  DOS extender built in. Likewise, the Watcom C and C++ had their own DOS
-  extender unrelated to OIX.
+  DOS extender built in. Likewise, the Watcom C and C++ compilers had their
+  own DOS extender unrelated to OIX.
 
 Since these old Watcom programs are not free software, they are not
 distributed with WCFD32. If you want to run them, you need to purchase a copy.
