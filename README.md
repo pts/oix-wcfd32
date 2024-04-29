@@ -3,7 +3,7 @@
 oix-wcfd32 contains development tools, loaders, converters and
 documentation for OIX, the Watcom i386 operating-system-independent target.
 One goal is porting, i.e. to make it possible to run some old Watcom
-programs (WASM and WLINK) using this target on more systems such as Linux
+programs (WASM and WLIB) using this target on more systems such as Linux
 i386 and FreeBSD i386, as well as making it more convenient to run them on
 32-bit DOS and Win32. Another goal is helping to write new C and assembly
 programs for this target by providing development tools and documentation.
@@ -14,7 +14,7 @@ or its successors. It is based on free software only (mostly OpenWatcom 1.0
 and PMODE/W 1.33). It uses the OIX design invented by Watcom in 1994. The
 undocumented parts (most of it) have been reverse engineered.
 
-To see source code of simple programs written for OSI, look at
+To see source code of simple programs written for OIX, look at
 *cf/example.c* and *example.nasm* in this Git repository. The compilation
 scripts (running on Linux i386) are also provided.
 
@@ -89,9 +89,9 @@ later). Some of these are supported natively, some are supported with helper
 These are the programs officially released by Watcom (as part of Watcom
 C/C++ 10.x and 11.x) which use OIX:
 
-* WASM (Watcom Assembler) *binw/wasm.exe* in 10.0a, 10.5, 10.6, 11.0b, 11.c.
+* WASM (Watcom Assembler) *binw/wasm.exe* in 10.0a, 10.5, 10.6, 11.0b, 11.0c.
 * WLIB (Watcom Library Manager) *binw/wlib.exe* in 10.5, 10.6 and 11.0b,
-  11.c. (In 10.0a, it was a 16-bit DOS program.)
+  11.0c. (In 10.0a, it was a 16-bit DOS program.)
 * WLINK (Watcom Linker) *binw/wlink.exe* has never used OIX, it had its own
   DOS extender built in. Likewise, the Watcom C and C++ had their own DOS
   extender unrelated to OIX.
@@ -141,7 +141,7 @@ software targeting OIX.
   for example it doesn't have printf(...)* or *strlen(...)*, so apparently
   the Watcom tools used other libs (parts of the Watcom C runtime library).
 
-* The DOS extender and OSI implementation for 32-bit DOS in *w32run.exe*.
+* The DOS extender and OIX implementation for 32-bit DOS in *w32run.exe*.
   This has never been part of OpenWatcom even though it is mentioned in the
   OpenWatcom 1.0 sources. It was part of Watcom C/C++ 10.0b, but not 10.0c.
   Apparently lots of the source code of the DOS extender is available in
@@ -150,7 +150,7 @@ software targeting OIX.
 
   We can work this around by using PMODE/W 1.33 and *wcfd32dos.exe* instead.
 
-* The OSI implementation for OS/2 and DOS loader (which loads *w32run.exe*):
+* The OIX implementation for OS/2 and DOS loader (which loads *w32run.exe*):
   It can be grabbed from the first 0x2800 bytes of *binw/wasm.exe* and
   *binw/wlib.exe* (in Watcom C/C++ 10.x and 11.x). It looks like it's
   possible to build this from sources: *loader16.asm*, *dpmildr.asm*,
@@ -315,7 +315,7 @@ More details:
 * There is a small code generation bloat, so your final executable will be a
   bit larger than a perfectly optimized one could be.
 * By adding a few `#define`s and `#include`s to the top of your C code (see
-  the example .c files), it's possible to make them work both with __OSI__
+  the example .c files), it's possible to make them work both with `__OSI__`
   target and as regular C programs.
 * All I/O is binary. For DOS compatibility, you should explicitly write
   `"\r\n"` as line terminator for DOS compatibility. This works on Linux and
