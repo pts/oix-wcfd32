@@ -1,0 +1,41 @@
+#! /bin/sh --
+#
+# osicc: OpenWatcom C compiler fronted for the Watcom OS-independent target (OIX, __OSI__)
+# by pts@fazekas.hu at Sat Apr 27 05:15:07 CEST 2024
+#
+
+osidir=.
+test "${0%/*}" = "$0" || osidir="${0%/*}"
+
+unset WLANG LANG LANGUAGE LC_ALL LC_CTYPE
+
+if test $# = 0; then
+  echo "Usage: $0 <source.c> [...]" >&2
+  exit 1
+fi
+
+basefn="${1%.*}"
+if test "$basefn" = "$1"; then
+  echo "fatal: source filename with extension expected: $1" >&2
+  exit 2
+fi
+
+if ! type owcc >/dev/null 2>&1; then
+  echo "fatal: compiler command not found: owcc" >&2
+fi
+
+# !! TODO(pts): Make -W... configurable.
+# !! TODO(pts): Add -o flag etc.
+# !! TODO(pts): Don't create temporary .o files in the current directory (there is owcc flag, we have to run wcc386 and wlink, and manage manually). Also clean up.
+#    -Wl,order -Wl,clname -Wl,FAR_DATA -Wl,op -Wl,q -Wl,format -Wl,raw -Wl,bin -Wl,op -Wl,start=_cstart_ -Wl,op -Wl,d -Wl,disable -Wl,1014 -Wl,op -Wl,noext \
+#    invalid exe:  -Wl,order -Wl,clname -Wl,FAR_DATA -Wl,op -Wl,q -Wl,output -Wl,raw -Wl,op -Wl,start=_cstart_ -Wl,op -Wl,d -Wl,disable -Wl,1014 -Wl,op -Wl,noext \
+INCLUDE="$osidir/h_empty" owcc -brawbin \
+    -Wl,order -Wl,clname -Wl,FAR_DATA -Wl,op -Wl,q -Wl,op -Wl,start=_cstart_ -Wl,op -Wl,d -Wl,disable -Wl,1014 -Wl,op -Wl,noext \
+    -Wno-n201 -Wno-n202 -D__OSI__ -Wc,-fi="$osidir/__osi__.h" -fnostdlib -fno-stack-check -Os -s -march=i386 -Wall -Wextra -Werror -o "$basefn.oix" "$@" || exit "$?"
+# ! Try without `op d' (`option dosseg'). For dosseg, there is _edata and _end, but for `format raw' it is not populated.
+#wlink order clname START copy START op map="$basefn.map" op q format raw bin op start=_cstart_ op d disable 1014 op noext name "$basefn.oix" file "$basefn.o" file other.o file last.o || exit "$?"
+#wlink order clname FAR_DATA op map="$basefn.map" op q format raw bin op start=_cstart_ op d disable 1014 op noext name "$basefn.oix" file other.o file "$basefn.o" file lastc.o || exit "$?"
+
+#-Wl,format -Wl,raw -Wl,bin
+
+: "$0" OK.

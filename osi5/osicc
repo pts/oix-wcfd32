@@ -1,0 +1,39 @@
+#! /bin/sh --
+#
+# osicc: OpenWatcom C compiler fronted for the Watcom OS-independent target (OIX, __OSI__)
+# by pts@fazekas.hu at Sat Apr 27 05:15:07 CEST 2024
+#
+
+osidir=.
+test "${0%/*}" = "$0" || osidir="${0%/*}"
+
+unset WLANG LANG LANGUAGE LC_ALL LC_CTYPE
+
+if test $# = 0; then
+  echo "Usage: $0 <source.c> [...]" >&2
+  exit 1
+fi
+
+basefn="${1%.*}"
+if test "$basefn" = "$1"; then
+  echo "fatal: source filename with extension expected: $1" >&2
+  exit 2
+fi
+
+if ! type owcc >/dev/null 2>&1; then
+  echo "fatal: compiler command not found: owcc" >&2
+fi
+
+
+MINICC="$HOME/prg/trusty.i386.dir/tmp/minilibc686/pathbin/minicc"
+# !! TODO(pts): Make -W... configurable.
+CFLAGS="--minilibc -mno-smart -g0r -Wl,-N -nostdlib -march=i386 -D__OSI__ -W -Wall -Werror"
+
+"$MINICC" nasm -O999999999 -w+orphan-labels -f elf -o "$osidir"/osi5_start.o "$osidir"/osi5_start.nasm || exit "$?"
+"$MINICC" elfofix -w -- "$osidir"/osi5_start.o || exit "$?"
+
+"$MINICC" $CFLAGS -o "$basefn".elf "$@" "$osidir"/libci.a "$osidir"/osi5_start.o || exit "$?"
+
+"$osidir"/miniperl-5.004.04 -x "$osidir"/elf2oix.pl "$basefn".elf "$basefn".oix || exit "$?"
+
+: "$0" OK.

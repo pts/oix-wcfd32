@@ -12,7 +12,11 @@
 /wcfd32linux
 /hello
 /hello.exe
-/*.oix
+*.oix
+*.o
+*.obj
+/osi4/*.rex
+/osi5/*.elf
 /oixrun
 /oixrun.exe
 /cf/cstrtosi.o
