@@ -42,7 +42,6 @@ load_wcfd32_program_image:
 %ifdef CONFIG_LOAD_FIND_CF_HEADER  ; Not needed by the WCFD32 .exe files we create.
 		mov edx, 'CF'  ; "CF\0\0". CF header signature.
   %define CF_SIGNATURE edx
-		jb .invalid
 		mov edi, esp
 		cmp dword [edi], CF_SIGNATURE
 		je .found_cf_header
