@@ -1,4 +1,4 @@
-v# oix-wcfd32: revival of OIX, the Watcom i386 operating-system-independent target
+# oix-wcfd32: revival of OIX, the Watcom i386 operating-system-independent target
 
 oix-wcfd32 contains development tools, loaders, converters and
 documentation for OIX, the Watcom i386 operating-system-independent target.
