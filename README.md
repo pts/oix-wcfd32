@@ -1,4 +1,4 @@
-# oix-wcfd32: revival of OIX, the Watcom i386 operating-system-independent target
+v# oix-wcfd32: revival of OIX, the Watcom i386 operating-system-independent target
 
 oix-wcfd32 contains development tools, loaders, converters and
 documentation for OIX, the Watcom i386 operating-system-independent target.
@@ -263,9 +263,16 @@ More details:
   implies the i386 ISA (32-bit Intel x86) in 32-bit protected mode.
 * Use `./osicc prog.c helper1.c helper1` helper script to compile the program.
 * The helper script runs the Watcom C Compiler. Have the *wcc386* and
-  *wlink* commands on your path. A recent (>= 2022) [OpenWatcom v2
+  *wlink* commands on your path. A recent [OpenWatcom v2
   release](https://github.com/open-watcom/open-watcom-v2/releases) will work
-  fine. Put the *binl* directory to your `$PATH`. No need to set the
+  fine. The earliest one I could find was from
+  [2020-09-08](https://github.com/open-watcom/open-watcom-v2/releases/tag/2020-09-08-Build).
+  The first version of WLINK which supports *format raw bin* came with
+  OpenWatcom 1.9 (2010-05-25), but that was buggy when calculating symbol
+  offsets (probably because of miscalculating the alignment). Maybe earlier
+  versions of OpenWatcom v2 were already good, but I wasn't able to find any
+  to try.
+  Put the *binl* directory to your `$PATH`. No need to set the
   `$WATCOM` or `$INCLUDE` environment variables.
 * You can define your main function as: any of:
   ```C

@@ -40,8 +40,14 @@ for cfile in "$@"; do
   ofile="${cfile%.*}".o
   ofiles="$ofiles f $ofile"
   # -fo=.o
+  #wcc386
+  #./wcc386-2.0-2020-09-08
   wcc386 -q -bt=rawbin -wcd=201 -wcd=202 -D__OSI__ -fi="$osidir"/__osi__.h -zl -s -os -w4 -wx -we -3r -fo="$ofile" -fr "$cfile" || exit "$?"
 done
+# !! ./wlink-1.9 OpenWatcom 1.9 (2010-05-25) has `form raw bin', but it's buggy, it calculates the offset with alignment added.
+# !! This works: https://github.com/open-watcom/open-watcom-v2/releases/download/2020-09-08-Build/open-watcom-2_0-c-linux-x86
+#dwlink
+#./wlink-2.0-2020-09-08
 wlink form raw bin ord cln FAR_DATA op q op start=_cstart_ op d disable 1014 op noext n "$basefn".oix $ofiles || exit "$?"
 
 : "$0" OK.
