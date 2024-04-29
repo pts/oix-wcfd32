@@ -113,6 +113,7 @@ static char * __watcall parse_first_arg(char *pw) {
     } else if (c == '"') {
       is_quote ^= 1;
     } else if (!is_quote && (c == ' ' || c == '\t' || c == '\n' || c == '\v')) {
+      if (p == pw) ++p;  /* Don't clobber the rest with '\0' below. */
      after_arg:
       *pw = '\0';
       return (char*)p;
@@ -192,6 +193,9 @@ __declspec(naked) char * __watcall parse_first_arg(char *pw) { (void)pw; __asm {
 		inc eax
 		jmp short L8
   L14:		dec edx
+		cmp eax, edx
+		jne L16
+		inc edx
   L16:		mov byte ptr [eax], 0x0
 		xchg eax, edx  /* EAX := EDX: EDX := junk. */
   Lret:		pop esi
