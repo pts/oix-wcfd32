@@ -417,7 +417,7 @@ handle_INT21H_FUNC_44H_IOCTL_IN_FILE:  ; EBX is the file descriptor. AL is the i
 		pop eax
 		mov dl, 0  ; Indicated disk file to DOS.
 		jmp .ret_edx
-.not_enotty:	test eax, eax
+.not_enotty:	test eax, eax  ; Also sets CF=0.
 		pop eax
 		js strict short handle_common.pop_xret
 		mov dl, 0x80  ; Indicate character device to DOS.
