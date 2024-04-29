@@ -324,4 +324,9 @@ static void qsort(void *base, size_t n, size_t size,
   }
 }
 
+/* --- */
+
+#define S(ptr) (ptr)    /* To make __OSI__ v3 sources compile. */
+#define GSTRUCT(g) (g)  /* To make __OSI__ v3 sources compile. */
+
 #endif  /* _OSI_H */
