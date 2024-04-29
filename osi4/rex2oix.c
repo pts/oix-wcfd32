@@ -1,21 +1,25 @@
 /* Based on bld/w32loadr/w32bind.c in OpenWatcom 1.0 https://openwatcom.org/ftp/source/open_watcom_1.0.0-src.zip */
 
-#include <stddef.h>
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <fcntl.h>
-#include <stdarg.h>
-#ifdef __TURBOC__  /* Targeting MS-DOS. */
-#  include <io.h>
-#  if defined(__MSDOS__) || defined(__OS2__) || defined(__TINY__) || defined(__SMALL__) || defined(__MEDIUM__) || defined(__COMPACT__) || defined(__LARGE__) || defined(__HUGE__)
-    typedef unsigned short uint16_t;
-    typedef unsigned long uint32_t;
-    typedef long off_t;
+#ifndef __OSI__  /* Not __OSI__ v3. */
+#  define S(ptr) (ptr)
+#  define GSTRUCT(struct_name) (struct_name)
+#  include <stddef.h>
+#  include <string.h>
+#  include <stdio.h>
+#  include <stdlib.h>
+#  include <fcntl.h>
+#  include <stdarg.h>
+#  ifdef __TURBOC__  /* Targeting MS-DOS. */
+#    include <io.h>
+#    if defined(__MSDOS__) || defined(__OS2__) || defined(__TINY__) || defined(__SMALL__) || defined(__MEDIUM__) || defined(__COMPACT__) || defined(__LARGE__) || defined(__HUGE__)
+      typedef unsigned short uint16_t;
+      typedef unsigned long uint32_t;
+      typedef long off_t;
+#    endif
+#  else
+#    include <unistd.h>
+#    include <stdint.h>
 #  endif
-#else
-#  include <unistd.h>
-#  include <stdint.h>
 #endif
 
 #if defined(O_BINARY) && !(O_BINARY)
