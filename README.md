@@ -124,7 +124,7 @@ missing, and it's not possible to reproduce working binaries with modern
 OpenWatcom v2.
 
 Required components (but unreleased by Watcom) for building and running new
-software targeting OIX.
+software targeting OIX:
 
 * The C runtime library (libc): There are no
   functions like *write(...)*, *printf(...)* or *strlen(...)*. It would be
@@ -143,7 +143,7 @@ software targeting OIX.
 
 * The DOS extender and OIX implementation for 32-bit DOS in *w32run.exe*.
   This has never been part of OpenWatcom even though it is mentioned in the
-  OpenWatcom 1.0 sources. It was part of Watcom C/C++ 10.0b, but not 10.0c.
+  OpenWatcom 1.0 sources. It was part of Watcom C/C++ 11.0b, but not 11.0c.
   Apparently lots of the source code of the DOS extender is available in
   OpenWatcom 1.0 *bld/w32loadr*: *loader.c* (for *x32run.obj*), *cmain32.asm*,
   *x32start.asm*, but the *x32fix* program is not provided.
@@ -160,8 +160,8 @@ software targeting OIX.
   We don't need this, all functionality is included in *wcfd32dos.exe*
   above.
 
-* The *w32bind* tool, part of the build process: It's not part of OpenWatcom
-  (old or new).
+* The *w32bind* tool, part of the build process: The precompiled .exe is not
+  part of OpenWatcom (old or new).
 
   We work this around by modifying *bld/w32loadr/w32bind.c* in OpenWatcom
   1.0 slightly, and compiling it.
@@ -218,7 +218,7 @@ TODO(pts): Write more.
 ## Building OIX programs from NASM assembly source
 
 You can use the *hello.nasm*, *example.nasm* and *oixrun.nasm* NASM assembly
-source files in the Git repository can be used as tutorials and reference
+source files in the Git repository as tutorials and reference
 implementations to write your own programs.
 
 Please note that NASM (just like other assemblers if a linker is not
