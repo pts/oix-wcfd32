@@ -12,17 +12,6 @@
 #  error Watcom OS-independent target is required.
 #endif
 
-void (__far *_INT21ADDR)(void);
-void *_STACKTOP;
-unsigned *_BreakFlagPtr;
-char __OS;
-char **_EnvPtr;
-char **environ;
-char *_LpPgmName;
-
-extern char _edata[], _end[];  /* Populated by WLINK. */
-
-int _argc;  /* Autogenerted by __WATCOMC__ as a dependency of main(...). TODO(pts): Make it an alias. */
 extern int __watcall main(int argc, char **argv);
 
 /* Reverses the elements in a NULL-terminated array of (void*)s. */
@@ -205,6 +194,18 @@ __declspec(naked) char * __watcall parse_first_arg(char *pw) { (void)pw; __asm {
 		ret
 } }
 #endif
+
+extern char _edata[], _end[];  /* Populated by WLINK. */
+
+void (__far *_INT21ADDR)(void);
+void *_STACKTOP;
+unsigned *_BreakFlagPtr;
+char __OS;
+char **_EnvPtr;
+char **environ;
+char *_LpPgmName;
+
+int _argc;  /* Autogenerted by __WATCOMC__ as a dependency of main(...). TODO(pts): Make it an alias. */
 
 /* __OSI__ program entry point. */
 __declspec(naked) void __watcall __far _cstart(void) { __asm {

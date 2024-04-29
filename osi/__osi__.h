@@ -65,8 +65,18 @@
 #undef __gnu_linux__
 #undef linux
 
+/* <stdint.h> */
 typedef char assert_int_size[sizeof(int) == 4 ? 1 : -1];
 typedef char assert_long_long_size[sizeof(long long) == 8 ? 1 : -1];
+typedef unsigned char uint8_t;
+typedef unsigned short uint16_t;
+typedef unsigned int uint32_t;
+typedef unsigned long long uint64_t;
+typedef unsigned char int8_t;
+typedef short int16_t;
+typedef int int32_t;
+typedef long long int64_t;
+
 /* <stdarg.h> */
 typedef char *va_list;
 #define va_start(ap, last) ((ap) = (char*)&(last) + ((sizeof(last)+3)&~3), (void)0)  /* i386 only. */
@@ -88,14 +98,6 @@ extern char **_EnvPtr;
 extern char **environ;
 extern char *_LpPgmName;
 
-typedef unsigned char uint8_t;
-typedef unsigned short uint16_t;
-typedef unsigned int uint32_t;
-typedef unsigned long long uint64_t;
-typedef unsigned char int8_t;
-typedef short int16_t;
-typedef int int32_t;
-typedef long long int64_t;
 typedef int ssize_t;
 typedef unsigned size_t;
 typedef long off_t;  /* The __OSI__ ABI doesn't support 64-bit seek offsets, thus the largest file size correctly supported is 2 GiB - 1 byte. */
@@ -119,13 +121,14 @@ typedef unsigned mode_t;
 #define SEEK_CUR 1
 #define SEEK_END 2
 
-/* --- __OSI__ functions. */
+/* --- __OSI__ syscall functions. */
 
-#define _INT_21 "call fword ptr _INT21ADDR"
+#define _INT_21  "call fword ptr _INT21ADDR"
+#define _INT_21_A call fword ptr _INT21ADDR
 
 /* There are no cleanups. A regular libc would flush the stdio streams before calling _exit(). */
 __declspec(noreturn) void __watcall exit(int exit_code);
-#pragma aux exit = "mov esp, _STACKTOP" "retf" __parm [__eax]
+#pragma aux exit  = "mov esp, _STACKTOP" "retf" __parm [__eax]
 
 __declspec(noreturn) void __watcall _exit(int exit_code);
 #pragma aux _exit = "mov esp, _STACKTOP" "retf" __parm [__eax]
@@ -139,19 +142,60 @@ ssize_t __watcall write(int fd, const void *buf, size_t count);
 
 #define CONFIG_USE_FTRUNCATE_HERE 1
 
-/* Same as: ftruncate(fd, lseek(fd, 0, SEEK_CUR)); */
+/* Same as: ftruncate(fd, lseek(fd, 0, SEEK_CUR));
+ * This is not a standard C or POSIX function.
+ */
 int __watcall ftruncate_here(int fd);
 #pragma aux ftruncate_here = "xor ecx, ecx" "mov ah, 40h" _INT_21 "sbb eax, eax" __parm [__ebx] __value [__eax] __modify __exact [__ecx]
 
-off_t __watcall lseek(int fd, off_t offset, int whence);
-#pragma aux lseek = "mov ah, 42h" "mov ecx, edx" "shr ecx, 16" _INT_21 "rcl dx, 1" "ror dx, 1" "shl edx, 16" "mov dx, ax" __parm [__ebx] [__edx] [__al] __value [__edx] __modify [__eax __ebx __ecx __edx];
+static __declspec(naked) int __watcall ftruncate(int fd, off_t size) { (void)fd; (void)size; __asm {
+		push ebx
+		push ecx
+		push esi
+		mov esi, edx  /* Save argument size. */
+		xchg ebx, eax  /* EBX := EAX (filehandle); EBX := junk. */
+		mov ax, 4201h  /* SEEK_CUR. */
+		xor ecx, ecx
+		xor edx, edx
+		_INT_21_A
+		jc Ldone
+		xchg edx, eax  /* DX := AX (low word); AX := (high word). */
+		xchg ecx, eax  /* CX := AX (high word); AX := junk. */
+		push ecx
+		push edx
+		mov edx, esi
+		mov ecx, esi
+		shr ecx, 16
+		mov ax, 4200h  /* SEEK_SET to ESI. */
+		_INT_21_A
+		jc Ldone
+		mov ah, 40h
+		xor ecx, ecx
+		_INT_21_A  /* Truncate. */
+		jc Ldone
+		pop edx
+		pop ecx
+		mov ax, 4200h  /* SEEK_SET back. */
+		_INT_21_A
+  Ldone:	sbb eax, eax
+		pop esi
+		pop ecx
+		pop ebx
+		ret
+} }
 
+off_t __watcall lseek(int fd, off_t offset, int whence);
+#pragma aux lseek = "mov ah, 42h" "mov ecx, edx" "shr ecx, 16" _INT_21 "rcl dx, 1" "ror dx, 1" "shl edx, 16" "mov dx, ax" __parm [__ebx] [__edx] [__al] __value [__edx] __modify [__eax __ebx __ecx __edx]
+
+/* If unsure, pass 0666 as mode. It will be ignored by __OSI__. */
 int creat(const char *pathname, mode_t mode);
-#pragma aux creat = "mov ah, 3ch" _INT_21 "rcl eax, 1" "ror eax, 1" __parm [__edx] [__ecx] __value [eax];
+#pragma aux creat = "mov ah, 3ch" "xor ecx, ecx" _INT_21 "rcl eax, 1" "ror eax, 1" __parm [__edx] [__ecx] __value [eax];
 
 #define CONFIG_USE_OPEN2 1
 
-/* A 2-argument open(...) which is not able to create files. */
+/* A 2-argument open(...) which is not able to create files.
+ * This is not a standard C or POSIX function.
+ */
 #pragma aux open2 = "and eax, 3" "mov ah, 3dh" _INT_21 "rcl eax, 1" "ror eax, 1" __parm [__edx] [__al] __value [__eax];
 int open2(const char *pathname, int flags);
 
@@ -161,6 +205,9 @@ int open(const char *pathname, int flags, mode_t mode);
 
 int __watcall close(int fd);
 #pragma aux close = "mov ah, 3eh" _INT_21 "sbb eax, eax" __parm [__ebx] __value [__eax]
+
+int __watcall isatty(int fd);
+#pragma aux isatty = "mov ax, 4400h" _INT_21 "mov eax, 0" "jc done" "test dl, 80h" "jz done" "inc eax" "done:" __parm [__ebx] __value [__eax] __modify [__edx]
 
 void * __watcall malloc(size_t size);
 #pragma aux malloc = "mov ah, 48h" _INT_21 "sbb ebx, ebx" "not ebx" "and eax, ebx" __parm [__ebx] __value [__eax] __modify __exact [__eax __ebx]
