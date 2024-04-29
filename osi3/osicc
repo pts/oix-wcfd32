@@ -27,15 +27,21 @@ fi
 # !! TODO(pts): Make -W... configurable.
 # !! TODO(pts): Add -o flag etc.
 # !! TODO(pts): Don't create temporary .o files in the current directory (there is owcc flag, we have to run wcc386 and wlink, and manage manually). Also clean up.
-#    -Wl,order -Wl,clname -Wl,FAR_DATA -Wl,op -Wl,q -Wl,format -Wl,raw -Wl,bin -Wl,op -Wl,start=_cstart_ -Wl,op -Wl,d -Wl,disable -Wl,1014 -Wl,op -Wl,noext \
-#    invalid exe:  -Wl,order -Wl,clname -Wl,FAR_DATA -Wl,op -Wl,q -Wl,output -Wl,raw -Wl,op -Wl,start=_cstart_ -Wl,op -Wl,d -Wl,disable -Wl,1014 -Wl,op -Wl,noext \
-INCLUDE="$osidir/h_empty" owcc -brawbin \
-    -Wl,order -Wl,clname -Wl,FAR_DATA -Wl,op -Wl,q -Wl,op -Wl,start=_cstart_ -Wl,op -Wl,d -Wl,disable -Wl,1014 -Wl,op -Wl,noext \
-    -Wno-n201 -Wno-n202 -D__OSI__ -Wc,-fi="$osidir/__osi__.h" -fnostdlib -fno-stack-check -Os -s -march=i386 -Wall -Wextra -Werror -o "$basefn.oix" "$@" || exit "$?"
-# ! Try without `op d' (`option dosseg'). For dosseg, there is _edata and _end, but for `format raw' it is not populated.
-#wlink order clname START copy START op map="$basefn.map" op q format raw bin op start=_cstart_ op d disable 1014 op noext name "$basefn.oix" file "$basefn.o" file other.o file last.o || exit "$?"
-#wlink order clname FAR_DATA op map="$basefn.map" op q format raw bin op start=_cstart_ op d disable 1014 op noext name "$basefn.oix" file other.o file "$basefn.o" file lastc.o || exit "$?"
 
-#-Wl,format -Wl,raw -Wl,bin
+#INCLUDE="$osidir/h_empty" owcc -brawbin \
+#    -Wl,order -Wl,clname -Wl,FAR_DATA -Wl,op -Wl,q -Wl,op -Wl,start=_cstart_ -Wl,op -Wl,d -Wl,disable -Wl,1014 -Wl,op -Wl,noext \
+#    -Wno-n201 -Wno-n202 -D__OSI__ -Wc,-fi="$osidir/__osi__.h" -fnostdlib -fno-stack-check -Os -s -march=i386 -Wall -Wextra -Werror -o "$basefn.oix" "$@" || exit "$?"
+
+unset WATCOM INCLUDE
+INCLUDE="$osidir/h_empty"
+
+ofiles=""  # !! Use only newline as separator.
+for cfile in "$@"; do
+  ofile="${cfile%.*}".o
+  ofiles="$ofiles f $ofile"
+  # -fo=.o
+  wcc386 -q -bt=rawbin -wcd=201 -wcd=202 -D__OSI__ -fi="$osidir"/__osi__.h -zl -s -os -w4 -wx -we -3r -fo="$ofile" -fr "$cfile" || exit "$?"
+done
+wlink form raw bin ord cln FAR_DATA op q op start=_cstart_ op d disable 1014 op noext n "$basefn".oix $ofiles || exit "$?"
 
 : "$0" OK.
