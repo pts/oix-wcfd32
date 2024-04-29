@@ -106,7 +106,7 @@ C/C++ compiler and WASM (Watcom Assembler) to create those programs, and
 also some unreleased custom tools and config files. Some files have been
 released as part of OpenWatcom, e.g. the source files for building the
 loaders are in the *bld/w32loadr* directory of
-[https://openwatcom.org/ftp/source/open_watcom_1.0.0-src.zip](open_watcom_1.0.0-src.zip)
+[open_watcom_1.0.0-src.zip](https://openwatcom.org/ftp/source/open_watcom_1.0.0-src.zip)
 (2003-01-24).
 Also the same source archive contains some C source files with `#if
 defined(__OSI__)` indicating that those sources have been compiled for OIX.
