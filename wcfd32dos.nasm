@@ -154,6 +154,7 @@ _start:
 		int 21h  ; This is the only way to exit from PMODE/W, these don't work: `ret', `retf', `iret', `int 20h'.
 		; Not reached.
 
+%ifdef DEBUG
 print_crlf:  ; !! Prints a CRLF ("\r", "\n") to stdout.
 		push eax
 		push edx
@@ -165,7 +166,9 @@ print_crlf:  ; !! Prints a CRLF ("\r", "\n") to stdout.
 		pop edx
 		pop eax
 		ret
+%endif
 
+%ifdef DEBUG
 print_chr:  ; !! Prints single byte in AL to stdout.
 		push eax
 		push edx
@@ -175,6 +178,7 @@ print_chr:  ; !! Prints single byte in AL to stdout.
 		pop edx
 		pop eax
 		ret
+%endif
 
 print_str:  ; !! Prints the ASCIIZ string (NUL-terminated) at EAX to stdout.
 		push eax
@@ -328,7 +332,9 @@ malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conve
 %include "wcfd32load.inc.nasm"
 
 wcfd32_far_syscall:  ; proc far
-		;call debug_syscall  ; !!
+%ifdef DEBUG
+		call debug_syscall
+%endif
 		cmp ah, INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE
 		je strict short .handle_INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE
 		cmp ah, INT21H_FUNC_4FH_FIND_NEXT_MATCHING_FILE
@@ -363,6 +369,7 @@ wcfd32_far_syscall:  ; proc far
 		pop edx			; restore EDX
 		jmp strict short .done
 
+%ifdef DEBUG
 debug_syscall:	push eax
 		mov al, ah
 		shr al, 4
@@ -387,6 +394,7 @@ debug_syscall:	push eax
 
 message db '?$'  ; !!
 done_message db '.', 13, 10, '$' ; !!
+%endif
 
 emit_load_errors
 
