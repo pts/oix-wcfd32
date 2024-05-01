@@ -258,7 +258,7 @@ parse_first_arg:
 msg:		db 'Hello, World!', 13, 10, 0
 %endif
 
-msg_usage:	db 'Usage: oixrun <oixprog> [<arg> ...]', 13, 10, 0
+msg_usage:	db 'Usage: oixrun <prog.oix> [<arg> ...]', 13, 10, 0
 
 emit_load_errors
 

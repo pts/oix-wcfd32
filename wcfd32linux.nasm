@@ -965,7 +965,11 @@ concatenate_env:
 
 msg_oom:	db 'fatal: out of memory', 13, 10, 0
 %ifdef RUNPROG
-msg_usage:	db 'Usage: wcfd32linux <wcfd32-prog-file> [<arg> ...]', 13, 10, 0
+  %ifdef OIXRUN
+    msg_usage:	db 'Usage: oixrun <prog.oix> [<arg> ...]', 13, 10, 0
+  %else
+    msg_usage:	db 'Usage: wcfd32linux <prog.oix> [<arg> ...]', 13, 10, 0
+  %endif
 %endif
 
 ;section .data
