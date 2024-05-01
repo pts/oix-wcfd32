@@ -8,7 +8,7 @@ cpu 386
 
 cf_header:  ; The 32-bit DOS loader finds it at mz_header.hdrsize. Must be aligned to 0x10.
 .signature:	dd 'CF'                ; +0x00. Signature.
-.load:		dd text-$$             ; +0x04. load_fofs.
+.load_fofs:	dd text-$$             ; +0x04. load_fofs.
 .load_size:	dd prebss-text         ; +0x08. load_size.
 .reloc_rva:	dd relocations-text    ; +0x0c. reloc_rva.
 .mem_size:	dd program_end-bss+prebss-text  ; +0x10. mem_size.

@@ -286,7 +286,7 @@ incbin 'wcfd32dos.exe', 0, 6  ; 'MZ' signature and image size.
 incbin 'wcfd32dosp.exe', 6, 0x20-6  ; wcfd32dos.exe and wcfd32dosp.exe are identical here.
 cf_header:  ; The 32-bit DOS loader finds it at mz_header.hdrsize. Must be aligned to 0x10.
 		db 'CF', 0, 0          ; +0x00. Signature.
-.load:		dd 0;wcfd32_load       ; +0x04. load_fofs.
+.load_fofs:	dd 0;wcfd32_load_fofs  ; +0x04. load_fofs.
 .load_size:	dd 0;wcfd32_load_size  ; +0x08. load_size.
 .reloc_rva:	dd 0;wcfd32_reloc_rva  ; +0x0c. reloc_rva.
 .mem_size:	dd 0;wcfd32_mem_size   ; +0x10. mem_size.
