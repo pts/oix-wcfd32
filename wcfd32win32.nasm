@@ -22,12 +22,18 @@
 bits 32
 cpu 386
 
+%macro dllimport 1
+  import _%1 kernel32.dll %1  ; Adds import directive to the .obj file which WLINK uses to populate the PE import directory.  https://retrocomputing.stackexchange.com/a/29884
+  extern __imp__%1
+%endm
+
 %define .text _TEXT
 %define .rodatastr CONST  ; Unused.
 %define .rodata CONST2
 %define .data _DATA
 %define .bss _BSS
 
+; These declarations matter (!), otherwise the dllimport goes to a different section (!).
 section _TEXT  USE32 class=CODE align=1
 section CONST  USE32 class=DATA align=1  ; OpenWatcom generates align=4.
 section CONST2 USE32 class=DATA align=4
@@ -35,45 +41,45 @@ section _DATA  USE32 class=DATA align=4
 section _BSS   USE32 class=BSS NOBITS align=4  ; NOBITS is ignored by NASM, but class=BSS works.
 group DGROUP CONST CONST2 _DATA _BSS
 
-; WLINK will add even unused (i.e. no extern) import directives to the .exe.
+; WLINK will add even unused (i.e. no extern) import directives to the .exe, so we only list here what we really use.
 ; Corresponding WLINK .lnk directives: import '_GetStdHandle' 'kernel32.dll'.GetStdHandle
-extern __imp__GetStdHandle  ; HANDLE __stdcall GetStdHandle (DWORD nStdHandle);
-extern __imp__WriteFile	  ; BOOL __stdcall WriteFile (HANDLE hFile, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfBytesWritten, LPOVERLAPPED lpOverlapped);
-extern __imp__ExitProcess  ; void __stdcall __noreturn ExitProcess (UINT uExitCode);
-extern __imp__GetFileType  ; DWORD __stdcall GetFileType (HANDLE hFile);
-extern __imp__SetFilePointer  ; DWORD __stdcall SetFilePointer (HANDLE hFile, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, DWORD dwMoveMethod);
-extern __imp__DeleteFileA  ; BOOL __stdcall DeleteFileA (LPCSTR lpFileName);
-extern __imp__SetEndOfFile  ; BOOL __stdcall SetEndOfFile (HANDLE hFile);
-extern __imp__CloseHandle  ; BOOL __stdcall CloseHandle (HANDLE hObject);
-extern __imp__MoveFileA	  ; BOOL __stdcall MoveFileA (LPCSTR lpExistingFileName, LPCSTR lpNewFileName);
-extern __imp__SetCurrentDirectoryA  ; BOOL __stdcall SetCurrentDirectoryA (LPCSTR lpPathName);
-extern __imp__GetLocalTime  ; void __stdcall GetLocalTime (LPSYSTEMTIME lpSystemTime);
-extern __imp__GetLastError  ; DWORD __stdcall GetLastError ();
-extern __imp__GetCurrentDirectoryA  ; DWORD __stdcall GetCurrentDirectoryA (DWORD nBufferLength, LPSTR lpBuffer);
-extern __imp__GetFileAttributesA  ; DWORD __stdcall GetFileAttributesA (LPCSTR lpFileName);
-extern __imp__FindClose	  ; BOOL __stdcall FindClose (HANDLE hFindFile);
-extern __imp__FindFirstFileA  ; HANDLE __stdcall FindFirstFileA (LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindFileData);
-extern __imp__FindNextFileA  ; BOOL __stdcall FindNextFileA (HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData);
-extern __imp__LocalFileTimeToFileTime  ; BOOL __stdcall LocalFileTimeToFileTime (const FILETIME *lpLocalFileTime, LPFILETIME lpFileTime);
-extern __imp__DosDateTimeToFileTime  ; BOOL __stdcall DosDateTimeToFileTime (WORD wFatDate, WORD wFatTime, LPFILETIME lpFileTime);
-extern __imp__FileTimeToDosDateTime  ; BOOL __stdcall FileTimeToDosDateTime (const FILETIME *lpFileTime, LPWORD lpFatDate, LPWORD lpFatTime);
-extern __imp__FileTimeToLocalFileTime  ; BOOL __stdcall FileTimeToLocalFileTime (const FILETIME *lpFileTime, LPFILETIME lpLocalFileTime);
-extern __imp__GetFullPathNameA	; DWORD __stdcall GetFullPathNameA (LPCSTR lpFileName, DWORD nBufferLength, LPSTR lpBuffer, LPSTR *lpFilePart);
-extern __imp__SetFileTime  ; BOOL __stdcall SetFileTime (HANDLE hFile, const FILETIME *lpCreationTime, const FILETIME *lpLastAccessTime, const FILETIME *lpLastWriteTime);
-extern __imp__GetFileTime  ; BOOL __stdcall GetFileTime (HANDLE hFile, LPFILETIME lpCreationTime, LPFILETIME lpLastAccessTime, LPFILETIME lpLastWriteTime);
-extern __imp__ReadFile	; BOOL __stdcall ReadFile (HANDLE hFile, LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead, LPOVERLAPPED lpOverlapped);
-extern __imp__SetConsoleMode  ; BOOL __stdcall SetConsoleMode (HANDLE hConsoleHandle, DWORD dwMode);
-extern __imp__GetConsoleMode  ; BOOL __stdcall GetConsoleMode (HANDLE hConsoleHandle, LPDWORD lpMode);
-extern __imp__CreateFileA  ; HANDLE __stdcall CreateFileA (LPCSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile);
-extern __imp__SetConsoleCtrlHandler  ; BOOL __stdcall SetConsoleCtrlHandler (PHANDLER_ROUTINE HandlerRoutine, BOOL Add);
-extern __imp__GetModuleFileNameA  ; DWORD __stdcall GetModuleFileNameA (HMODULE hModule, LPSTR lpFilename, DWORD nSize);
-extern __imp__GetEnvironmentStrings  ; LPCH __stdcall GetEnvironmentStrings ();
-extern __imp__GetCommandLineA  ; LPSTR __stdcall GetCommandLineA ();
-extern __imp__GetCPInfo	  ; BOOL __stdcall GetCPInfo (UINT CodePage, LPCPINFO lpCPInfo);
-extern __imp__ReadConsoleInputA	  ; BOOL __stdcall ReadConsoleInputA (HANDLE hConsoleInput, PINPUT_RECORD lpBuffer, DWORD nLength, LPDWORD lpNumberOfEventsRead);
-extern __imp__PeekConsoleInputA	  ; BOOL __stdcall PeekConsoleInputA (HANDLE hConsoleInput, PINPUT_RECORD lpBuffer, DWORD nLength, LPDWORD lpNumberOfEventsRead);
-;extern __imp__LocalAlloc  ; HLOCAL __stdcall LocalAlloc (UINT uFlags, SIZE_T uBytes);
-extern __imp__VirtualAlloc  ; LPVOID __stdcall VirtualAlloc(LPVOID lpAddress, SIZE_T dwSize, DWORD flAllocationType, DWORD flProtect);
+dllimport GetStdHandle  ;; HANDLE __stdcall GetStdHandle (DWORD nStdHandle);
+dllimport WriteFile  ;; BOOL __stdcall WriteFile (HANDLE hFile, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfBytesWritten, LPOVERLAPPED lpOverlapped);
+dllimport ExitProcess  ;; void __stdcall __noreturn ExitProcess (UINT uExitCode);
+dllimport GetFileType  ;; DWORD __stdcall GetFileType (HANDLE hFile);
+dllimport SetFilePointer  ;; DWORD __stdcall SetFilePointer (HANDLE hFile, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, DWORD dwMoveMethod);
+dllimport DeleteFileA  ;; BOOL __stdcall DeleteFileA (LPCSTR lpFileName);
+dllimport SetEndOfFile  ;; BOOL __stdcall SetEndOfFile (HANDLE hFile);
+dllimport CloseHandle  ;; BOOL __stdcall CloseHandle (HANDLE hObject);
+dllimport MoveFileA  ;; BOOL __stdcall MoveFileA (LPCSTR lpExistingFileName, LPCSTR lpNewFileName);
+dllimport SetCurrentDirectoryA  ;; BOOL __stdcall SetCurrentDirectoryA (LPCSTR lpPathName);
+dllimport GetLocalTime  ;; void __stdcall GetLocalTime (LPSYSTEMTIME lpSystemTime);
+dllimport GetLastError  ;; DWORD __stdcall GetLastError ();
+dllimport GetCurrentDirectoryA  ;; DWORD __stdcall GetCurrentDirectoryA (DWORD nBufferLength, LPSTR lpBuffer);
+dllimport GetFileAttributesA  ;; DWORD __stdcall GetFileAttributesA (LPCSTR lpFileName);
+dllimport FindClose  ;; BOOL __stdcall FindClose (HANDLE hFindFile);
+dllimport FindFirstFileA  ;; HANDLE __stdcall FindFirstFileA (LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindFileData);
+dllimport FindNextFileA  ;; BOOL __stdcall FindNextFileA (HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData);
+dllimport LocalFileTimeToFileTime  ;; BOOL __stdcall LocalFileTimeToFileTime (const FILETIME *lpLocalFileTime, LPFILETIME lpFileTime);
+dllimport DosDateTimeToFileTime  ;; BOOL __stdcall DosDateTimeToFileTime (WORD wFatDate, WORD wFatTime, LPFILETIME lpFileTime);
+dllimport FileTimeToDosDateTime  ;; BOOL __stdcall FileTimeToDosDateTime (const FILETIME *lpFileTime, LPWORD lpFatDate, LPWORD lpFatTime);
+dllimport FileTimeToLocalFileTime  ;; BOOL __stdcall FileTimeToLocalFileTime (const FILETIME *lpFileTime, LPFILETIME lpLocalFileTime);
+dllimport GetFullPathNameA  ;; DWORD __stdcall GetFullPathNameA (LPCSTR lpFileName, DWORD nBufferLength, LPSTR lpBuffer, LPSTR *lpFilePart);
+dllimport SetFileTime  ;; BOOL __stdcall SetFileTime (HANDLE hFile, const FILETIME *lpCreationTime, const FILETIME *lpLastAccessTime, const FILETIME *lpLastWriteTime);
+dllimport GetFileTime  ;; BOOL __stdcall GetFileTime (HANDLE hFile, LPFILETIME lpCreationTime, LPFILETIME lpLastAccessTime, LPFILETIME lpLastWriteTime);
+dllimport ReadFile  ;; BOOL __stdcall ReadFile (HANDLE hFile, LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead, LPOVERLAPPED lpOverlapped);
+dllimport SetConsoleMode  ;; BOOL __stdcall SetConsoleMode (HANDLE hConsoleHandle, DWORD dwMode);
+dllimport GetConsoleMode  ;; BOOL __stdcall GetConsoleMode (HANDLE hConsoleHandle, LPDWORD lpMode);
+dllimport CreateFileA  ;; HANDLE __stdcall CreateFileA (LPCSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile);
+dllimport SetConsoleCtrlHandler  ;; BOOL __stdcall SetConsoleCtrlHandler (PHANDLER_ROUTINE HandlerRoutine, BOOL Add);
+dllimport GetModuleFileNameA  ;; DWORD __stdcall GetModuleFileNameA (HMODULE hModule, LPSTR lpFilename, DWORD nSize);
+dllimport GetEnvironmentStrings  ;; LPCH __stdcall GetEnvironmentStrings ();
+dllimport GetCommandLineA  ;; LPSTR __stdcall GetCommandLineA ();
+dllimport GetCPInfo  ;; BOOL __stdcall GetCPInfo (UINT CodePage, LPCPINFO lpCPInfo);
+dllimport ReadConsoleInputA  ;; BOOL __stdcall ReadConsoleInputA (HANDLE hConsoleInput, PINPUT_RECORD lpBuffer, DWORD nLength, LPDWORD lpNumberOfEventsRead);
+dllimport PeekConsoleInputA  ;; BOOL __stdcall PeekConsoleInputA (HANDLE hConsoleInput, PINPUT_RECORD lpBuffer, DWORD nLength, LPDWORD lpNumberOfEventsRead);
+;dllimport LocalAlloc  ;; HLOCAL __stdcall LocalAlloc (UINT uFlags, SIZE_T uBytes);
+dllimport VirtualAlloc  ;; LPVOID __stdcall VirtualAlloc(LPVOID lpAddress, SIZE_T dwSize, DWORD flAllocationType, DWORD flProtect);
 
 NULL equ 0
 

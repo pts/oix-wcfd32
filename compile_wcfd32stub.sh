@@ -27,12 +27,11 @@ mv w.exe wcfd32dos.exe
 nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o wcfd32dosp.exe wcfd32dosp.nasm
 
 nasm-0.98.39 -O999999999 -w+orphan-labels -f obj -o wcfd32win32.obj wcfd32win32.nasm
-awk '$1=="extern"&&$2~/^__imp__/{$0=$2;sub(/^__imp__/,"");print"import \x27_"$0"\x27 \x27kernel32.dll\x27."$0}' <wcfd32win32.nasm >wcfd32import.lnk
 # `option heapsize=' is ignored by WLINK, SizeOfHeapReserve will always be
 # 0. `commit heap=' is saved to SizeOfHeapCommit. SizeOfHeapCommit matters
 # for mwpestub LocalAlloc and HeapAlloc. It's not needed by Win32
 # LocalAlloc or mwpestub VirtualAlloc.
-"$wlink" @wcfd32import.lnk form win nt ru con=3.10 op stub=wcfd32dosp.exe op q op d op h=1 com h=0 n wcfd32win32.exe f wcfd32win32.obj
+"$wlink" form win nt ru con=3.10 op stub=wcfd32dosp.exe op q op d op h=1 com h=0 n wcfd32win32.exe f wcfd32win32.obj
 rm -f wcfd32stub  # For correct permissions.
 nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -DLINUXPROG -o wcfd32stub wcfd32stub.nasm
 chmod +x wcfd32stub
