@@ -10,6 +10,10 @@ LOAD_INT21_FUNC_3FH_READ_FROM_FILE equ 0x3f
 LOAD_INT21_FUNC_42H_SEEK_IN_FILE equ 0x42
 LOAD_INT21_FUNC_48H_ALLOCATE_MEMORY equ 0x48
 
+%ifndef   CONFIG_LOAD_CF_HEADER_FOFS
+  %define CONFIG_LOAD_CF_HEADER_FOFS 20h  ; Without CONFIG_LOAD_FIND_CF_HEADER, we only try at offset 20h, that's the self-offset for the MZ-flavored wcfd32stub.
+%endif
+
 ; load_error_t __usercall load_wcfd32_program_image@<eax>(const char *filename@<eax>)
 ; Returns:
 ; * EAX: On success, entry point address. On error, -LOAD_ERROR_*. Success iff (unsigned)EAX < (unsigned)-10.
@@ -48,9 +52,9 @@ load_wcfd32_program_image:
 %else
   %define CF_SIGNATURE 'CF'  ; Used only once, inline it.
 %endif
-		cmp eax, 20h
+		cmp eax, CONFIG_LOAD_CF_HEADER_FOFS
 		jb .not_at_20h
-		lea edi, [esp+20h]  ; Without CONFIG_LOAD_FIND_CF_HEADER, we only try at offset 20h, that's the self-offset for the MZ-flavored wcfd32stub.
+		lea edi, [esp+CONFIG_LOAD_CF_HEADER_FOFS]
 		cmp dword [edi], CF_SIGNATURE
 		je .found_cf_header
 .not_at_20h:
