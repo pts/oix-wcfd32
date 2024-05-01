@@ -32,17 +32,16 @@ nasm-0.98.39 -O999999999 -w+orphan-labels -f obj -o wcfd32win32.obj wcfd32win32.
 # for mwpestub LocalAlloc and HeapAlloc. It's not needed by Win32
 # LocalAlloc or mwpestub VirtualAlloc.
 "$wlink" form win nt ru con=3.10 op stub=wcfd32dosp.exe op q op d op h=1 com h=0 n wcfd32win32.exe f wcfd32win32.obj
+nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o wcfd32stub.bin wcfd32stub.nasm  # Final output: wcfd32stub.bin.
+nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o wcfd32linux.bin wcfd32linux.nasm
 rm -f wcfd32stub  # For correct permissions.
 nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -DLINUXPROG -o wcfd32stub wcfd32stub.nasm
 chmod +x wcfd32stub
 # Final output: wcfd32stub Linux i386 executable program.
-nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o wcfd32stub.bin wcfd32stub.nasm
-# Final output: wcfd32stub.bin.
 
 rm -f wcfd32linux  # For correct permissions.
 nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -DRUNPROG -o wcfd32linux wcfd32linux.nasm
 chmod +x wcfd32linux
-nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o wcfd32linux.bin wcfd32linux.nasm
 
 # Example OIX hello-world program.
 nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o hello.oix hello.nasm
