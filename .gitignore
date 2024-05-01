@@ -22,8 +22,6 @@
 /wcfd32win32.exe
 /wcfd32win32.obj
 /wcfd32linux
-/hello
-/hello.exe
 *.oix
 *.o
 *.obj
@@ -42,3 +40,9 @@
 /cf/w32bind.exe
 /cf/w32bind.o
 /osi/rex2oix
+/asm_demo/*.oix
+/asm_demo/*.exe
+/asm_demo/answer42
+/asm_demo/hello
+/asm_demo/example
+/asm_demo/talk
