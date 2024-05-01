@@ -136,6 +136,10 @@ _start:
 		; Call: far call.
 		; Output: EAX: exit code (0 for EXIT_SUCCESS).
 		push 0  ; Simulate that the break flag is always 0. WLIB needs it.
+		; TODO(pts): Make it smaller by using stosd or push.
+		;mov dword [wcfd32_copyright], 0  ; Not needed, .bss is zero-initialized by PMODE/W.
+		;mov dword [wcfd32_is_japanese], 0  ; Not needed, .bss is zero-initialized by PMODE/W.
+		;mov dword [wcfd32_max_handle_for_os2], 0  ; Not needed, .bss is zero-initialized by PMODE/W.
 		mov [wcfd32_break_flag_ptr], esp
 		mov [wcfd32_program_filename], edi
 		mov [wcfd32_command_line], ebp
