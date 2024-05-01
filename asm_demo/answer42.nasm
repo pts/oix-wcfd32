@@ -1,6 +1,8 @@
 ;
-; answer42.nasm: example NASM source code for an OIX program which just does exit(42)
+; answer42.nasm: exit(42) demo program for OIX, written in NASM
 ; by pts@fazekas.hu at Wed May  1 04:34:36 CEST 2024
+;
+; Compile with: nasm -O999999999 -w+orphan-labels -f bin -o answer42.oix answer42.nasm
 ;
 
 bits 32

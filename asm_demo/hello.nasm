@@ -1,4 +1,9 @@
+;
+; hello.nasm: hello-world demo program for OIX, written in NASM
 ; by pts@fazekas.hu at Fri Apr 26 08:48:19 CEST 2024
+;
+; Compile with: nasm -O999999999 -w+orphan-labels -f bin -o hello.oix hello.nasm
+;
 
 bits 32
 cpu 386

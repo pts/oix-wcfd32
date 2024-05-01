@@ -1,8 +1,11 @@
 ;
-; example.nasm: an OS-independent program which prints its command line and environment
+; example.nasm: command-line and environment printer demo program for IOX, written in NASM
 ; by pts@fazekas.hu at Fri Apr 26 22:24:38 CEST 2024
 ;
-; It has the same functionality as example.c.
+; Compile with: nasm -O999999999 -w+orphan-labels -f bin -o example.oix example.nasm
+;
+; It has the same functionality as example.c. It doesn't split the
+; command-line arguments to argv.
 ;
 
 bits 32
