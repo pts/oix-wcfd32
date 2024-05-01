@@ -398,6 +398,10 @@ done_message db '.', 13, 10, '$' ; !!
 
 emit_load_errors
 
+; Unfortunately the format LE 4 KiB of alignment between .code and .data, no
+; way to make it smaller, but PMODE/W supports LE only. So we just put
+; everything to .text to save a few KiB.
+;
 ;section .data
 
 
