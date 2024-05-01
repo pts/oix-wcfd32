@@ -51,7 +51,6 @@
 # TODO(pts): (v7) Add time, stat and utime syscalls.
 # TODO(pts): (v8) Add FreeBSD compatibility for oixrun0, and this will make the build system work.
 # TODO(pts): Why doesn't it run with PMODE/W with 0 extended memory? Is it by design? Can it run?
-# TODO(pts): NASM prints an extra newline after each error message (e.g. "division by zero\n\n"). Investigate and fix.
 # TODO(pts): Better error reporting (with at least filename displayed) for oixrun.
 # TODO(pts): Make oixconv/wcfd32stub be able to create non-prelinked ELF programs (without too much bloat?).
 # TODO(pts): Make oixconv/wcfd32stub be able to create prelinked ELF programs with the CFP header.
