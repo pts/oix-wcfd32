@@ -59,9 +59,7 @@ org $$-.vcont  ; Position independent code (PIC): from now all global variables 
 		pop eax  ; Restore. Incoming AH contains the operating system identifier.
 		pop edx  ; Restore.
 		xor ebp, ebp  ; Clear it and also set flags, to make it deterministic.
-		push cs  ; For the `retf' of the far call.
-		call esi  ; Run the loaded program, starting at its entry point.
-		retf
+		jmp esi  ; Run the loaded program, starting at its entry point. Its retf will retf to our caller.
 
 %define CONFIG_LOAD_FIND_CF_HEADER
 %define CONFIG_LOAD_SINGLE_READ
