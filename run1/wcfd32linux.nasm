@@ -15,7 +15,29 @@ file_header:	db 0x7F,'ELF',1,1,1,OSABI_Linux,0,0,0,0,0,0,0,0,2,0,3,0
 		dd program_header-file_header, 0, 0
 		dw program_header-file_header, 0x20, 1, 0, 0, 0
 program_header:	dd 1, 0, file_header, file_header
-		dd prebss-file_header, program_end-bss+prebss-file_header, RWX, 0x1000
+%ifdef SELFPROG
+		dd program_end-file_header
+%else
+		dd prebss-file_header
+%endif
+		dd program_end-bss+prebss-file_header, RWX, 0x1000
+
+%macro assert_at 1
+  times  (%1)-($-$$) db 0
+  times -(%1)+($-$$) db 0
+%endm
+
+%ifdef SELFPROG
+  assert_at 0x54
+  cf_header:
+  .signature:	db 'CF', 0, 0
+  .load_fofs:	dd oix_image-file_header
+  .load_size:	;dd ?
+  .reloc_rva:	equ .load_size+4  ;dd ?
+  ;.mem_size:	;dd ?  ; Must be the same as .load_size (true for oixrun.oix) for the ELF-32 phdr memsiz formula above (program_end-bss+prebss-file_header) to work.
+  .entry_rva:	equ .load_size+0xc  ;dd ?
+		incbin 'oixrun.oix', 8, 0x18-8  ; Fields .load_size, .reloc_rva, .mem_size, .entry_rva.
+%endif  ; SELFPROG.
 
 ; Linux i386 syscall numbers.
 SYS_exit equ 1
@@ -85,10 +107,38 @@ EXIT_SUCCESS equ 0
 EXIT_FAILURE equ 1
 
 
-_start:  ; Program entry point.
+_start:  ; Linux i386 program entry point.
 %ifndef RUNPROG
+  %ifndef SELFPROG
 		mov esi, bss  ; Value will be patched by wfcd32stub to WCFD32 program entry_vaddr during executable program file generation.
 		; Now: ESI: entry point address.
+  %endif
+%endif
+%ifdef SELFPROG  ; Apply relocations.
+		mov edx, oix_image  ; Same as [cf_header.load_fofs]. Moving it without changing the ELF-32 phdr fields is not supported.
+		mov esi, [cf_header.reloc_rva]
+.apply_relocations:
+		; Apply relocations.
+		; Input: EDX: image_base; ESI: reloc_rva.
+		; Spoils: EAX, EBX, ECX, ESI.
+		add esi, edx  ; ESI := image_base + cf_header.reloc_rva (old EDX).
+		jmp strict short .next_block
+.next_reloc:	lodsw
+		add ebx, eax
+.first_reloc:	add [ebx], edx
+		loop .next_reloc
+.next_block:	lodsw
+		movzx ecx, ax
+		jecxz .rdone
+		lodsd
+		xchg ebx, eax  ; EBX := EAX; EAX := junk.
+		ror ebx, 16
+		add ebx, edx
+		xor eax, eax
+		jmp strict short .first_reloc
+.rdone:		; Keep image_base in EDX. It will be unused.
+		mov esi, [cf_header.entry_rva]
+		add esi, edx
 %endif
 		pop edx  ; argc.
 %ifdef RUNPROG
@@ -145,7 +195,7 @@ _start:  ; Program entry point.
 		jmp .exit ; exit(load_error_code).
 .load_ok:	; Now: EAX: entry point address.
 %else
-		xchg eax, esi  ; EAX := ESI; ESI := junk.
+		xchg eax, esi  ; EAX := ESI (entry point address); ESI := junk.
 %endif  ; else RUNPROG.
 		; Now we call the entry point.
 		;
@@ -994,7 +1044,9 @@ msg_unimplemented: db 'fatal: unimplemented syscall 0x',
 		_malloc_simple_free	dd 0  ; char *free;
 		_malloc_simple_end	dd 0  ; char *end;
   prebss:
-  bss:  ; .bss must be empty so that the WCFD32 program image can be appended.
+  bss:  ; .bss must be empty so that the OIX program image can be appended.
 %endif
-
+%ifdef SELFPROG
+  oix_image:	incbin 'oixrun.oix', 0x18
+%endif
 program_end:

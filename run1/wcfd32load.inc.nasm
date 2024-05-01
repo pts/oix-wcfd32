@@ -43,12 +43,20 @@ load_wcfd32_program_image:
 		; Now find the CF header in ESP[0 : 200h]. This logic is duplicated in wcfd32stub.nasm.
 		sub eax, 18h
 		jb .invalid
-%ifdef CONFIG_LOAD_FIND_CF_HEADER  ; Not needed by the WCFD32 .exe files we create.
+%ifdef CONFIG_LOAD_FIND_CF_HEADER
 		mov edx, 'CF'  ; "CF\0\0". CF header signature.
   %define CF_SIGNATURE edx
 		mov edi, esp
 		cmp dword [edi], CF_SIGNATURE
 		je .found_cf_header
+		cmp dword [esp], 7fh|'ELF'<<8
+		jne .not_elf
+		cmp eax, 54h
+		jb .not_elf
+		lea edi, [esp+54h]
+		cmp dword [edi], CF_SIGNATURE
+		je .found_cf_header
+.not_elf:
 %else
   %define CF_SIGNATURE 'CF'  ; Used only once, inline it.
 %endif
@@ -158,7 +166,7 @@ load_wcfd32_program_image:
 		push ecx
 		push edi
 		push eax
-		mov ecx, [edi+0x10]  ; mem_size.
+		mov ecx, [edi+10h]  ; mem_size.
 		mov edi, [edi+8]  ; load_size.
 		sub ecx, edi
 		add edi, esi  ; image_base.

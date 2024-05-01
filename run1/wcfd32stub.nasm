@@ -55,7 +55,15 @@ _start:		pop eax  ; Skip argc.
 		mov esi, read_buf
 		cmp dword [esi], edx
 		je .cf_found
-		cmp eax, 0x20
+		cmp dword [esi], 0x7f|'ELF'<<8
+		jne .not_elf
+		cmp eax, 0x54
+		jb .not_elf
+		cmp dword [esi+0x54], edx
+		jne .not_elf
+		add esi, 0x54
+		jmp .cf_found
+.not_elf:	cmp eax, 0x20
 		jb .s3
 		add esi, 0x20
 		cmp dword [esi], edx

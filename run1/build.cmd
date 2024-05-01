@@ -41,9 +41,9 @@ del wcfd32win32.exe
 @if errorlevel 1 exit /b 1
 %nasm% -O999999999 -w+orphan-labels -f bin -DRUNPROG -DOIXRUN0 -o oixrun0 wcfd32linux.nasm
 @if errorlevel 1 exit /b 1
-%nasm% -O999999999 -w+orphan-labels -f bin -DRUNPROG -DOIXRUN -o oixrun wcfd32linux.nasm
-@if errorlevel 1 exit /b 1
 %nasm% -O999999999 -w+orphan-labels -f bin -o oixrun.oix oixrun.nasm
+@if errorlevel 1 exit /b 1
+%nasm% -O999999999 -w+orphan-labels -f bin -DSELFPROG -DOIXRUN -o oixrun wcfd32linux.nasm
 @if errorlevel 1 exit /b 1
 %nasm% -O999999999 -w+orphan-labels -f bin -o oixrun0.exe -DOIXRUN0 oixrunexe.nasm
 @if errorlevel 1 exit /b 1

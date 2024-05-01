@@ -9,13 +9,13 @@ mz_header:  ; This is not valid DOS MZ header, but it's good enough for wcfd32st
                times 8 dw 0
 %endif
 cf_header:  ; The 32-bit DOS loader finds it at mz_header.hdrsize. Must be aligned to 0x10.
-.signature:	dd 'CF'                ; +0x00. Signature.
-.load_fofs:	dd text-$$             ; +0x04. load_fofs.
-.load_size:	dd prebss-text         ; +0x08. load_size.
-.reloc_rva:	dd relocations-text    ; +0x0c. reloc_rva.
-.mem_size:	dd program_end-bss+prebss-text  ; +0x10. mem_size.
-.entry_rva:	dd _start-text         ; +0x14. entry_rva.
-		; End.                 ; +0x18. Size.
+.signature:	dd 'CF'                 ; +0x00. Signature.
+.load_fofs:	dd text-$$              ; +0x04. load_fofs.
+.load_size:	dd prebss-text          ; +0x08. load_size.
+.reloc_rva:	dd ..@relocations-text  ; +0x0c. reloc_rva.
+.mem_size:	dd prebss-text          ; +0x10. mem_size. For this program, it must be the same as mem_size, because wcfd32linux.nasm assumes it in its ELF headers.
+.entry_rva:	dd _start-text          ; +0x14. entry_rva.
+		; End.                  ; +0x18. Size.
 text:
 
 ; WCFD32 ABI constants.
@@ -29,8 +29,8 @@ org $$-.vcont  ; Position independent code (PIC): from now all global variables 
 		pop ebp  ; EBP := vaddr of .vcont.
 		push edx  ; Save.
 		push eax  ; Save.
-		mov [ebp+wcfd32_far_syscall_offset], edx
-		mov [ebp+wcfd32_far_syscall_segment], bx
+		mov [ebp+wcfd32_syscall.offset], edx
+		mov [ebp+wcfd32_syscall.segment], bx
 		mov eax, [edi+4]  ; dword [wcfd32_param_struct+4]: command-line (ASCIIZ).
 		call parse_first_arg
 		cmp eax, [edi+4]
@@ -59,14 +59,22 @@ org $$-.vcont  ; Position independent code (PIC): from now all global variables 
 		pop edx  ; Restore.
 		xor ebp, ebp  ; Clear it and also set flags, to make it deterministic.
 		jmp esi  ; Run the loaded program, starting at its entry point. Its retf will retf to our caller.
+		; Not reached.
 
 %define CONFIG_LOAD_FIND_CF_HEADER
 %define CONFIG_LOAD_SINGLE_READ
-%define CONFIG_LOAD_INT21H call far [ebp+wcfd32_far_syscall_offset]
+%define CONFIG_LOAD_INT21H call wcfd32_syscall
 %undef  CONFIG_LOAD_MALLOC_EAX
 %undef  CONFIG_LOAD_MALLOC_EBX
 %define CONFIG_LOAD_CLEAR_BSS
 %include "wcfd32load.inc.nasm"  ; We use the fact that this code doesn't read or write EBP.
+
+wcfd32_syscall:
+		db 0x9a  ; `call <segment>:<offset>'.
+.offset:	dd 0  ; _start will patch it to the real syscall offset.
+..@relocations:  ; Must be 2 zero bytes, to indicate end-of-relocations. It would be hard to generate them from NASM, so we use EBP+... effective addresses instead.
+.segment:	dw 0  ; _start will patch it to the real syscall offset.
+		ret
 
 print_str:  ; Prints the NUL-terminated string in EAX to stdout.
 		push ebx
@@ -82,7 +90,7 @@ print_str:  ; Prints the NUL-terminated string in EAX to stdout.
 		push STDOUT_FILENO
 		pop ebx
 		mov ah, INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE
-		call far [ebp+wcfd32_far_syscall_offset]
+		call wcfd32_syscall
 .after_write:	pop eax
 		pop edx
 		pop ecx
@@ -257,17 +265,9 @@ parse_first_arg:
 msg:		db 'Hello, World!', 13, 10, 0
 %endif
 
-msg_usage:	db 'Usage: oixrun <prog.oix> [<arg> ...]', 13, 10  ; Falls through to cf_header.reloc_rva.
-relocations:	dw 0  ; Must be 2 zero bytes, to indicate end-of-relocations. It would be hard to generate them from NASM, so we use EBP+... effective addresses instead.
+msg_usage:	db 'Usage: oixrun <prog.oix> [<arg> ...]', 13, 10, 0
 
 emit_load_errors
 
-prebss:
-bss_align equ (text-$)&3
-section .bss align=1  ; We could use `absolute $' here instead, but that's broken (breaks address calculation in program_end-bss+prebss-file_header) in NASM 0.95--0.97.
-bss:		resb bss_align  ; Uninitialized data follows.
-
-wcfd32_far_syscall_offset: resd 1
-wcfd32_far_syscall_segment: resd 1  ; Only word size, but using dword for alignment.
-
-program_end:
+prebss:  ; No BSS at all, it would break ELF-32 phdr memsiz in wcfd32linux.nasm.
+;program_end:  Not defined.
