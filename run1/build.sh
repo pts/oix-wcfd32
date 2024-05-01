@@ -1,9 +1,56 @@
 #! /bin/sh --
+#
+# build.sh: build script for the WCFD32 runtime system on Win32
 # by pts@fazekas.hu at Wed May  1 03:26:19 CEST 2024
+#
+# To run it, just open a termainal, cd to the directory containing this
+# file, and then run: sh build.sh
+#
+# This build script works on Linux i386 and amd64, because it uses the
+# tools/wlink (WLINK: OpenWatcom Linker 1.4) and tools/nasm (NASM: Netwide
+# Assembler 0.98.39) executable programs, which are compiled for Linux i386.
+# However, if you can get these two tools running on your Unix system, the
+# build will work, because it uses cross compilation.
+#
+# This build:
+#
+# * is reproducible: it produces identical files as output when run again.
+# * is multi-target: it builds for all targets (operating systems)
+# * uses cross-compilation: it doesn't run any program it builds on the
+#   build host system, it runs nasm and wlink only
+#
+# Output files of this build:
+#
+# * oixrun and oixrun0: OIX program runners for Linux. It will be made work on
+#   FreeBSD as well later
+# * oixrun.oix: OIX program runner for OIX. Most people don't need it, it's
+#   a nice meta touch: `oixrun oixrun.oix oixrun.oix oixrun.oix hello.oix`.
+# * oixrun.exe and oixrun0.exe: OIX program runner for Win32 and 32-bit DOS.
+#   It is self-contained, even the DOS extender PMODE/W 1.33 is included.
+# * wcfd32stub: preliminary OIX converter which can convert an .oix program
+#   file to a self-contained Linux i386 executable program or a
+#   self-contained Win32--DOS program .exe. Eventually this will be replaced
+#   with oixconv, oixconv.exe and oixconv.oix.
+#
+# TODO(pts): Add build.cmd for building on Win32.
+# TODO(pts): Rebuild oixrun from oixrun.nasm instead as an OIX program (ELF-flavored OIX), using NASM. oixrun0: native Linux implementation; oixrun: ELF-flavored OIX implementation; oixrun1: prelinked ELF
+# TODO(pts): Add usage message for oixstub.
+# TODO(pts): Build oixstub.exe and oixstub, using NASM, from new OIX oixstub.nasm sources.
+# TODO(pts): Make the relocation `dw 0' in oixrun.nasm 1 byte shorter by moving it (but not into the CF header, to save memory).
+# TODO(pts): (v2) Drop WLINK as a build dependency, use NASM only. For that we need to build the PE executable with NASM (hard).
+# TODO(pts): (v3) Replace NASM with nasm0.oix, oixrun0 and oixrun0.exe for the build.
+# TODO(pts): (v4) Add compressed nasm0.oix (upxbc --elftiny).
+# TODO(pts): (v6) Add missing non-time syscalls.
+# TODO(pts): (v7) Add time, stat and utime syscalls.
+# TODO(pts): (v8) Add FreeBSD compatibility, and this will make the build system work.
+#
+
 set -ex
 test "${0%/*}" = "$0" || cd "${0%/*}"
 
 unset WATCOM WLANG INCLUDE  # For wlink.
+unset LANG LANGUAGE LC_ALL LC_CTYPE LC_MESSAGES LC_NUMERIC LC_TIME TZ  # For reproducible results.
+export LC_ALL=C TZ=GMT  # For reproducible results.
 
 wlink=tools/wlink  # OpenWatcom 1.4 (2005-11-15) was the first one with a Linux binary release.
 nasm=tools/nasm    # NASM 0.98.39 (2005-01-15) was the last version without amd64 (`bits 64') support. Integers are still 32-bit.
@@ -44,13 +91,6 @@ chmod +x oixrun  # Final output: oixrun i386 executable program.
 "$nasm" -O999999999 -w+orphan-labels -f bin -o oixrun0.exe -DOIXRUN0 oixrunexe.nasm  # -DOIXRUN0 doesn't make a difference, it's precompiled.
 "$nasm" -O999999999 -w+orphan-labels -f bin -o oixrun.exe -DOIXRUN oixrunexe.nasm
 
-# TODO(pts): Add build.cmd for building on Win32.
-# TODO(pts): Rebuild oixrun from oixrun.nasm instead as an OIX program (ELF-flavored OIX), using NASM. oixrun0: native Linux implementation; oixrun: ELF-flavored OIX implementation; oixrun1: prelinked ELF
-# TODO(pts): Add usage message for oixstub.
-# TODO(pts): Build oixstub.exe and oixstub, using NASM, from new OIX oixstub.nasm sources.
-# TODO(pts): Make the relocation `dw 0' in oixrun.nasm 1 byte shorter by moving it (but not into the CF header, to save memory).
-# TODO(pts): (v2) Drop WLINK as a build dependency, use NASM only. For that we need to build the PE executable with NASM (hard).
-# TODO(pts): (v3) Replace NASM with nasm0.oix, oixrun0 and oixrun0.exe for the build.
-# TODO(pts): (v4) Add compressed nasm0.oix (upxbc --elftiny).
+ls -l oixrun0.exe oixrun.exe oixrun0 oixrun oixrun.oix wcfd32stub
 
 : "$0" OK.
