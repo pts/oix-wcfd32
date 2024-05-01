@@ -34,11 +34,17 @@ rm -f wcfd32win32.exe  # Get rid of non-reproducible file.
 rm -f wcfd32linux  # For correct permissions below.
 "$nasm" -O999999999 -w+orphan-labels -f bin -DRUNPROG -o wcfd32linux wcfd32linux.nasm
 chmod +x wcfd32linux  # Final output wcfd32linux i386 executable program.
+rm -f oixrun0  # For correct permissions below.
+"$nasm" -O999999999 -w+orphan-labels -f bin -DRUNPROG -DOIXRUN0 -o oixrun0 wcfd32linux.nasm
+chmod +x oixrun0  # Final output: oixrun0 i386 executable program.
 rm -f oixrun  # For correct permissions below.
 "$nasm" -O999999999 -w+orphan-labels -f bin -DRUNPROG -DOIXRUN -o oixrun wcfd32linux.nasm
 chmod +x oixrun  # Final output: oixrun i386 executable program.
+"$nasm" -O999999999 -w+orphan-labels -f bin -o oixrun.oix oixrun.nasm
+
 # TODO(pts): Rebuild oixrun from oixrun.nasm instead as an OIX program, and keep the previous oixrun as oixrun0.
 # TODO(pts): Build oixrun.exe for DOS and Win32 directly, using NASM.
+# TODO(pts): Add build.cmd for building on Win32.
 # TODO(pts): Build oixstub.exe and oixstub, using NASM, from new OIX oixstub.nasm sources.
 # TODO(pts): Add usage message for oixstub.
 # TODO(pts): (v2) Drop WLINK as a build dependency, use NASM only.

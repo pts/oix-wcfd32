@@ -1,5 +1,8 @@
 *~
 /run1/oixrun
+/run1/oixrun.exe
+/run1/oixrun0
+/run1/oixrun0.exe
 /run1/w.exe
 /run1/wcfd32dos.exe
 /run1/wcfd32dosp.exe
@@ -28,6 +31,8 @@
 /osi5/*.elf
 /oixrun
 /oixrun.exe
+/oixrun0
+/oixrun0.exe
 /cf/cstrtosi.o
 /cf/example.exe
 /cf/example.o
