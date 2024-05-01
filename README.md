@@ -37,9 +37,12 @@ Limitations of OIX (as introduced by Watcom in 1994):
   64-bit (long) mode of newer Intel x86 CPUs is also not supported. Other
   architectures such as ARM or RISC-V aren't supported either.
 * All code and data (.text, .rodata, .data, .bss and .stack sections) is
-  read-write-execute.
+  read-write-execute. This makes it an easer target for hackers.
 * It's not possible to return unused memory to the operating system.
 * It suppots only file seek offsets less than 2 GiB.
+* Debugging is not supported. There is no symbol table or other debug info.
+* Networking is not supported.
+* Multihreaded programs are not supported.
 * Watcom hasn't released any official documentation.
 * Watcom hasn't made available development tools (such as assemblers, C
   compilers) neither as proprietary nor free software, so it wasn't easy for
