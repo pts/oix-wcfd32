@@ -1,10 +1,14 @@
 #! /bin/sh --
 #
-# build.sh: build script for the WCFD32 runtime system on Win32
+# build.sh: build script for the WCFD32 runtime system on Linux
 # by pts@fazekas.hu at Wed May  1 03:26:19 CEST 2024
 #
-# To run it, just open a termainal, cd to the directory containing this
+# To run it, just open a terminal, cd to the directory containing this
 # file, and then run: sh build.sh
+#
+# See also the equivalent build script build.cmd, which runs on Win32
+# (Windows NT or newer). The commands in these two scripts are kept in sync
+# manually.
 #
 # This build script works on Linux i386 and amd64, because it uses the
 # tools/wlink (WLINK: OpenWatcom Linker 1.4) and tools/nasm (NASM: Netwide
@@ -32,11 +36,10 @@
 #   self-contained Win32--DOS program .exe. Eventually this will be replaced
 #   with oixconv, oixconv.exe and oixconv.oix.
 #
-# TODO(pts): Add build.cmd for building on Win32.
-# TODO(pts): Rebuild oixrun from oixrun.nasm instead as an OIX program (ELF-flavored OIX), using NASM. oixrun0: native Linux implementation; oixrun: ELF-flavored OIX implementation; oixrun1: prelinked ELF
-# TODO(pts): Add usage message for oixstub.
-# TODO(pts): Build oixstub.exe and oixstub, using NASM, from new OIX oixstub.nasm sources.
 # TODO(pts): Make the relocation `dw 0' in oixrun.nasm 1 byte shorter by moving it (but not into the CF header, to save memory).
+# TODO(pts): Rebuild oixrun from oixrun.nasm instead as an OIX program (ELF-flavored OIX), using NASM. oixrun0: native Linux implementation; oixrun: ELF-flavored OIX implementation; oixrun1: prelinked ELF
+# TODO(pts): Add usage message for oixconv.
+# TODO(pts): Build oixconv.exe and oixconv, using NASM, from new OIX oixconv.nasm sources. Port the Linux-only code in wcfd32stub.nasm to OIX.
 # TODO(pts): (v2) Drop WLINK as a build dependency, use NASM only. For that we need to build the PE executable with NASM (hard).
 # TODO(pts): (v3) Replace NASM with nasm0.oix, oixrun0 and oixrun0.exe for the build.
 # TODO(pts): (v4) Add compressed nasm0.oix (upxbc --elftiny).
@@ -90,6 +93,7 @@ chmod +x oixrun  # Final output: oixrun i386 executable program.
 "$nasm" -O999999999 -w+orphan-labels -f bin -o oixrun.oix oixrun.nasm
 "$nasm" -O999999999 -w+orphan-labels -f bin -o oixrun0.exe -DOIXRUN0 oixrunexe.nasm  # -DOIXRUN0 doesn't make a difference, it's precompiled.
 "$nasm" -O999999999 -w+orphan-labels -f bin -o oixrun.exe -DOIXRUN oixrunexe.nasm
+# TODO(pts): Sync changes from build.sh to build.cmd.
 
 ls -l oixrun0.exe oixrun.exe oixrun0 oixrun oixrun.oix wcfd32stub
 
