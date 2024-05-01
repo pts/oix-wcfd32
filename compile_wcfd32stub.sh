@@ -13,6 +13,7 @@ nasm=run1/tools/nasm  # NASM 0.98.39 (2005-01-15) was the last version without a
 "$nasm" -O999999999 -w+orphan-labels -f bin -o asm_demo/answer42.oix asm_demo/answer42.nasm
 "$nasm" -O999999999 -w+orphan-labels -f bin -o asm_demo/hello.oix    asm_demo/hello.nasm
 "$nasm" -O999999999 -w+orphan-labels -f bin -o asm_demo/example.oix  asm_demo/example.nasm
+"$nasm" -O999999999 -w+orphan-labels -f bin -o asm_demo/talk.oix     asm_demo/talk.nasm
 
 #"$nasm" -O999999999 -w+orphan-labels -f bin -o wasm106.exe wasm106.nasm
 # Don't do it for oixrun.oix, because that would spoil the CF header in `oixrun'.

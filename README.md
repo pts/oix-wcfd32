@@ -376,7 +376,8 @@ will depend on NASM only.
 ## Building OIX programs from NASM assembly source
 
 You can use the *asm\_demo/answer42.nasm*, *asm\_demo/hello.nasm*,
-*asm\_demo/example.nasm* and *run1/oixrun.nasm* NASM assembly source files
+*asm\_demo/example.nasm*, *asm\_demo/talk.nasm* and
+*run1/oixrun.nasm* NASM assembly source files
 in the Git repository as tutorials and reference implementations to write
 your own programs.
 
