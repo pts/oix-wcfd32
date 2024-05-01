@@ -1,6 +1,6 @@
 # oix-wcfd32: revival of OIX, the Watcom i386 operating-system-independent target
 
-oix-wcfd32 contains development tools, loaders, converters and
+oix-wcfd32 contains development tools, runners, converters and
 documentation for OIX, the Watcom i386 operating-system-independent target.
 One goal is porting, i.e. to make it possible to run some old Watcom
 programs (WASM and WLIB) using this target on more systems such as Linux
@@ -105,7 +105,7 @@ of the programs they released, it looks like they were using the Watcom
 C/C++ compiler and WASM (Watcom Assembler) to create those programs, and
 also some unreleased custom tools and config files. Some files have been
 released as part of OpenWatcom, e.g. the source files for building the
-loaders are in the *bld/w32loadr* directory of
+runners (loaders) are in the *bld/w32loadr* directory of
 [open_watcom_1.0.0-src.zip](https://openwatcom.org/ftp/source/open_watcom_1.0.0-src.zip)
 (2003-01-24).
 Also the same source archive contains some C source files with `#if
@@ -117,7 +117,7 @@ with the Watcom C compiler targeting OIX.
 However, the compilation scripts and the documentation are not provided, and
 it looks like many of the files are missing.
 
-The source code for the loaders (the native program which loads and executes
+The source code for the runners (the native program which loads and executes
 the OIX program) has been released in the *bld/w32loadr* directory above,
 but the source of the DOS extender (needed for building *w32run.exe*) is
 missing, and it's not possible to reproduce working binaries with modern
@@ -150,7 +150,7 @@ software targeting OIX:
 
   We can work this around by using PMODE/W 1.33 and *wcfd32dos.exe* instead.
 
-* The OIX implementation for OS/2 and DOS loader (which loads *w32run.exe*):
+* The OIX implementation for OS/2 and DOS runner (which loads *w32run.exe*):
   It can be grabbed from the first 0x2800 bytes of *binw/wasm.exe* and
   *binw/wlib.exe* (in Watcom C/C++ 10.x and 11.x). It looks like it's
   possible to build this from sources: *loader16.asm*, *dpmildr.asm*,
@@ -182,22 +182,22 @@ Windows). It will be implemented for FreeBSD i386.
 WCFD32 provides the converter program *wcfd32stub* (currently it runs only
 on Linux i386) which can extract the OIX program headers and image from a
 program file (typically an .exe, such as
-*binw/wasm.exe*), and build new program files by adding a different loader.
+*binw/wasm.exe*), and build new program files by adding a different runner.
 
-WCFD32 provides the following loaders (and *wcfd32stub* can add them):
+WCFD32 provides the following runners (and *wcfd32stub* can add them):
 
-* The MZ-flavored loader is an .exe program which works on both 32-bit DOS
+* The MZ-flavored runner is an .exe program which works on both 32-bit DOS
   (including emulators such as DOSBox) and Win32 (buth 32-bit and 64-bit
   Windows). It has very little memory overhead, and on DOS it can use all
   available conventional and high memory (transparently). The program file is
-  self-contained: with the loader and OIX program combined to a single .exe
+  self-contained: with the runner and OIX program combined to a single .exe
   file, no other files are needed on the target system to run the program.
   The memory overhead is very small, only about 64 KiB.
 
-* The ELF-flavored loader is a Linux i386 executable program (running on
+* The ELF-flavored runner is a Linux i386 executable program (running on
   32-bit and 64-bit Linux kernels). In the future the same program will run
   on FreeBSD i386 as well. The program file is self-contained: with the
-  loader and OIX program combined to a single, statically linked ELF
+  runner and OIX program combined to a single, statically linked ELF
   executable file, no other files are needed on the target system to run the
   program. *qemu-i386* can be used to run it on non-x86 Linux systems.
 
@@ -228,7 +228,7 @@ register (EBP) is used to hold the program base address, and thus it cannot
 be used for other purposes at the same time.
 
 The *compile_wcfd32stub.sh* shell script builds these programs (both with
-the MZ-flavored loader and the ELF-flavored loader) automatically.
+the MZ-flavored runner and the ELF-flavored runner) automatically.
 
 ## Building OIX programs from C source
 
@@ -283,7 +283,7 @@ More details:
   ```
 * In your main source file, put the main(...) function last, and don't
   declare any non-const static global variable within the function. If you
-  do so, some loaders will fail to load the program because of load_size
+  do so, some runners will fail to load the program because of load_size
   alignment issues.
 * Don't do any floating-point calculations. If you do so, the Watcom C
   compiler may put some of your constants to global variables, and your
@@ -334,7 +334,7 @@ inline assembly though in *osi3/\_\_osi\_\_.h*.)
 The build process is automated by the  *osi3/osicc* shell script, which runs
 on Linux. The generated OIX program file can be run with *oixrun* or
 converted to combined 32-bit DOS and Win32 .exe program with MZ-flavored
-loader or to Linux i386 executable (of ELF format), both using the
+runner or to Linux i386 executable (of ELF format), both using the
 *wcfd32stub* tool.
 
 ### Version 4: with automatic relocations
@@ -363,7 +363,7 @@ the *oixrun* program yet, run `./compile_wcfd32stub.sh` to build it.
 
 You can then use *wcfd32stub* to create executable programs from
 *cf/example2.oix*. `./wcfd32stub cf/example2.oix cf/example2.exe` creates
-the program with the MZ-flavored loader, and `./wcfd32stub cf/example2.oux
+the program with the MZ-flavored runner, and `./wcfd32stub cf/example2.oux
 cf/example2` creates a Linux i386 executable. Run `chmod +x cf/example2`,
 and then you can run it as `cf/example2`.
 
@@ -407,7 +407,7 @@ The build process of an OIX program from C source:
   script.
 
 * The OIX program can be run with *oixrun* or converted to combined 32-bit
-  DOS and Win32 .exe program with MZ-flavored loader or to Linux i386
+  DOS and Win32 .exe program with MZ-flavored runner or to Linux i386
   executable (of ELF format), both using the *wcfd32stub* tool.
 
 It looks like this build process (with *oix2rex*) is very similary to what
@@ -473,7 +473,7 @@ The build process of an OIX program from C source:
   to changed by editing the script.
 
 * The OIX program can be run with *oixrun* or converted to combined 32-bit
-  DOS and Win32 .exe program with MZ-flavored loader or to Linux i386
+  DOS and Win32 .exe program with MZ-flavored runner or to Linux i386
   executable (of ELF format), both using the *wcfd32stub* tool.
 
 ## Running OIX programs on Linux directly
