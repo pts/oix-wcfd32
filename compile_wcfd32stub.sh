@@ -5,8 +5,8 @@ test "${0%/*}" = "$0" || cd "${0%/*}"
 unset WATCOM WLANG INCLUDE  # For wlink.
 
 (cd run1 && . ./build.sh) || exit "$?"
-rm -f wcfd32stub oixrun oixrun0 oixrun.oix
-cp -a run1/wcfd32stub run1/oixrun run1/oixrun0 run1/oixrun.oix ./
+rm -f wcfd32stub oixrun0.exe oixrun0 oixrun.oix
+cp -a run1/wcfd32stub run1/oixrun0.exe run1/oixrun0 run1/oixrun.oix ./
 
 nasm=run1/tools/nasm  # NASM 0.98.39 (2005-01-15) was the last version without amd64 (`bits 64') support. Integers are still 32-bit.
 

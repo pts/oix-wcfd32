@@ -41,13 +41,15 @@ rm -f oixrun  # For correct permissions below.
 "$nasm" -O999999999 -w+orphan-labels -f bin -DRUNPROG -DOIXRUN -o oixrun wcfd32linux.nasm
 chmod +x oixrun  # Final output: oixrun i386 executable program.
 "$nasm" -O999999999 -w+orphan-labels -f bin -o oixrun.oix oixrun.nasm
+"$nasm" -O999999999 -w+orphan-labels -f bin -o oixrun0.exe -DOIXRUN0 oixrunexe.nasm  # -DOIXRUN0 doesn't make a difference, it's precompiled.
+"$nasm" -O999999999 -w+orphan-labels -f bin -o oixrun.exe -DOIXRUN oixrunexe.nasm
 
-# TODO(pts): Rebuild oixrun from oixrun.nasm instead as an OIX program, and keep the previous oixrun as oixrun0.
-# TODO(pts): Build oixrun.exe for DOS and Win32 directly, using NASM.
 # TODO(pts): Add build.cmd for building on Win32.
-# TODO(pts): Build oixstub.exe and oixstub, using NASM, from new OIX oixstub.nasm sources.
+# TODO(pts): Rebuild oixrun from oixrun.nasm instead as an OIX program (ELF-flavored OIX), using NASM. oixrun0: native Linux implementation; oixrun: ELF-flavored OIX implementation; oixrun1: prelinked ELF
 # TODO(pts): Add usage message for oixstub.
-# TODO(pts): (v2) Drop WLINK as a build dependency, use NASM only.
+# TODO(pts): Build oixstub.exe and oixstub, using NASM, from new OIX oixstub.nasm sources.
+# TODO(pts): Make the relocation `dw 0' in oixrun.nasm 1 byte shorter by moving it (but not into the CF header, to save memory).
+# TODO(pts): (v2) Drop WLINK as a build dependency, use NASM only. For that we need to build the PE executable with NASM (hard).
 # TODO(pts): (v3) Replace NASM with nasm0.oix, oixrun0 and oixrun0.exe for the build.
 # TODO(pts): (v4) Add compressed nasm0.oix (upxbc --elftiny).
 
