@@ -13,6 +13,7 @@
 ;    write it to video memory.
 ; !! TODO(pts): Implement Ctrl-<C> and Ctrl-<Break>.
 ; !! TODO(pts): Set up some exception handlers such as division by zero.
+; !! TODO(pts): Support long filenames using some Windows 95 DOS APIs, if available. This will not work on DOSBox.
 ;
 
 bits 32
