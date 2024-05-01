@@ -17,7 +17,6 @@ cf_header:  ; The 32-bit DOS loader finds it at mz_header.hdrsize. Must be align
 .entry_rva:	dd _start-text         ; +0x14. entry_rva.
 		; End.                 ; +0x18. Size.
 text:
-relocations:	dw 0  ; End of relocations. It would be hard to generate them from NASM.
 
 ; WCFD32 ABI constants.
 INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE equ 0x40
@@ -258,7 +257,8 @@ parse_first_arg:
 msg:		db 'Hello, World!', 13, 10, 0
 %endif
 
-msg_usage:	db 'Usage: oixrun <prog.oix> [<arg> ...]', 13, 10, 0
+msg_usage:	db 'Usage: oixrun <prog.oix> [<arg> ...]', 13, 10  ; Falls through to cf_header.reloc_rva.
+relocations:	dw 0  ; Must be 2 zero bytes, to indicate end-of-relocations. It would be hard to generate them from NASM, so we use EBP+... effective addresses instead.
 
 emit_load_errors
 

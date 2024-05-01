@@ -36,7 +36,6 @@
 #   self-contained Win32--DOS program .exe. Eventually this will be replaced
 #   with oixconv, oixconv.exe and oixconv.oix.
 #
-# TODO(pts): Make the relocation `dw 0' in oixrun.nasm 1 byte shorter by moving it (but not into the CF header, to save memory).
 # TODO(pts): Rebuild oixrun from oixrun.nasm instead as an OIX program (ELF-flavored OIX), using NASM. oixrun0: native Linux implementation; oixrun: ELF-flavored OIX implementation; oixrun1: prelinked ELF
 # TODO(pts): Add usage message for oixconv.
 # TODO(pts): Build oixconv.exe and oixconv, using NASM, from new OIX oixconv.nasm sources. Port the Linux-only code in wcfd32stub.nasm to OIX.
