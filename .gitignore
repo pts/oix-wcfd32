@@ -1,4 +1,13 @@
 *~
+/run1/oixrun
+/run1/w.exe
+/run1/wcfd32dos.exe
+/run1/wcfd32dosp.exe
+/run1/wcfd32linux
+/run1/wcfd32linux.bin
+/run1/wcfd32stub
+/run1/wcfd32stub.bin
+/run1/wcfd32win32.exe
 /wasm*.exe
 /wlib*.exe
 /wcfd32dos.exe
