@@ -43,6 +43,9 @@ rm -f wcfd32linux  # For correct permissions.
 nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -DRUNPROG -o wcfd32linux wcfd32linux.nasm
 chmod +x wcfd32linux
 
+# Example OIX exit(42) program.
+nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o answer42.oix answer42.nasm
+
 # Example OIX hello-world program.
 nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o hello.oix hello.nasm
 
@@ -52,7 +55,7 @@ nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o example.oix example.nasm
 nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o oixrun.oix oixrun.nasm
 
 #nasm-0.98.39 -O999999999 -w+orphan-labels -f bin -o wasm106.exe wasm106.nasm
-for f in hello.oix example.oix oixrun.oix wasmx100a.exe wasmx105.exe wasmx106.exe wasmx110b.exe wlibx105.exe wlibx106.exe wlibx110b.exe; do
+for f in answer42.oix hello.oix example.oix oixrun.oix wasmx100a.exe wasmx105.exe wasmx106.exe wasmx110b.exe wlibx105.exe wlibx106.exe wlibx110b.exe; do
   if test -f "$f"; then
     if test "${f%.oix}" = "$f"; then
       head="${f%x*.exe}"
