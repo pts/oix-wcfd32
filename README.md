@@ -15,8 +15,9 @@ and PMODE/W 1.33). It uses the OIX design invented by Watcom in 1994. The
 undocumented parts (most of it) have been reverse engineered.
 
 To see source code of simple programs written for OIX, look at
-*cf/example.c* and *example.nasm* in this Git repository. The compilation
-scripts (running on Linux i386) are also provided.
+*osi4/hello.c*, *osi4/talk.c* and *asm\_demo/hello.nasm* in this Git
+repository. The compilation scripts (running on Linux i386) are also
+provided.
 
 Original OIX does, but WFCD32 doesn't support 32-bit OS/2 2.x and 32-bit
 Windows 3.x as operating systems on which OIX programs can be run. WFCD32
@@ -25,7 +26,7 @@ adds new operating systems: Linux i386 (partial but works) and FreeBSD i386
 
 The license of WCFD32 is GNU GPL v2. All the source code is provided as part
 of the Git repository, and it is derived from free software (mostly
-OpenWatcom 1.0).
+OpenWatcom 1.0 and PMODE/W 1.33).
 
 Limitations of OIX (as introduced by Watcom in 1994):
 
@@ -59,7 +60,7 @@ In the name WCFD32:
 The name OIX is an abvreviation of Operating-system-Independent-eXecutable.
 the filename extension is also `.oix`.
 
-Some specific goals of WCFD32 (not all of them has been achieved):
+Some specific goals of WCFD32 (not all of them has been achieved yet):
 
 * Make it possible to run the precompiled old Watcom tools WASM and WLIB
   (none of them free or open source) on more operating systems such as Linux
@@ -92,7 +93,8 @@ later). Some of these are supported natively, some are supported with helper
 These are the programs officially released by Watcom (as part of Watcom
 C/C++ 10.x and 11.x) which use OIX:
 
-* WASM (Watcom Assembler) *binw/wasm.exe* in 10.0a, 10.5, 10.6, 11.0b, 11.0c.
+* WASM (Watcom Assembler) *binw/wasm.exe* in 10.0a (1994-09-01), 10.5
+  (1995-07-11), 10.6 (1996-02-29), 11.0b (1998-02-24, 11.0c (2002-08-27).
 * WLIB (Watcom Library Manager) *binw/wlib.exe* in 10.5, 10.6 and 11.0b,
   11.0c. (In 10.0a, it was a 16-bit DOS program.)
 * WLINK (Watcom Linker) *binw/wlink.exe* has never used OIX, it had its own
@@ -100,7 +102,8 @@ C/C++ 10.x and 11.x) which use OIX:
   own DOS extender unrelated to OIX.
 
 Since these old Watcom programs are not free software, they are not
-distributed with WCFD32. If you want to run them, you need to purchase a copy.
+distributed with WCFD32. If you want to run them, you need to obtain a copy
+separately.
 
 Watcom hasn't released development tools (such as as assemblers and C
 compilers) for writing programs targeting OIX. By looking at the disassembly
@@ -174,63 +177,219 @@ software targeting OIX:
   I managed to figure it out by looking at the files in *bld/w32loadr* in
   OpenWatcom 1.0.
 
-## Porting tools in WCFD32
+## The OIX executable format
 
-WCFD32 provides the runner program *oixrun*, which can find the OIX program
-headers in a program file, load the OIX program image and execute it.
+Most of this has been reverse engineered for WCFD32. Source code of some
+relevant runners and tools have been studied in the *bld/w32loadr* directory
+of the OpenWatcom 1.0 sources.
+
+The OIX program file may contain additional data and code alongside the OIX
+program. The OIX program conists of the 0x18-byte CF header (with 4 bytes of
+signature: `"CF\0\0"`), a read-write-execute image byte array, and a
+relocation table (part of the image). The memory size can be larger than the
+load size, to accommodate zero-initialized BSS.
+
+The CF header can be in the beginning of the program file, or near the
+beginning (fitting to the first 0x200 bytes), with some within-file pointers
+describing how to find it. The Watcom tools (e.g. *w32run.exe*) were able to
+find it only at one location, the WCFD32 runtime system can find it at
+multiple additional locations, including the beginning of the file.
+
+The CF header consits of 6 dwords, each dword being a little-endian 32-bit
+number (indicated as `dd` below):
+
+```
+struct cf_header {  /* 0x18 bytes. */
+  uint32_t signature;  /* "CF\0\0"; 'C'|'F'<<8. */
+  uint32_t load_fofs;  /* Start reading the image at this file offset. */
+  uint32_t load_size;  /* Load that many image bytes. */
+  uint32_t reloc_rva;  /* Apply relocations starting in the file at load_fofs+reloc_rva. */
+  uint32_t mem_size;   /* Preallocate this many bytes of memory for the image. Fill the bytes between load_size and mem_size with NUL (0 byte). */
+  uint32_t entry_rva;  /* To start the program, do a far call to this many bytes after the allocated memory region. */
+};
+```
+
+This is how the Watcom tools find the CF header: Get word [8] (DOS .exe
+.hdrsize), multiply it by 16, save it to cf_ofs (0x50), and read the CF
+header (0x18 bytes).
+
+Some of the Watcom tools load additional data (called resources) from the
+file near its the end (after the OIX image). However, this is unrelated to
+OIX file format, they do the same for DOS .exe, Win32 PE .exe and Linux i386
+ELF-32 file formats.
+
+TODO(pts): Write more, especially about relocations, argv, environment,
+start ABI, int 21h ABI.
+
+## The WCFD32 runtime system
+
+The WCFD32 runtime system (in short: the runtime) is a set of tools for
+running and converting OIX programs. There are separate developer tools and
+documentation for writing new OIX programs, see them elsewhere in this
+document.
+
+**TL;DR** The WCFD32 runtime system contains the runner program *oixrun*,
+which can find the OIX program headers in a program file, load the OIX
+program image and execute it.
 *oixrun* is implemented for Linux i386 (it runs with both 32-bit and 64-bit
 Linux kernels), 32-bit DOS and Win32 (it runs on both 32-bit and 64-bit
 Windows). It will be implemented for FreeBSD i386.
 
-WCFD32 provides the converter program *wcfd32stub* (currently it runs only
-on Linux i386) which can extract the OIX program headers and image from a
-program file (typically an .exe, such as
-*binw/wasm.exe*), and build new program files by adding a different runner.
+The runtime consists of the following programs:
 
-WCFD32 provides the following runners (and *wcfd32stub* can add them):
+* *oixrun*: This is the runner command-line tool, which can run an OIX
+  program file. It works like this: `./oixrun <prog.oix> <arg1> <arg2> ...`.
+  Not all OIX programs have an
+  .oix extension, for example the Watcom tools *binw/wasm.exe* and
+  *binw/wlib.exe* have the .exe extension. The runtime doesn't care about
+  the filename or extension, it finds the and runs the OIX program within
+  those files as well.
 
-* The MZ-flavored runner is an .exe program which works on both 32-bit DOS
-  (including emulators such as DOSBox) and Win32 (buth 32-bit and 64-bit
-  Windows). It has very little memory overhead, and on DOS it can use all
-  available conventional and high memory (transparently). The program file is
-  self-contained: with the runner and OIX program combined to a single .exe
-  file, no other files are needed on the target system to run the program.
-  The memory overhead is very small, only about 64 KiB.
+  *oixrun* has been ported to multiple operating systems, and all of them
+  are built from source as port of the WCFD32 runtime build process (see
+  below). The build process generates *oixrun.exe* which works on Win32 and
+  32-bit DOS, and and the *oixrun* executable program, which works on Linux
+  i386 (and it will also work on FreeBSD i386). Other operating systems are
+  not supported, such as OS/2 2.x (or later) or macOS 10.14 Mojave (or
+  earlier).
 
-* The ELF-flavored runner is a Linux i386 executable program (running on
-  32-bit and 64-bit Linux kernels). In the future the same program will run
-  on FreeBSD i386 as well. The program file is self-contained: with the
-  runner and OIX program combined to a single, statically linked ELF
-  executable file, no other files are needed on the target system to run the
-  program. *qemu-i386* can be used to run it on non-x86 Linux systems.
+* *oixconv*: A command-line tool which can convert OIX program files. One
+  possible conversion is converting an OIX program (.oix, .exe etc.) to a
+  self-contained native executable program, embedding *oixrun*, so that it
+  doesn't need an external *oixrun* program to run. Conversions targets:
 
-## The OIX executable format
+  * an .exe which works on both Win32 (including 64-bit Windows systems,
+    also including emulators like Wine) and 32-bit DOS (including emulators
+    like DOSBox). Do the conversion like this: `./oixconv <prog.oix>
+    <prog.exe> exe`. The output file still contains the OIX program, and can
+    be converted further later. The output file is also called MZ-flavored,
+    named after the MZ .exe header.
 
-It has the 0x18-byte CF header (with 4 bytes of signature: `"CF\0\0"`) and
-an read-write-execute image. The image also contains relocations. The memory
-size can be larger than the load size, to accommodate zero-initialized BSS.
+    The output .exe file has very little memory overhead (less than 64 KiB
+    on DOS), and on DOS it can use all available conventional and high
+    memory (transparently). The program file is self-contained: with the
+    runner and OIX program combined to a single .exe file, no other files
+    are needed on the target system to run the program.
 
-The CF header can be in the beginning of the program file, or near the
-beginning (fitting to the first 0x200 bytes), with some within-file pointers
-describing how to find it. The Watcomm tools (e.g. *w32run.exe*) were able
-to find it only at one location, the WCFD32 tools find it at multiple
-locations, including the beginning.
+  * an i386 ELF-32 executable program which runs on Linux i386 (and amd64)
+    and FreeBSD i386 (and amd64) systems. Do the conversion like this:
+    `./oixconv <prog.oix> <prog> elf`, and then `chmod +x prog`.  The output
+    file still contains the OIX program, and can be converted further later.
+    The output file is also called ELF-flavored, named after the ELF-32
+    (native) executable file format it uses.
 
-TODO(pts): Write more.
+    The output program file is self-contained: with the runner and OIX
+    program combined to a single, statically linked ELF executable file, no
+    other files are needed on the target system to run the program.
+    *qemu-i386* can be used to run it on non-x86 Linux systems.
+
+  * an i386 ELF-32 executable program which runs on Linux i386 (and amd64)
+    and FreeBSD i386 (and amd64) systems, which is pre-relocated, so it a
+    bit faster to start up, but it is not an OIX program anymore.
+    *oixconv* can still convert it back to an OIX program later. Do the
+    conversion like this: `./oixconv <prog.oix> <prog> epl`.
+
+  * just an OIX program file (.oix), without any other (native)
+    functionality. It needs *oixrun* to run.
+
+  With these conversions, it's trivial to port a OIX program to many target:
+  just compile it to an OIX program, and then run *oixconv* to generate the
+  target-specific executables.
+
+  *oixconv* is not implemented yet, currently a temporary stop-gap tool
+  *wcfd32stub* is provided instead (as part of the runtime), and it runs on
+  Linux i386 only. *wcfd32stub* can:
+
+  * create the Win32--DOS dual .exe: *./wcfd32stub <prog.oix> <prog.exe>*
+
+  * create a pre-relocated Linux i386 executable (which cannot be converted
+    back to an OIX program file): *./wcfd32stub <prog.oix> <prog> epl*.
+
+The runtime is able to run the Watcom tools such as *binw/wasm.exe* and
+*binw/wlib.exe*, released between 1994 and 2002, see above which Watcom
+C/C++ version had them. For example, run `./oixrun wasm.exe testprog.asm`.
+The Watcom tools are not distributed together with the runtime (because they
+are neither open source nor free software, because they were released before
+OpenWatcom), you need to obteain them separately.
+
+The development of the runtime started in 2024-04 by studying the
+*bld/w32loadr* directory of
+[open_watcom_1.0.0-src.zip](https://openwatcom.org/ftp/source/open_watcom_1.0.0-src.zip)
+(2003-01-24), and reverse engineering some Watcom tools. The initial goal
+for this development was running the Watcom tools on Linux i386. This has
+been achieved by writing a brand new runtime implementation targeting Linux.
+Since then the runtime has been implemented for 32-bit DOS and also Win32.
+The latter was heavily based on the runner found in the *bld/w32loadr*
+directory of the OpenWatcom 1.0 sources. The runtime, having reached its
+original goal, is still under development.
+
+The runtime is free and open source software (GNU GPL v2), it is written in
+[NASM (Netwide Assembler)](https://www.nasm.us/) assembly language, using
+NASM 0.98.39 (2005-01-15) for reproducible builds, but newer versions of
+NASM are also able to compile it. A copy of NASM 0.98.39 precompiled for
+Linux i386 and Win32 is bundled with the runtime sources. In addition to
+NASM, the runtime also uses the WLINK (OpenWatcom Linker) tool for linking,
+from [OpenWatcom
+1.4](http://openwatcom.org/ftp/archive/open-watcom-c-win32-1.4.exe)
+(2005-11-15). Newer versions of WLINK are also able to link it. A copy of
+WLINK 1.4 precompiled for Linux i386 and Win32 is bundled with the runtime
+sources. The runtime uses the DOS extender
+[PMODE/W](http://www.sid6581.net/pmodew/) 1.33 (1997-01-01, open sourced in
+2023-07 under the MIT license) as the DOS stub, a copy of *pmodew.exe* is
+bundled with the runtime sources.
+
+It's possible to build the runtime on any system which has NASM and WLINK
+installed, but it's most convenient to do so on Linux i386 (or amd64) or
+Win32 (including 64-bit x86 Windows) systems, for which build automation is
+provided and the tools NASM and WLINK are precompiled and bundled. For
+version 1, the automation for Linux is the simple and short shell script
+[build.sh](https://github.com/pts/oix-wcfd32/blob/master/run1/build.sh) (run
+it as `sh build.sh` after cloning the Git repository), and for Win32 is the
+simple and short .cmd script
+[build.cmd](https://github.com/pts/oix-wcfd32/blob/master/run1/build.cmd)
+(run it as `build.cmd` from within the cmd.exe Command Prompt window after
+cloning the Git repository). It's also possible to run *build.sh* in Wine,
+like this `wine cmd /c build.cmd`. As of the writing of this paragraph, the
+build automation script runs NASM 13 times and WLINK 2 times, producing
+multiple temporary files and final output files. It all happens in less than
+a second on a modern system.
+
+The build process of the runtime:
+
+* is reproducible: it produces identical files as output when run again on
+  the same sources.
+* is multi-target: it builds for all targets (operating systems). Currently
+  this is Win32, 32-bit DOS and Linux. FreeBSD is planned.
+* uses only cross-compilation: it doesn't run any program it builds on the
+  build host system, it runs NASM and WLINK only. (Thus it's possible to
+  build the runtime even on non-i386 systems, if NASM and WLINK are built
+  from source first for the host system.)
+* is non-incremental: the build automation script does a full build each
+  time it is run. This is OK, because it's still fast enough.
+
+It is planned to drop the build dependency of the runtime on WLINK, by
+recreating the linker functionality in pure NASM (with `nasm -f bin`). This
+will be possible, but it is especially tricky for LE (32-bit DOS) and PE
+(Win32) executables with relocation. After that point building the runtime
+will depend on NASM only.
 
 ## Building OIX programs from NASM assembly source
 
-You can use the *hello.nasm*, *example.nasm* and *oixrun.nasm* NASM assembly
-source files in the Git repository as tutorials and reference
-implementations to write your own programs.
+You can use the *asm\_demo/answer42.nasm*, *asm\_demo/hello.nasm*,
+*asm\_demo/example.nasm* and *run1/oixrun.nasm* NASM assembly source files
+in the Git repository as tutorials and reference implementations to write
+your own programs.
 
 Please note that NASM (just like other assemblers if a linker is not
 involved) is not able to generate relocation entries, so these programs are
 written as position-independent code (PIC). Currently this means that one
 register (EBP) is used to hold the program base address, and thus it cannot
-be used for other purposes at the same time.
+be used for other purposes at the same time. An alternative, with relocation
+support, would be similar to version 4 of the C source design (see below),
+which would involve NASM + WLINK + *rex2oix*, but no examples are provided
+for that.
 
-The *compile_wcfd32stub.sh* shell script builds these programs (both with
+The *compile\_wcfd32stub.sh* shell script builds these programs (both with
 the MZ-flavored runner and the ELF-flavored runner) automatically.
 
 ## Building OIX programs from C source
