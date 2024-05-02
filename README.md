@@ -177,7 +177,7 @@ software targeting OIX:
   I managed to figure it out by looking at the files in *bld/w32loadr* in
   OpenWatcom 1.0.
 
-## The OIX executable format
+## The OIX executable file format
 
 Most of this has been reverse engineered for WCFD32. Source code of some
 relevant runners and tools have been studied in the *bld/w32loadr* directory
@@ -209,14 +209,33 @@ struct cf_header {  /* 0x18 bytes. */
 };
 ```
 
-This is how the Watcom tools find the CF header: Get word [8] (DOS .exe
-.hdrsize), multiply it by 16, save it to cf_ofs (0x50), and read the CF
-header (0x18 bytes).
+This is how the Watcom tools (such as *w32run.exe*) find the CF header: get
+16-bit little-endian integer at file offset 8 (DOS .exe .hdrsize), maximum
+allowed value 0x1e, multiply it by 0x10, check that the CF signature (4
+bytes: `"CF\0\0"`) is there at that file offset.
 
-Some of the Watcom tools load additional data (called resources) from the
-file near its the end (after the OIX image). However, this is unrelated to
-OIX file format, they do the same for DOS .exe, Win32 PE .exe and Linux i386
-ELF-32 file formats.
+The *oixrun* and *oixconv* tools in WCFD32 runtime system find the CF
+header like this (compatible with the Watcom tools), in this order:
+
+* If the file starts with the CF signature (4 bytes: `"CF\0\0"`), then it's
+  there (at file offset 0).
+
+* If the file starts with the ELF signature (4 bytes: `"\x7f""ELF"`), and
+  there is a CF signature at file offset 0x54 (that's right after the ELF-32
+  ehdr and a single phdr), then it's there.
+
+* If the file has the CF signature at file offset 0x20, then it's there.
+
+* This is the as the Watcom tools do it: get 16-bit little-endian integer at
+  file offset 8 (DOS .exe .hdrsize), maximum allowed value 0x1e, multiply it
+  by 0x10 (maximum allowed value 0x1e0), check that the CF signature (4 bytes:
+  `"CF\0\0"`) is there at that file offset, then it's there.
+
+Some of the Watcom tools load Watcom resource data from the file near its
+the end (after the OIX image). However, this is unrelated to OIX executable
+file format, they do the same for DOS .exe, Win32 PE .exe and Linux i386
+ELF-32 file formats. The *oixconv* tool copies this resource data by just
+copying everything after the OIX image.
 
 TODO(pts): Write more, especially about relocations, argv, environment,
 start ABI, int 21h ABI.
