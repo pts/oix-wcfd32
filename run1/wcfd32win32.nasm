@@ -300,7 +300,7 @@ pop_esi_edx_ecx_ebx_ret:
 %undef  CONFIG_LOAD_FIND_CF_HEADER
 %define CONFIG_LOAD_SINGLE_READ
 %define CONFIG_LOAD_INT21H call wcfd32_near_syscall
-%undef  CONFIG_LOAD_MALLOC_EAX
+%undef  CONFIG_LOAD_MALLOC_EAX  ; TODO(pts): Move malloc to a separate function, define this to make it shorter.
 %undef  CONFIG_LOAD_CLEAR_BSS  ; VirtualAlloc(...) already returns 0 bytes.
 %include "wcfd32load.inc.nasm"
 
