@@ -231,13 +231,60 @@ header like this (compatible with the Watcom tools), in this order:
   by 0x10 (maximum allowed value 0x1e0), check that the CF signature (4 bytes:
   `"CF\0\0"`) is there at that file offset, then it's there.
 
+Here is how an OIX runner loads and runs an OIX program:
+
+* Open the program file, find and read the CF header (see above).
+
+* Allocate cf_header.mem_size bytes of memory, aligned to a multiple of 4
+  bytes. Remember the starting address as image_base.
+
+* Read cf_header.load_size bytes from the program file, starting at file
+  offset cf_header.load_fofs to memory address image_base.
+
+* Apply relocations starting at image_base + cf_header.reloc_rva.
+
+* Prepare the registers and the stack, and do a far call to image_base +
+  cf_header.entry_rva.
+
+* When the far call returns, use the value of register AL as process exit
+  code, and exit.
+
+The relocation table is an array of 16-bit little-endian integers. It
+consists of 0 or more nonempty blocks and then a terminating 0 integer. An
+empty relocation table is just the terminating 2 zero bytes. Most of the
+relocations take only 2 bytes (a single integer). This is rather nicely
+packed, because for example LE relocations take at least 7 bytes, and Win32
+PE relocations take 4 bytes.
+
+Here is how to apply the relocations:
+
+* Start reading relocation table starting at image_base +
+  cf_header.reloc_rva, process each nonempty block, stop at the terminating
+  0 integer. More details below.
+
+* First read the next integer as block_size, then repeat this while
+  block_size is nonzero:
+
+  * Read 2 integers (high first, low second!), and build the address as
+    `image_base + (high << 16 | low)`.
+
+  * Repeat this block_size times:
+
+    * Apply a single relocation at the address: load a 32-bit little-endian
+      integer from 4 memory bytes at the address, add the image_base to the
+      integer, and save the result to the 4 memory bytes at the address.
+
+    * Read an integer, and add it to the address.
+
+  * Use the last integer read as the block_size of the next block.
+
 Some of the Watcom tools load Watcom resource data from the file near its
 the end (after the OIX image). However, this is unrelated to OIX executable
 file format, they do the same for DOS .exe, Win32 PE .exe and Linux i386
 ELF-32 file formats. The *oixconv* tool copies this resource data by just
 copying everything after the OIX image.
 
-TODO(pts): Write more, especially about relocations, argv, environment,
+TODO(pts): Write more, especially about argv, environment,
 start ABI, int 21h ABI.
 
 ## The WCFD32 runtime system
