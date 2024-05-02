@@ -97,7 +97,7 @@ OSF_TARGET_INTERNAL         equ 0x00  ; Only this target is supported by PMODE/W
   %endrep
 %endm
 
-section .le.bss align=1 nobits
+section .le.bss align=1 nobits  ; PMODE/W puts it to a separate 4K page. !! TODO(pts): Remove .le.bss and .le.stack.
 le.bss:
 section .le.text align=1
 
@@ -309,16 +309,17 @@ fixup_record_table:  ; Relocations. https://github.com/yetmorecode/lxedit/blob/0
 fixup_record_table_page_0:
 assert_at 0x2e1e
 ; TODO(pts): Move the fixups after le.text_end, thus we know their count.
-le_fixups 22  ; There will be this many relocation, sets le_reloc_count.
+le_fixups 23  ; There will be this many relocation, sets le_reloc_count.
 fixup_record_table_end:
-assert_at 0x2eb8
+assert_at 0x2eb8+(le_reloc_count-22)*7
 imported_modules_name_table:
 imported_procedures_name_table:
 ..@0x2eb8: dd 0
-assert_at 0x2ebc
+assert_at 0x2ebc+(le_reloc_count-22)*7
 data_pages:
 le.text:
 %include 'wcfd32dos.nasm'
+section .le.bss
 le.bss_end:
 section .le.text
 le.text_end:

@@ -19,6 +19,10 @@
 bits 32
 cpu 386
 
+%macro assert_le 2  ; If false, NASM issueas a warning, and continues compilation.
+  times (%2)-(%1) times 0 db 0
+%endm
+
 %ifnidn __OUTPUT_FORMAT__, bin
   %define .le.text _TEXT
   ;%define .rodatastr CONST  ; Unused.
@@ -40,7 +44,6 @@ cpu 386
     %2
     %undef relval
   %endm
-  %define relocated_le.bss relocated_le.text
 %endif
 %macro relocated_le.text.dd 1
   relocated_le.text %1, dd (relval)
@@ -86,10 +89,33 @@ le.start:
 %ifnidn __OUTPUT_FORMAT__, bin
   ..start:
 %endif
-		sti  ; Enable virtual interrupts. TODO(pts): Do we need it?
-		;int 3  ; This would cause an exception, making PMODE/W dump the registers to video memory and exit.
+
+%assign obss_size 0
+%macro obss_resb 1
+  %00 equ obss+obss_size
+  %assign obss_size obss_size+(%1)
+%endm
+obss:  ; We overlap BSS with the start of our code. That's fine, the beginning of the code won't be used.
+malloc_base	obss_resb 4  ; Address of the currently allocated block.
+malloc_capacity	obss_resb 4  ; Total number of bytes in the currently allocated block.
+malloc_rest	obss_resb 4  ; Number of bytes available at the end of the currently allocated block.
+wcfd32_param_struct: obss_resb 0  ; Contains 7 dd fields, see below.
+  wcfd32_program_filename obss_resb 4  ; dd empty_str  ; ""
+  wcfd32_command_line obss_resb 4  ; dd empty_str  ; ""
+  wcfd32_env_strings obss_resb 4  ; dd empty_env
+  wcfd32_break_flag_ptr obss_resb 4
+  wcfd32_copyright obss_resb 4
+  wcfd32_is_japanese obss_resb 4
+  wcfd32_max_handle_for_os2 obss_resb 4
+obss_align4: obss_resb 0
+obss_align44: obss_resb (obss-obss_align4)&3
+obss_end: obss_resb 0
+
 		push ds
 		pop es  ; Default value is different.
+		sti  ; Enable virtual interrupts. TODO(pts): Do we need it?
+		; PMODE/W doesn't zero-initialized the BSS, so we do it. But we do it later, because here we still need our code.
+		;int3  ; This would cause an exception, making PMODE/W dump the registers to video memory and exit.
 		mov ah, 62h  ; Get PSP selector.
 		int 21h
 		mov ax, 6
@@ -121,6 +147,14 @@ le.start:
 		jne .cont_var
 		inc edi
 		inc edi
+		; Now: EBP: command-line arguments terminated by NUL; dword [esp]: DOS environment variable strings; EDI: full program pathname terminated by NUL.
+		push edi
+		relocated_le.text obss, mov edi, relval
+		mov ecx, (obss_end-obss)>>2
+		xor eax, eax
+		rep stosd  ; PMODE/W initializes DF=1, good.
+		assert_le obss_end, $
+		pop edi
 		pop ecx
 		; Now: EBP: command-line arguments terminated by NUL; ECX: DOS environment variable strings; EDI: full program pathname terminated by NUL.
 		mov eax, edi
@@ -128,10 +162,10 @@ le.start:
 		cmp eax, -10
 		jb .load_ok
 		neg eax  ; EAX := load_error_code.
-		push eax
+		push eax  ; Save exit_code.
 		relocated_le.text load_errors, mov eax, [relval+4*eax]
 		call print_str  ; !! Report filename etc. on file open error.
-		pop eax
+		pop eax  ; Restore exit_code.
 		jmp .exit ; exit(load_error_code).
 .load_ok:	; Now we call the entry point.
 		;
@@ -151,19 +185,19 @@ le.start:
 		; Output: EAX: exit code (0 for EXIT_SUCCESS).
 		push 0  ; Simulate that the break flag is always 0. WLIB needs it.
 		; TODO(pts): Make it smaller by using stosd or push.
-		;mov dword [wcfd32_copyright], 0  ; Not needed, .bss is zero-initialized by PMODE/W.
-		;mov dword [wcfd32_is_japanese], 0  ; Not needed, .bss is zero-initialized by PMODE/W.
-		;mov dword [wcfd32_max_handle_for_os2], 0  ; Not needed, .bss is zero-initialized by PMODE/W.
-		relocated_le.bss wcfd32_break_flag_ptr, mov [relval], esp
-		relocated_le.bss wcfd32_program_filename, mov [relval], edi
-		relocated_le.bss wcfd32_command_line, mov [relval], ebp
-		relocated_le.bss wcfd32_env_strings, mov [relval], ecx
+		;mov dword [wcfd32_copyright], 0  ; Not needed, we've zero-initialized obss.
+		;mov dword [wcfd32_is_japanese], 0  ; Not needed, we've zero-initialized obss.
+		;mov dword [wcfd32_max_handle_for_os2], 0  ; Not needed, we've zero-initialized obss.
+		relocated_le.text wcfd32_break_flag_ptr, mov [relval], esp
+		relocated_le.text wcfd32_program_filename, mov [relval], edi
+		relocated_le.text wcfd32_command_line, mov [relval], ebp
+		relocated_le.text wcfd32_env_strings, mov [relval], ecx
 		xor ebx, ebx  ; Not needed by the ABI, just make it deterministic.
 		xor esi, esi  ; Not needed by the ABI, just make it deterministic.
 		xor ebp, ebp  ; Not needed by the ABI, just make it deterministic.
 		sub ecx, ecx  ; This is an unknown parameter, which we always set to 0.
 		relocated_le.text wcfd32_far_syscall, mov edx, relval
-		relocated_le.bss wcfd32_param_struct, mov edi, relval
+		relocated_le.text wcfd32_param_struct, mov edi, relval
 		mov bx, cs  ; Segment of wcfd32_far_syscall for the far call.
 		xchg esi, eax  ; ESI := (entry point address); EAX := junk.
 		mov ah, WCFD32_OS_DOS  ; !! wasmx106.exe (loader16.asm) does OS_WIN16. !! Why? Which of DOS or OS2? Double check.
@@ -246,11 +280,11 @@ malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conve
 		;push eax
 		;call dos_printf
 		;add esp, 8
-.try_fit:	relocated_le.bss malloc_base, mov eax, [relval]
-		relocated_le.bss malloc_rest, sub eax, [relval]
-		relocated_le.bss malloc_rest, sub [relval], ebp
+.try_fit:	relocated_le.text malloc_base, mov eax, [relval]
+		relocated_le.text malloc_rest, sub eax, [relval]
+		relocated_le.text malloc_rest, sub [relval], ebp
 		jc .full  ; We actually waste the rest of the current block, but for WASM it's zero waste.
-		relocated_le.bss malloc_capacity, add eax, [relval]
+		relocated_le.text malloc_capacity, add eax, [relval]
 		;push eax
 		;push '!'
 		;mov eax, esp
@@ -280,9 +314,9 @@ malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conve
 		shl ebx, 16
 		mov bx, cx
 		pop ecx
-		relocated_le.bss malloc_base, mov [relval], ebx  ; Newly allocated address.
-		relocated_le.bss malloc_rest, mov [relval], ecx
-		relocated_le.bss malloc_capacity, mov [relval], ecx
+		relocated_le.text malloc_base, mov [relval], ebx  ; Newly allocated address.
+		relocated_le.text malloc_rest, mov [relval], ecx
+		relocated_le.text malloc_capacity, mov [relval], ecx
 		;push '#'
 		;mov eax, esp
 		;push eax
@@ -305,7 +339,6 @@ malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conve
 		; Not using DPMI syscall 100h
 		; (https://fd.lod.bz/rbil/interrup/dos_extenders/310100.html) here, because
 		; that also allocates selectors.
-		;jmp .oom  ; !!! This prevents the crash with --mem-mb=2.
 		mov ah, 48h
 		xor ebx, ebx
 		dec bx  ; Try to allocate maximum available conventional memory.
@@ -319,8 +352,8 @@ malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conve
 		pop ebx
 		jc .oom
 		shl ebx, 4
-		relocated_le.bss malloc_rest, mov [relval], ebx
-		relocated_le.bss malloc_capacity, mov [relval], ebx
+		relocated_le.text malloc_rest, mov [relval], ebx
+		relocated_le.text malloc_capacity, mov [relval], ebx
 		; PMODE/W (but not WDOSX): EAX is selector. !! Try DPMI syscall 100h instead, maybe they are compatible. But that allocates a selector in DX, we should free it.
 		xchg ebx, eax  ; EBX := selector; EAX := junk.
 		push edx  ; Save.
@@ -329,10 +362,10 @@ malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conve
 		shl ecx, 16
 		mov cx, dx  ; ECX := linear address of PSP.
 		pop edx  ; Restore original value for the caller of malloc.
-		relocated_le.bss malloc_base, mov [relval], ecx
+		relocated_le.text malloc_base, mov [relval], ecx
 		;movzx eax, ax
 		;shl eax, 4
-		;relocated_le.bss malloc_base, mov [relval], eax
+		;relocated_le.text malloc_base, mov [relval], eax
 		jmp .try_fit  ; It may not fit though.
 .oom:		xor eax, eax  ; NULL.
 .return:	pop ebp
@@ -421,15 +454,4 @@ done_message db '.', 13, 10, '$' ; !!
 
 emit_load_errors
 
-section .le.bss  ; align=4 specified above. Good.
-malloc_base	resd 1  ; Address of the currently allocated block.
-malloc_capacity	resd 1  ; Total number of bytes in the currently allocated block.
-malloc_rest	resd 1  ; Number of bytes available at the end of the currently allocated block.
-wcfd32_param_struct:  ; Contains 7 dd fields, see below.
-  wcfd32_program_filename resd 1  ; dd empty_str  ; ""
-  wcfd32_command_line resd 1  ; dd empty_str  ; ""
-  wcfd32_env_strings resd 1  ; dd empty_env
-  wcfd32_break_flag_ptr resd 1  ; !! Set.
-  wcfd32_copyright resd 1
-  wcfd32_is_japanese resd 1
-  wcfd32_max_handle_for_os2 resd 1
+section .le.bss  ; align=4 specified above. Good.  !! TODO(pts): Remove the entire section, keep only stack.
