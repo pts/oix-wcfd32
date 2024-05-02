@@ -313,6 +313,13 @@ program image and execute it.
 Linux kernels), 32-bit DOS and Win32 (it runs on both 32-bit and 64-bit
 Windows). It will be implemented for FreeBSD i386.
 
+If you only have the runtime, but no OIX programs, you can try the runtime
+with the following command: *./oixrun oixrun.oix*. This will display usage
+information. If you don't even have the runtime, then get it by cloning the
+https://github.com/pts/oix-wcfd32 sources, and running *sh compile.sh* (on
+Linux) or *compile.cmd* (on Win32) in the *run1* subdirectory. This will
+generate files *oixrun*, *oixrun.exe*, *oixrun.oix* and others.
+
 The runtime consists of the following programs:
 
 * *oixrun*: This is the runner command-line tool, which can run an OIX
