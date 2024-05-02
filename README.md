@@ -373,6 +373,28 @@ will be possible, but it is especially tricky for LE (32-bit DOS) and PE
 (Win32) executables with relocation. After that point building the runtime
 will depend on NASM only.
 
+## Watcom resource data
+
+Some Watcom program files (such as WASM, WLIB and WLINK, but not *wcc* or
+*wcc386*) contain resource data. The program opens its own program file,
+finds, reads and uses the resource data. Most of the resource data content
+is error messages.
+
+When converting Watcom OIX program files, the resource data must be kept
+intact. Since it is at the end of the program file, *oixconv* keeps it
+by just copying everything after the OIX image.
+
+Here is some more info about about the Watcom resource data format. There
+are two headers: the debug header (*struct dbgheader*) and the resource
+header (*struct WResHeader*). The program first loads the debug header from
+the very end of the file. The debug header is 14 bytes long, it starts with
+a 2-byte signature (`"\x02\x83", named *WAT\_RES\_SIG*), and it ends with
+the *debug\_size* field (32-bit little endian integer). Subtracting the
+*debug\_size* value from the file size, the program gets the offset of the
+start of the resource data, starting with the resource header, starting with
+8 bytes of signature (`"\xd7\xc1\xd4\xc3\xcf\xcd\xd2\xc3\x8c", named
+*WRESMAGIC0* and *WRESMAGIC1*`).
+
 ## Building OIX programs from NASM assembly source
 
 You can use the *asm\_demo/answer42.nasm*, *asm\_demo/hello.nasm*,
