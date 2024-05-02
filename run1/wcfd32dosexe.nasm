@@ -14,8 +14,8 @@ bits 32
 cpu 386
 
 %macro assert_at 1
-  times  (%1)-($-$$) db 0
-  times -(%1)+($-$$) db 0
+  times  (%1)-($-$$) times 0 db 0
+  times -(%1)+($-$$) times 0 db 0
 %endm
 
 %macro assert_eq 2
