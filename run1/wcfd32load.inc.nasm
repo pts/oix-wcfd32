@@ -13,6 +13,12 @@ LOAD_INT21_FUNC_48H_ALLOCATE_MEMORY equ 0x48
 %ifndef   CONFIG_LOAD_CF_HEADER_FOFS
   %define CONFIG_LOAD_CF_HEADER_FOFS 20h  ; Without CONFIG_LOAD_FIND_CF_HEADER, we only try at offset 20h, that's the self-offset for the MZ-flavored wcfd32stub.
 %endif
+%ifndef   CONFIG_LOAD_RELOCATED
+  %define CONFIG_LOAD_RELOCATED
+%endif
+%ifndef   CONFIG_LOAD_RELOCATED_BASE
+  %define CONFIG_LOAD_RELOCATED_BASE 0
+%endif
 
 ; load_error_t __usercall load_wcfd32_program_image@<eax>(const char *filename@<eax>)
 ; Returns:
@@ -229,9 +235,9 @@ aLoaderReadError db 'Loader read error',0Dh,0Ah,0
 aMemoryAllocation db 'Memory allocation failed',0Dh,0Ah,0
 
 ; Corresponding to LOAD_ERROR_SUCCESS .. LOAD_ERROR_OUT_OF_MEMORY.
-load_errors:	dd aCanTOpenSRcD.end-1  ; empty_str  ; ""
-		dd aCanTOpenSRcD  ; "Can't open '%s'; rc=%d\r\n"
-		dd aInvalidExe	; "Invalid EXE\r\n"
-		dd aLoaderReadError  ; "Loader read error\r\n"
-		dd aMemoryAllocation  ; "Memory allocation failed\r\n"
+load_errors:	CONFIG_LOAD_RELOCATED dd aCanTOpenSRcD.end-1-CONFIG_LOAD_RELOCATED_BASE  ; empty_str  ; ""
+		CONFIG_LOAD_RELOCATED dd aCanTOpenSRcD-CONFIG_LOAD_RELOCATED_BASE  ; "Can't open '%s'; rc=%d\r\n"
+		CONFIG_LOAD_RELOCATED dd aInvalidExe-CONFIG_LOAD_RELOCATED_BASE	; "Invalid EXE\r\n"
+		CONFIG_LOAD_RELOCATED dd aLoaderReadError-CONFIG_LOAD_RELOCATED_BASE  ; "Loader read error\r\n"
+		CONFIG_LOAD_RELOCATED dd aMemoryAllocation-CONFIG_LOAD_RELOCATED_BASE  ; "Memory allocation failed\r\n"
 %endm

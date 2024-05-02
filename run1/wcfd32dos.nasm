@@ -19,20 +19,29 @@
 bits 32
 cpu 386
 
-%define .text _TEXT
-%define .rodatastr CONST  ; Unused.
-%define .rodata CONST2
-%define .data _DATA
-%define .bss _BSS
-;%define .stack _STACK
+%ifnidn __OUTPUT_FORMAT__, bin
+  %define .le.text _TEXT
+  ;%define .rodatastr CONST  ; Unused.
+  ;%define .rodata CONST2
+  ;%define .data _DATA
+  %define .le.bss _BSS
+  ;%define .stack _STACK
 
-section _TEXT  USE32 class=CODE align=1
-section CONST  USE32 class=DATA align=1  ; OpenWatcom generates align=4.
-section CONST2 USE32 class=DATA align=4
-section _DATA  USE32 class=DATA align=4
-section _BSS   USE32 class=BSS NOBITS align=4  ; NOBITS is ignored by NASM, but class=BSS works.
-section STACK  USE32 class=STACK NOBITS align=1  ; Pacify WLINK: Warning! W1014: stack segment not found
-group DGROUP CONST CONST2 _DATA _BSS
+  section _TEXT  USE32 class=CODE align=1
+  section CONST  USE32 class=DATA align=1  ; OpenWatcom generates align=4.
+  section CONST2 USE32 class=DATA align=4
+  section _DATA  USE32 class=DATA align=4
+  section _BSS   USE32 class=BSS NOBITS align=4  ; NOBITS is ignored by NASM, but class=BSS works.
+  section STACK  USE32 class=STACK NOBITS align=1  ; Pacify WLINK: Warning! W1014: stack segment not found
+  group DGROUP CONST CONST2 _DATA _BSS
+
+  %macro relocated_le.text 1+
+    %define base 0
+    %1
+    %undef base
+  %endm
+  %define relocated_le.bss relocated_le.text
+%endif
 
 INT21H_FUNC_06H_DIRECT_CONSOLE_IO equ 0x6
 INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO equ 0x8
@@ -67,11 +76,13 @@ WCFD32_OS_UNKNOWN equ 4  ; Anything above 3 is unknown.
 
 NULL equ 0
 
-section .text
+section .le.text
 
-global _start
-_start:
-..start:
+global le.start
+le.start:
+%ifnidn __OUTPUT_FORMAT__, bin
+  ..start:
+%endif
 		sti  ; Enable virtual interrupts. TODO(pts): Do we need it?
 		;int 3  ; This would cause an exception, making PMODE/W dump the registers to video memory and exit.
 		push ds
@@ -115,7 +126,7 @@ _start:
 		jb .load_ok
 		neg eax  ; EAX := load_error_code.
 		push eax
-		mov eax, [load_errors+4*eax]
+		relocated_le.text mov eax, [load_errors+4*eax-base]
 		call print_str  ; !! Report filename etc. on file open error.
 		pop eax
 		jmp .exit ; exit(load_error_code).
@@ -140,16 +151,16 @@ _start:
 		;mov dword [wcfd32_copyright], 0  ; Not needed, .bss is zero-initialized by PMODE/W.
 		;mov dword [wcfd32_is_japanese], 0  ; Not needed, .bss is zero-initialized by PMODE/W.
 		;mov dword [wcfd32_max_handle_for_os2], 0  ; Not needed, .bss is zero-initialized by PMODE/W.
-		mov [wcfd32_break_flag_ptr], esp
-		mov [wcfd32_program_filename], edi
-		mov [wcfd32_command_line], ebp
-		mov [wcfd32_env_strings], ecx
+		relocated_le.bss mov [wcfd32_break_flag_ptr-base], esp
+		relocated_le.bss mov [wcfd32_program_filename-base], edi
+		relocated_le.bss mov [wcfd32_command_line-base], ebp
+		relocated_le.bss mov [wcfd32_env_strings-base], ecx
 		xor ebx, ebx  ; Not needed by the ABI, just make it deterministic.
 		xor esi, esi  ; Not needed by the ABI, just make it deterministic.
 		xor ebp, ebp  ; Not needed by the ABI, just make it deterministic.
 		sub ecx, ecx  ; This is an unknown parameter, which we always set to 0.
-		mov edx, wcfd32_far_syscall
-		mov edi, wcfd32_param_struct
+		relocated_le.text mov edx, wcfd32_far_syscall-base
+		relocated_le.bss mov edi, wcfd32_param_struct-base
 		mov bx, cs  ; Segment of wcfd32_far_syscall for the far call.
 		xchg esi, eax  ; ESI := (entry point address); EAX := junk.
 		mov ah, WCFD32_OS_DOS  ; !! wasmx106.exe (loader16.asm) does OS_WIN16. !! Why? Which of DOS or OS2? Double check.
@@ -232,11 +243,11 @@ malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conve
 		;push eax
 		;call dos_printf
 		;add esp, 8
-.try_fit:	mov eax, [malloc_base]
-		sub eax, [malloc_rest]
-		sub [malloc_rest], ebp
+.try_fit:	relocated_le.bss mov eax, [malloc_base-base]
+		relocated_le.bss sub eax, [malloc_rest-base]
+		relocated_le.bss sub [malloc_rest-base], ebp
 		jc .full  ; We actually waste the rest of the current block, but for WASM it's zero waste.
-		add eax, [malloc_capacity]
+		relocated_le.bss add eax, [malloc_capacity-base]
 		;push eax
 		;push '!'
 		;mov eax, esp
@@ -266,9 +277,9 @@ malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conve
 		shl ebx, 16
 		mov bx, cx
 		pop ecx
-		mov [malloc_base], ebx  ; Newly allocated address.
-		mov [malloc_rest], ecx
-		mov [malloc_capacity], ecx
+		relocated_le.bss mov [malloc_base-base], ebx  ; Newly allocated address.
+		relocated_le.bss mov [malloc_rest-base], ecx
+		relocated_le.bss mov [malloc_capacity-base], ecx
 		;push '#'
 		;mov eax, esp
 		;push eax
@@ -305,8 +316,8 @@ malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conve
 		pop ebx
 		jc .oom
 		shl ebx, 4
-		mov [malloc_rest], ebx
-		mov [malloc_capacity], ebx
+		relocated_le.bss mov [malloc_rest-base], ebx
+		relocated_le.bss mov [malloc_capacity-base], ebx
 		; PMODE/W (but not WDOSX): EAX is selector. !! Try DPMI syscall 100h instead, maybe they are compatible. But that allocates a selector in DX, we should free it.
 		xchg ebx, eax  ; EBX := selector; EAX := junk.
 		push edx  ; Save. !! pushad.
@@ -315,10 +326,10 @@ malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conve
 		shl ecx, 16
 		mov cx, dx  ; ECX := linear address of PSP.
 		pop edx  ; Restore.
-		mov [malloc_base], ecx
+		relocated_le.bss mov [malloc_base-base], ecx
 		;movzx eax, ax
 		;shl eax, 4
-		;mov [malloc_base], eax
+		;relocated_le.bss mov [malloc_base-base], eax
 		jmp .try_fit  ; It may not fit though.
 .oom:		xor eax, eax  ; NULL.
 .return:	pop ebp
@@ -334,6 +345,8 @@ malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conve
 %define CONFIG_LOAD_MALLOC_EAX call malloc
 %undef  CONFIG_LOAD_MALLOC_EBX
 %define CONFIG_LOAD_CLEAR_BSS
+%define CONFIG_LOAD_RELOCATED relocated_le.text
+%define CONFIG_LOAD_RELOCATED_BASE base
 %include "wcfd32load.inc.nasm"
 
 wcfd32_far_syscall:  ; proc far
@@ -394,27 +407,20 @@ debug_syscall:	push eax
 		pop eax
 		ret
 
-;section .data  ; !! TODO(pts): Remove this to avoid 0x1000 bytes of LE alignment.
-;section .rodata
-
 message db '?$'  ; !!
 done_message db '.', 13, 10, '$' ; !!
 %endif
-
-emit_load_errors
 
 ; Unfortunately the format LE 4 KiB of alignment between .code and .data, no
 ; way to make it smaller, but PMODE/W supports LE only. So we just put
 ; everything to .text to save a few KiB.
 ;
-;section .data
+;section .le.data
+;section .le.rodata
 
+emit_load_errors
 
-;.data?  ; section .bss align=1
-;db (62 shl 10) dup (?)  ; DOS/32A: Making this 62 KiB will still keep it `BC', but 63 KiB won't.
-
-section .bss  ; align=4 specified above. Good.
-
+section .le.bss  ; align=4 specified above. Good.
 malloc_base	resd 1  ; Address of the currently allocated block.
 malloc_capacity	resd 1  ; Total number of bytes in the currently allocated block.
 malloc_rest	resd 1  ; Number of bytes available at the end of the currently allocated block.
