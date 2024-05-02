@@ -312,7 +312,7 @@ malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conve
 		int 21h
 		jnc .oom  ; This should fail, returning in BX the number of paragraphs (16-byte blocks) available.
 		test ebx, ebx
-		jz .oom
+		jz .oom  ; All conventional memory is already allocated, possibly by the previous call to .oom_high.
 		push ebx
 		mov ah, 48h
 		int 21h  ; Allocate maximum number of paragraphs available.
@@ -323,12 +323,12 @@ malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conve
 		relocated_le.bss malloc_capacity, mov [relval], ebx
 		; PMODE/W (but not WDOSX): EAX is selector. !! Try DPMI syscall 100h instead, maybe they are compatible. But that allocates a selector in DX, we should free it.
 		xchg ebx, eax  ; EBX := selector; EAX := junk.
-		push edx  ; Save. !! pushad.
+		push edx  ; Save.
 		mov ax, 6
 		int 31h  ; Get segment base of BX. CX:DX.
 		shl ecx, 16
 		mov cx, dx  ; ECX := linear address of PSP.
-		pop edx  ; Restore.
+		pop edx  ; Restore original value for the caller of malloc.
 		relocated_le.bss malloc_base, mov [relval], ecx
 		;movzx eax, ax
 		;shl eax, 4
