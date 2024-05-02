@@ -20,9 +20,7 @@ set nasm=tools\nasm
 
 %nasm% -O999999999 -w+orphan-labels -f obj -o wcfd32dos.obj wcfd32dos.nasm
 @if errorlevel 1 exit /b 1
-%wlink% form os2 le op stub=pmodew133.exe op q n w.exe f wcfd32dos.obj
-@if errorlevel 1 exit /b 1
-%nasm% -O0 -w+orphan-labels -f bin -o wcfd32dos.exe wcfd32ibw.nasm
+%nasm% -O999999999 -w+orphan-labels -f bin -o wcfd32dos.exe wcfd32dosexe.nasm
 @if errorlevel 1 exit /b 1
 %nasm% -O999999999 -w+orphan-labels -f bin -o wcfd32dosp.exe wcfd32dosp.nasm
 @if errorlevel 1 exit /b 1

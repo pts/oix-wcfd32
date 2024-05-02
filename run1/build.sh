@@ -61,6 +61,7 @@
 # TODO(pts): Make wcfd32linux.nasm autodetect and run on FreeBSD i386 (like https://github.com/pts/pts-pngout-20150319-i386/).
 # TODO(pts): Test the build on Windows 95.
 # TODO(pts): Do an automatic `rm` (unlink) and `chmod +x` for ELF executable output.
+# TODO(pts): Make the LE header fields in wcfd32dosexe.nasm smaller, especially remove the stack.
 #
 
 set -ex
@@ -76,8 +77,10 @@ nasm=tools/nasm    # NASM 0.98.39 (2005-01-15) was the last version without amd6
 "$nasm" -O999999999 -w+orphan-labels -f obj -o wcfd32dos.obj wcfd32dos.nasm
 # Using the output name w.exe because WLiNK inserts the output filename
 # (without the .exe extension) to the program, and we want it short.
-"$wlink" form os2 le op stub=pmodew133.exe op q n w.exe f wcfd32dos.obj
-"$nasm" -O0 -w+orphan-labels -f bin -o wcfd32dos.exe wcfd32ibw.nasm  # Copies w.exe to wcfd32dos.exe.
+#"$wlink" form os2 le op stub=pmodew133.exe op q n w.exe f wcfd32dos.obj  # Not needed, we do it with wcfd32dosexe.nasm.
+#"$nasm" -O0 -w+orphan-labels -f bin -o wcfd32dos.exe wcfd32ibw.nasm  # Copies w.exe to wcfd32dos.exe.
+"$nasm" -O999999999 -w+orphan-labels -f bin -o wcfd32dos.exe wcfd32dosexe.nasm
+#cmp w.exe wcfd32dos.exe
 # Same size, but mz_header image size is based on file size, and the file size is aligned to 4. That's for WLINK below.
 "$nasm" -O999999999 -w+orphan-labels -f bin -o wcfd32dosp.exe wcfd32dosp.nasm
 "$nasm" -O999999999 -w+orphan-labels -f obj -o wcfd32win32.obj wcfd32win32.nasm
