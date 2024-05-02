@@ -28,7 +28,7 @@ cpu 386
   ;%define .rodatastr CONST  ; Unused.
   ;%define .rodata CONST2
   ;%define .data _DATA
-  %define .le.bss _BSS
+  ;%define .le.bss _BSS
   ;%define .stack _STACK
 
   section _TEXT  USE32 class=CODE align=1
@@ -454,4 +454,4 @@ done_message db '.', 13, 10, '$' ; !!
 
 emit_load_errors
 
-section .le.bss  ; align=4 specified above. Good.  !! TODO(pts): Remove the entire section, keep only stack.
+; __END__

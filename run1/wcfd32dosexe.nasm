@@ -79,16 +79,9 @@ OSF_TARGET_INTERNAL         equ 0x00  ; Only this target is supported by PMODE/W
   %undef relval
   %assign le_found_reloc_count le_found_reloc_count+1
 %endm
-%macro relocated_le.bss 2+
-  %define relval (%1)-le.bss
-  %2
-  le_set_fixup_at le_found_reloc_count, objid_le.bss, relval
-  %undef relval
-  %assign le_found_reloc_count le_found_reloc_count+1
-%endm
 %assign le_reloc_count 0
 %macro le_add_fixup 1  ; %1 is le_reloc_count
-  fixup_o32_int le_ary_reloc_at_ %+ %1, le_ary_reloc_obj_ %+ %1, le_ary_reloc_val_ %+ %1  ; All values will be defined later, by `relocated_le.text' and `relocated_le.bss'.
+  fixup_o32_int le_ary_reloc_at_ %+ %1, le_ary_reloc_obj_ %+ %1, le_ary_reloc_val_ %+ %1  ; All values will be defined later, by `relocated_le.text'.
   %assign le_reloc_count %1+1
 %endm
 %macro le_fixups 1
@@ -97,9 +90,9 @@ OSF_TARGET_INTERNAL         equ 0x00  ; Only this target is supported by PMODE/W
   %endrep
 %endm
 
-section .le.bss align=1 nobits  ; PMODE/W puts it to a separate 4K page. !! TODO(pts): Remove .le.bss and .le.stack.
-le.bss:
 section .le.text align=1
+le.stack_size equ 0x1000  ; !! TODO(pts): Is this enough for a real-world program? It seems to be enough for NASM< but way too small for anything serious.
+;le.stack_size equ 0x100000
 
 file:
 mz_header:
@@ -200,12 +193,12 @@ dw 1  ; Target operating system. 01h: OS/2; 02h: Windows; 03h: DOS 4.x; 04h: Win
 dd 0  ; Module version.
 ..@0x2d10:
 dd 0x200  ; Module type flags. 0x200: Compatible with PM (OS/2 Presentation Manager) windowing. PMODE/W ignores it.
-dd (le.text_end-le.text+0xfff)>>12  ; 1. num_pages. Number of memory pages.
+dd ((le.text_end-le.text+0xfff)>>12)  ; 1. num_pages. Number of memory pages, excluding BSS and stack.
 dd objid_le.text  ; Initial object CS number.
 dd le.start-le.text  ; Initial EIP. Entry point.
 ..@0x2d20:
-dd objid_stack  ; Initial object SS number.
-dd stack_size  ; Initial ESP.
+dd objid_le.text  ; Initial object SS number.
+dd le.text_stack_end-le.text  ; Initial ESP. PMODE/W sets ESP to this + the SS object base.  ; Initial ESP.  !!! -8 doesn't help.  !!! doesn't make a difference
 dd 0x1000  ; Memory page size. Always 0x1000 for i386.
 dd le.text_end-le.text  ; 0x31a. Bytes on last page.
 ..@0x2d30:
@@ -240,14 +233,14 @@ dd 0  ; Non-resident names table offset from top of file.
 dd 0  ; Non-resident names table length
 ..@0x2d90:
 dd 0  ; Non-resident names table checksum.
-dd objid_le.bss  ; Automatic data (autodata) object.
+dd 0  ; Automatic data (autodata) object.
 dd 0  ; Debug information offset.
 dd 0  ; Debug information length.
 ..@0x2da0:
 dd 0  ; Preload instance pages number.
 dd 0  ; Demand instance pages number.
 dd 0  ; Extra heap allocation.
-dd stack_size  ; Stack size. PMODE/W seems to ignore this field.
+dd le.stack_size  ; Stack size. PMODE/W seems to ignore this field.
 ..@0x2db0:
 times 5 dd 0  ; Windows VxD fields, we don't need them with PMODE/W.  https://github.com/yetmorecode/lxedit/blob/09de1f3d253cc9123b8392db1d466e586416fb33/lx.h#L102-L106
 le_header_end:
@@ -256,34 +249,15 @@ assert_at le_header-$$+0xc4
 object_table:
 object_table_le.text:
 objid_le.text equ ($-object_table)/0x18+1
-.byte_size: dd le.text_end-le.text
+.byte_size: dd le.text_stack_end-le.text  ; Larger than the number of bytes in the file, because it includes the stack as well.
 .relocation_base: dd 0x10000  ; !! What does it mean?
 OBJ_READABLE equ 1
 OBJ_WRITEABLE equ 2
 OBJ_EXECUTABLE equ 4
 OBJ_BIG equ 0x2000
-.object_flags: dd OBJ_BIG|OBJ_READABLE|OBJ_EXECUTABLE  ; PMODE/W maps it to read-write-execute anyway.
+.object_flags: dd OBJ_BIG|OBJ_READABLE|OBJ_WRITEABLE|OBJ_EXECUTABLE  ; PMODE/W maps it to read-write-execute even without OBJ_WRITEABLE.
 .page_map_index: dd 1
 .page_map_entries: dd 1
-.unknown: dd 0
-object_table_le.bss:
-objid_le.bss equ ($-object_table)/0x18+1
-..@0x2ddc:
-.byte_size: dd le.bss_end-le.bss
-.relocation_base: dd 0x20000  ; !! What does it mean?
-.object_flags: dd OBJ_BIG|OBJ_READABLE|OBJ_WRITEABLE
-.page_map_index: dd 2
-.page_map_entries: dd 0
-.unknown: dd 0
-object_table_stack:  ; !! Is the stack section needed at all? We could save 0x18 bytes. PMODE/W seems to crash DOSBox if we remove it (and all objid references). Why?
-objid_stack equ ($-object_table)/0x18+1
-..@0x2df4:
-stack_size equ 0x1000  ; !! TODO(pts): Is this enough for a real-world program?
-.byte_size: dd stack_size  ; Does PMODE/W respect it?
-.relocation_base: dd 0x30000  ; !! What does it mean?
-.object_flags: dd OBJ_BIG|OBJ_READABLE|OBJ_WRITEABLE  ; Same as in .le.bss.
-.pakge_map_idx: dd 2
-.page_mape_entries: dd 0
 .unknown: dd 0
 object_table_end:
 ..@0x2e0c:
@@ -307,22 +281,19 @@ fixup_page_table:  ; Number of dds: 1+num_pages. This is an index for fixup_reco
 ..@0x2e16: dd 0, fixup_record_table_end-fixup_record_table_page_0  ; !! What does it mean? Does PMODE/W use it?
 fixup_record_table:  ; Relocations. https://github.com/yetmorecode/lxedit/blob/09de1f3d253cc9123b8392db1d466e586416fb33/lx.c#L6
 fixup_record_table_page_0:
-assert_at 0x2e1e
 ; TODO(pts): Move the fixups after le.text_end, thus we know their count.
 le_fixups 23  ; There will be this many relocation, sets le_reloc_count.
 fixup_record_table_end:
-assert_at 0x2eb8+(le_reloc_count-22)*7
 imported_modules_name_table:
 imported_procedures_name_table:
 ..@0x2eb8: dd 0
-assert_at 0x2ebc+(le_reloc_count-22)*7
 data_pages:
 le.text:
 %include 'wcfd32dos.nasm'
-section .le.bss
-le.bss_end:
 section .le.text
 le.text_end:
+le.text_stack equ $+((le.text-$)&3)  ; Align to 4.
+le.text_stack_end equ le.text_stack+le.stack_size
 times 0x1000-($-le.text) times 0 db 0; Check that .le.text size is at most 0x1000 bytes (single page).
 assert_eq le_reloc_count, le_found_reloc_count  ; Upon a difference, update the value of `le_fixups'.
 
