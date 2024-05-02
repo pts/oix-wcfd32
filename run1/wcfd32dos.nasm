@@ -35,13 +35,16 @@ cpu 386
   section STACK  USE32 class=STACK NOBITS align=1  ; Pacify WLINK: Warning! W1014: stack segment not found
   group DGROUP CONST CONST2 _DATA _BSS
 
-  %macro relocated_le.text 1+
-    %define base 0
-    %1
-    %undef base
+  %macro relocated_le.text 2+
+    %define relval %1
+    %2
+    %undef relval
   %endm
   %define relocated_le.bss relocated_le.text
 %endif
+%macro relocated_le.text.dd 1
+  relocated_le.text %1, dd (relval)
+%endm
 
 INT21H_FUNC_06H_DIRECT_CONSOLE_IO equ 0x6
 INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO equ 0x8
@@ -126,7 +129,7 @@ le.start:
 		jb .load_ok
 		neg eax  ; EAX := load_error_code.
 		push eax
-		relocated_le.text mov eax, [load_errors+4*eax-base]
+		relocated_le.text load_errors, mov eax, [relval+4*eax]
 		call print_str  ; !! Report filename etc. on file open error.
 		pop eax
 		jmp .exit ; exit(load_error_code).
@@ -151,16 +154,16 @@ le.start:
 		;mov dword [wcfd32_copyright], 0  ; Not needed, .bss is zero-initialized by PMODE/W.
 		;mov dword [wcfd32_is_japanese], 0  ; Not needed, .bss is zero-initialized by PMODE/W.
 		;mov dword [wcfd32_max_handle_for_os2], 0  ; Not needed, .bss is zero-initialized by PMODE/W.
-		relocated_le.bss mov [wcfd32_break_flag_ptr-base], esp
-		relocated_le.bss mov [wcfd32_program_filename-base], edi
-		relocated_le.bss mov [wcfd32_command_line-base], ebp
-		relocated_le.bss mov [wcfd32_env_strings-base], ecx
+		relocated_le.bss wcfd32_break_flag_ptr, mov [relval], esp
+		relocated_le.bss wcfd32_program_filename, mov [relval], edi
+		relocated_le.bss wcfd32_command_line, mov [relval], ebp
+		relocated_le.bss wcfd32_env_strings, mov [relval], ecx
 		xor ebx, ebx  ; Not needed by the ABI, just make it deterministic.
 		xor esi, esi  ; Not needed by the ABI, just make it deterministic.
 		xor ebp, ebp  ; Not needed by the ABI, just make it deterministic.
 		sub ecx, ecx  ; This is an unknown parameter, which we always set to 0.
-		relocated_le.text mov edx, wcfd32_far_syscall-base
-		relocated_le.bss mov edi, wcfd32_param_struct-base
+		relocated_le.text wcfd32_far_syscall, mov edx, relval
+		relocated_le.bss wcfd32_param_struct, mov edi, relval
 		mov bx, cs  ; Segment of wcfd32_far_syscall for the far call.
 		xchg esi, eax  ; ESI := (entry point address); EAX := junk.
 		mov ah, WCFD32_OS_DOS  ; !! wasmx106.exe (loader16.asm) does OS_WIN16. !! Why? Which of DOS or OS2? Double check.
@@ -243,11 +246,11 @@ malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conve
 		;push eax
 		;call dos_printf
 		;add esp, 8
-.try_fit:	relocated_le.bss mov eax, [malloc_base-base]
-		relocated_le.bss sub eax, [malloc_rest-base]
-		relocated_le.bss sub [malloc_rest-base], ebp
+.try_fit:	relocated_le.bss malloc_base, mov eax, [relval]
+		relocated_le.bss malloc_rest, sub eax, [relval]
+		relocated_le.bss malloc_rest, sub [relval], ebp
 		jc .full  ; We actually waste the rest of the current block, but for WASM it's zero waste.
-		relocated_le.bss add eax, [malloc_capacity-base]
+		relocated_le.bss malloc_capacity, add eax, [relval]
 		;push eax
 		;push '!'
 		;mov eax, esp
@@ -277,9 +280,9 @@ malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conve
 		shl ebx, 16
 		mov bx, cx
 		pop ecx
-		relocated_le.bss mov [malloc_base-base], ebx  ; Newly allocated address.
-		relocated_le.bss mov [malloc_rest-base], ecx
-		relocated_le.bss mov [malloc_capacity-base], ecx
+		relocated_le.bss malloc_base, mov [relval], ebx  ; Newly allocated address.
+		relocated_le.bss malloc_rest, mov [relval], ecx
+		relocated_le.bss malloc_capacity, mov [relval], ecx
 		;push '#'
 		;mov eax, esp
 		;push eax
@@ -316,8 +319,8 @@ malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conve
 		pop ebx
 		jc .oom
 		shl ebx, 4
-		relocated_le.bss mov [malloc_rest-base], ebx
-		relocated_le.bss mov [malloc_capacity-base], ebx
+		relocated_le.bss malloc_rest, mov [relval], ebx
+		relocated_le.bss malloc_capacity, mov [relval], ebx
 		; PMODE/W (but not WDOSX): EAX is selector. !! Try DPMI syscall 100h instead, maybe they are compatible. But that allocates a selector in DX, we should free it.
 		xchg ebx, eax  ; EBX := selector; EAX := junk.
 		push edx  ; Save. !! pushad.
@@ -326,10 +329,10 @@ malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conve
 		shl ecx, 16
 		mov cx, dx  ; ECX := linear address of PSP.
 		pop edx  ; Restore.
-		relocated_le.bss mov [malloc_base-base], ecx
+		relocated_le.bss malloc_base, mov [relval], ecx
 		;movzx eax, ax
 		;shl eax, 4
-		;relocated_le.bss mov [malloc_base-base], eax
+		;relocated_le.bss malloc_base, mov [relval], eax
 		jmp .try_fit  ; It may not fit though.
 .oom:		xor eax, eax  ; NULL.
 .return:	pop ebp
@@ -345,8 +348,7 @@ malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conve
 %define CONFIG_LOAD_MALLOC_EAX call malloc
 %undef  CONFIG_LOAD_MALLOC_EBX
 %define CONFIG_LOAD_CLEAR_BSS
-%define CONFIG_LOAD_RELOCATED relocated_le.text
-%define CONFIG_LOAD_RELOCATED_BASE base
+%define CONFIG_LOAD_RELOCATED_DD relocated_le.text.dd
 %include "wcfd32load.inc.nasm"
 
 wcfd32_far_syscall:  ; proc far
