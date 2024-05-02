@@ -65,7 +65,6 @@ org $$-.vcont  ; Position independent code (PIC): from now all global variables 
 %define CONFIG_LOAD_SINGLE_READ
 %define CONFIG_LOAD_INT21H call wcfd32_syscall
 %undef  CONFIG_LOAD_MALLOC_EAX
-%undef  CONFIG_LOAD_MALLOC_EBX
 %define CONFIG_LOAD_CLEAR_BSS
 %include "wcfd32load.inc.nasm"  ; We use the fact that this code doesn't read or write EBP.
 
