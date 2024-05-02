@@ -209,6 +209,10 @@ struct cf_header {  /* 0x18 bytes. */
 };
 ```
 
+OIX programs don't have a section table (everything is .text), and they
+don't have debug info. But they have a header, an image (containing .text
+and relocations) and .bss (zero-initialized program data).
+
 This is how the Watcom tools (such as *w32run.exe*) find the CF header: get
 16-bit little-endian integer at file offset 8 (DOS .exe .hdrsize), maximum
 allowed value 0x1e, multiply it by 0x10, check that the CF signature (4
@@ -286,6 +290,14 @@ copying everything after the OIX image.
 
 TODO(pts): Write more, especially about argv, environment,
 start ABI, int 21h ABI.
+
+## Executable file format debugging
+
+The OpenWatcom *wdump* tool can be used to display headers, relocation data,
+debug info etc. about DOS MZ .exe programs , Win32 PE .exe programs, OS/2 or
+DOS extender LX/LE .exe programs, Pharlap relocatable executable .rex files,
+but unfortunately it doesn't support OIX programs, not even those which were
+shipped by Watcom.
 
 ## The WCFD32 runtime system
 
