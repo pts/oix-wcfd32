@@ -93,21 +93,24 @@ load_wcfd32_program_image:
 		jc .read_error
 		shl edx, 10h
 		mov dx, ax	    ; r_edx
+%ifdef CONFIG_LOAD_MALLOC_EBX  ; !! Unused, remove.
 		push ebx  ; Save DOS filehandle.
-		mov ebx, [edi+10h]  ; Allocate this many bytes.
-%ifdef CONFIG_LOAD_MALLOC_EBX
+		mov ebx, [edi+10h]  ; Allocate cf_header.load_size bytes, address is returned in EAX.
 		CONFIG_LOAD_MALLOC_EBX
+		pop ebx  ; Restore DOS filehandle.
 %else
   %ifdef CONFIG_LOAD_MALLOC_EAX
-		xchg eax, ebx  ; EAX := EBX: EBX := junk.
+		mov eax, [edi+10h]  ; Allocate cf_header.load_size bytes, address is returned in EAX.
 		CONFIG_LOAD_MALLOC_EAX
   %else
+		push ebx  ; Save DOS filehandle.
+		mov ebx, [edi+10h]  ; Allocate cf_header.load_size bytes, address is returned in EAX.
 		mov ah, LOAD_INT21_FUNC_48H_ALLOCATE_MEMORY
 		CONFIG_LOAD_INT21H
+		pop ebx  ; Restore DOS filehandle.
+		jc .oom  ; CONFIG_LOAD_INT21H sets CF=1 indicating failured.
   %endif
 %endif
-		pop ebx  ; Restore DOS filehandle.
-		jc .oom
 		test eax, eax
 		jnz .malloc_ok
 .oom:		mov eax, -LOAD_ERROR_OUT_OF_MEMORY  ; error_code
