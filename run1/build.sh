@@ -62,6 +62,7 @@
 # TODO(pts): Test the build on Windows 95.
 # TODO(pts): Do an automatic `rm` (unlink) and `chmod +x` for ELF executable output.
 # TODO(pts): Make the LE header fields in wcfd32dosexe.nasm smaller, especially remove the stack.
+# TODO(pts): Preload oixrun.oix to wcfd32dos.exe, don't let it contain `Memory allocation failed' 3 times, just once.
 #
 
 set -ex
