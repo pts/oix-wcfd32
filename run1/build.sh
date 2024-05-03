@@ -41,27 +41,6 @@
 #   self-contained Win32--DOS program .exe. Eventually this will be replaced
 #   with oixconv, oixconv.exe and oixconv.oix.
 #
-# TODO(pts): Really fix oixrun.oix parse_first_arg argument parsing bug triggered by wcfd32win32.nasm.
-# TODO(pts): Add usage message for oixconv.
-# TODO(pts): Build oixconv.exe and oixconv, using NASM, from new OIX oixconv.nasm sources. Port the Linux-only code in wcfd32stub.nasm to OIX.
-# TODO(pts): (v2) Drop WLINK as a build dependency, use NASM only. For that we need to build the PE executable with NASM (hard).
-# TODO(pts): (v3) Replace NASM with nasmb.oix, oixrunb and oixrunb.exe for the build.
-# TODO(pts): (v3) Add build.bat, with shorter filenames, for DOS.
-# TODO(pts): (v4) Add compressed nasmb.oix (upxbc --elftiny).
-# TODO(pts): (v6) Add missing non-time syscalls.
-# TODO(pts): (v7) Add time, stat and utime syscalls.
-# TODO(pts): (v8) Add FreeBSD compatibility for oixrun0, and this will make the build system work.
-# TODO(pts): Better error reporting (with at least filename displayed) for oixrun.
-# TODO(pts): Make oixconv/wcfd32stub be able to create non-prelinked ELF programs (without too much bloat?).
-# TODO(pts): Make oixconv/wcfd32stub be able to create prelinked ELF programs with the CFP header.
-# TODO(pts): Make oixconv/wcfd32stub be able to create OIX programs (without ELF or MZ flavor).
-# TODO(pts): Make oixconv/wcfd32stub be able to create OIX programs even from prelinked ELF programs with the CFP header.
-# TODO(pts): Build oixrun1 (prelinked ELF) with NASM. This is just an excersize, it's not useful.
-# TODO(pts): Provide more reliable operating system indication, especially Linux and FreeBSD. Which Watcom programs are affected?
-# TODO(pts): Make wcfd32linux.nasm autodetect and run on FreeBSD i386 (like https://github.com/pts/pts-pngout-20150319-i386/).
-# TODO(pts): Do an automatic `rm` (unlink) and `chmod +x` for ELF executable output.
-# TODO(pts): Preload oixrun.oix to wcfd32win32.exe, don't let oixrun.exe contain `Memory allocation failed' 2 times, just once. This is possible by overlapping the end of the LE image with the beginning of the PE image. the winning is 211 file bytes, and the loss is more virtual memory usage.
-#
 
 set -ex
 test "${0%/*}" = "$0" || cd "${0%/*}"
