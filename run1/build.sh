@@ -50,17 +50,16 @@
 # TODO(pts): (v6) Add missing non-time syscalls.
 # TODO(pts): (v7) Add time, stat and utime syscalls.
 # TODO(pts): (v8) Add FreeBSD compatibility for oixrun0, and this will make the build system work.
-# TODO(pts): Why doesn't it run with PMODE/W with 0 extended memory? Is it by design? Can it run?
 # TODO(pts): Better error reporting (with at least filename displayed) for oixrun.
 # TODO(pts): Make oixconv/wcfd32stub be able to create non-prelinked ELF programs (without too much bloat?).
 # TODO(pts): Make oixconv/wcfd32stub be able to create prelinked ELF programs with the CFP header.
 # TODO(pts): Make oixconv/wcfd32stub be able to create OIX programs (without ELF or MZ flavor).
 # TODO(pts): Make oixconv/wcfd32stub be able to create OIX programs even from prelinked ELF programs with the CFP header.
 # TODO(pts): Build oixrun1 (prelinked ELF) with NASM. This is just an excersize, it's not useful.
-# TODO(pts): Provide more reliable operatiny system indication, especially Linux and FreeBSD. Which Watcom programs are affected?
+# TODO(pts): Provide more reliable operating system indication, especially Linux and FreeBSD. Which Watcom programs are affected?
 # TODO(pts): Make wcfd32linux.nasm autodetect and run on FreeBSD i386 (like https://github.com/pts/pts-pngout-20150319-i386/).
 # TODO(pts): Do an automatic `rm` (unlink) and `chmod +x` for ELF executable output.
-# TODO(pts): Preload oixrun.oix to wcfd32win32.exe, don't let oixrun.exe contain `Memory allocation failed' 2 times, just once.
+# TODO(pts): Preload oixrun.oix to wcfd32win32.exe, don't let oixrun.exe contain `Memory allocation failed' 2 times, just once. This is possible by overlapping the end of the LE image with the beginning of the PE image. the winning is 211 file bytes, and the loss is more virtual memory usage.
 #
 
 set -ex
