@@ -98,7 +98,6 @@ nasm=tools/nasm    # NASM 0.98.39 (2005-01-15) was the last version without amd6
 #"$wlink" @wcfd32import.lnk form win nt ru con=3.10 op stub=wcfd32dosp.exe op q op d op h=1 com h=0 n wcfd32win32.exe f wcfd32win32.obj
 "$wlink" form win nt ru con=3.10 op stub=wcfd32dosp.exe op q op d op h=1 com h=0 n wcfd32win32.exe f wcfd32win32.obj
 "$nasm" -O999999999 -w+orphan-labels -f bin -o oixrun.exe wcfd32stub.nasm  # Final output: oixrun.exe.  # incbin: wcfd32dos.exe, wcfd32dosp.exe, wcfd32win32.exe
-"$nasm" -O999999999 -w+orphan-labels -f bin -DOIXRUN0 -o oixrun0.exe wcfd32stub.nasm  # Final output: oixrun0.exe. -DOIXRUN0 doesn't make a difference, oixrun.oix is precompiled.
 "$nasm" -O999999999 -w+orphan-labels -f bin -o wcfd32linux.bin wcfd32linux.nasm
 rm -f wcfd32stub  # For correct permissions below.
 "$nasm" -O999999999 -w+orphan-labels -f bin -DLINUXPROG -o wcfd32stub wcfd32stub.nasm  # incbin: wcfd32linux.bin, wcfd32dos.exe, wcfd32dosp.exe, wcfd32win32.exe

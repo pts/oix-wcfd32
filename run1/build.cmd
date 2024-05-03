@@ -47,8 +47,6 @@ exit
 @if errorlevel 1 exit %b%
 %nasm% -O999999999 -w+orphan-labels -f bin -o oixrun.exe wcfd32stub.nasm
 @if errorlevel 1 exit %b%
-%nasm% -O999999999 -w+orphan-labels -f bin -DOIXRUN0 -o oixrun0.exe wcfd32stub.nasm
-@if errorlevel 1 exit %b%
 %nasm% -O999999999 -w+orphan-labels -f bin -o wcfd32linux.bin wcfd32linux.nasm
 @if errorlevel 1 exit %b%
 %nasm% -O999999999 -w+orphan-labels -f bin -DLINUXPROG -o wcfd32stub wcfd32stub.nasm
