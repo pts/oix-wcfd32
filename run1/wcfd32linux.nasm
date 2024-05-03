@@ -1012,7 +1012,9 @@ concatenate_env:
 .34:		and dword [eax], 0
 		jmp strict short pop_eax_edx_ecx_ebx_ret
 
-msg_oom:	db 'fatal: out of memory', 13, 10, 0
+%ifdef DEBUG
+  msg_oom:	db 'fatal: out of memory', 13, 10, 0
+%endif
 %ifdef RUNPROG
   %ifdef OIXRUN0
     msg_usage:	db 'Usage: oixrun0 <prog.oix> [<arg> ...]', 13, 10, 0
