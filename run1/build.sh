@@ -71,7 +71,7 @@ unset LANG LANGUAGE LC_ALL LC_CTYPE LC_MESSAGES LC_NUMERIC LC_TIME TZ  # For rep
 export LC_ALL=C TZ=GMT  # For reproducible results.
 
 if test "$1" = clean; then
-  exec rm -f oixrun oixrun.exe oixrun0 oixrun0.exe w.exe wcfd32dos.exe wcfd32dosp.exe wcfd32linux wcfd32linux.bin wcfd32stub wcfd32win32.exe
+  exec rm -f oixrun oixrun.exe oixrun0 oixrun0.exe w.exe wcfd32dos.exe wcfd32dosp.exe wcfd32linux wcfd32linux.bin wcfd32stub wcfd32win32.exe wcfd32dos.obj wcfd32win32.obj
 fi
 
 wlink=tools/wlink  # OpenWatcom 1.4 (2005-11-15) was the first one with a Linux binary release.

@@ -27,7 +27,7 @@ if "%1" == "clean" goto clean
 goto compile
 :clean
 del oixrun oixrun.exe oixrun0 oixrun0.exe w.exe wcfd32dos.exe wcfd32dosp.exe wcfd32linux wcfd32linux.bin
-del wcfd32stub wcfd32win32.exe
+del wcfd32stub wcfd32win32.exe wcfd32dos.obj wcfd32win32.obj
 rem if errorlevel 1 exit %b%  -- del fails if some of the files are missing; we don't propagate this.
 exit
 
