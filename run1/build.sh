@@ -41,6 +41,7 @@
 #   self-contained Win32--DOS program .exe. Eventually this will be replaced
 #   with oixconv, oixconv.exe and oixconv.oix.
 #
+# TODO(pts): Really fix oixrun.oix parse_first_arg argument parsing bug triggered by wcfd32win32.nasm.
 # TODO(pts): Add usage message for oixconv.
 # TODO(pts): Build oixconv.exe and oixconv, using NASM, from new OIX oixconv.nasm sources. Port the Linux-only code in wcfd32stub.nasm to OIX.
 # TODO(pts): (v2) Drop WLINK as a build dependency, use NASM only. For that we need to build the PE executable with NASM (hard).
