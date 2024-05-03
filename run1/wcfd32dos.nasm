@@ -157,16 +157,6 @@ obss_end: obss_resb 0
 		pop edi
 		pop ecx
 		; Now: EBP: command-line arguments terminated by NUL; ECX: DOS environment variable strings; EDI: full program pathname terminated by NUL.
-		mov eax, edi
-		call load_wcfd32_program_image
-		cmp eax, -10
-		jb .load_ok
-		neg eax  ; EAX := load_error_code.
-		push eax  ; Save exit_code.
-		relocated_le.text load_errors, mov eax, [relval+4*eax]
-		call print_str  ; !! Report filename etc. on file open error.
-		pop eax  ; Restore exit_code.
-		jmp .exit ; exit(load_error_code).
 .load_ok:	; Now we call the entry point.
 		;
 		; Input: AH: operating system (WCFD32_OS_DOS or WCFD32_OS_WIN32).
@@ -199,10 +189,9 @@ obss_end: obss_resb 0
 		relocated_le.text wcfd32_far_syscall, mov edx, relval
 		relocated_le.text wcfd32_param_struct, mov edi, relval
 		mov bx, cs  ; Segment of wcfd32_far_syscall for the far call.
-		xchg esi, eax  ; ESI := (entry point address); EAX := junk.
 		mov ah, WCFD32_OS_DOS  ; !! wasmx106.exe (loader16.asm) does OS_WIN16. !! Why? Which of DOS or OS2? Double check.
 		push cs  ; For the `retf' of the far call.
-		call esi
+		call oixrun_image
 .exit:		mov ah, 4ch  ; Exit with exit code in AL.
 		int 21h  ; This is the only way to exit from PMODE/W, these don't work: `ret', `retf', `iret', `int 20h'.
 		; Not reached.
@@ -233,6 +222,7 @@ print_chr:  ; !! Prints single byte in AL to stdout.
 		ret
 %endif
 
+%ifdef DEBUG
 print_str:  ; !! Prints the ASCIIZ string (NUL-terminated) at EAX to stdout.
 		push eax
 		push ebx
@@ -252,6 +242,7 @@ print_str:  ; !! Prints the ASCIIZ string (NUL-terminated) at EAX to stdout.
 		pop ebx
 		pop eax
 		ret
+%endif
 
 malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conventional memory. On success, returns starting address. On failure, returns NULL.
 		push ebx
@@ -375,14 +366,6 @@ malloc:  ; Allocates EAX bytes of memory. First it tries high memory, then conve
 		pop ebx
 		ret
 
-%undef  CONFIG_LOAD_FIND_CF_HEADER
-%define CONFIG_LOAD_SINGLE_READ  ; For testing, comment it out and add `stc' where indicated to wcfd32load.inc.nasm.
-%define CONFIG_LOAD_INT21H int 21h
-%define CONFIG_LOAD_MALLOC_EAX call malloc
-%define CONFIG_LOAD_CLEAR_BSS
-%define CONFIG_LOAD_RELOCATED_DD relocated_le.text.dd
-%include "wcfd32load.inc.nasm"
-
 wcfd32_far_syscall:  ; proc far
 %ifdef DEBUG
 		call debug_syscall
@@ -445,13 +428,15 @@ message db '?$'  ; !!
 done_message db '.', 13, 10, '$' ; !!
 %endif
 
+		times (le.start-$)&3 db 0  ; Align to 4 bytes.
+oixrun_image:	incbin 'oixrun.oix', 0x18
+.end:
+
 ; Unfortunately the format LE 4 KiB of alignment between .code and .data, no
 ; way to make it smaller, but PMODE/W supports LE only. So we just put
 ; everything to .text to save a few KiB.
 ;
 ;section .le.data
 ;section .le.rodata
-
-emit_load_errors
 
 ; __END__

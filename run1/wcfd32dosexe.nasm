@@ -102,6 +102,16 @@ mz_header:
 .nreloc:	dw 0
 .hdrsize:	dw (dos_image-file)>>4
 assert_at 0xa
+%macro emit_cf_header 0
+  cf_header:
+  .signature:	dd 'CF'
+  .load_fofs:	dd oixrun_image-file
+  .load_size:	dd oixrun_image.end-oixrun_image
+  .reloc_rva:	;dd ?
+  ;.mem_size:	dd ?
+  ;.entry_rva:	dd ?
+  incbin 'oixrun.oix', 0xc, 0xc
+%endm
 %ifdef PE
   ;.minalloc:	dw ?
   ;.maxalloc:	dw ?
@@ -116,8 +126,7 @@ assert_at 0xa
   .noverlay:	;dw 0
   incbin 'pmodew133.exe', 0x1a, 0x20-0x1a
   assert_at 0x20
-  cf_header:
-  .signature: dd 'CF', 0, 0, 0, 0  ; To be filled with the CF header later.
+  emit_cf_header
   assert_at 0x38
   le_ofs:
   ..@0x0038: dd le_header-file
@@ -137,7 +146,8 @@ assert_at 0xa
   incbin 'pmodew133.exe', 0xa, 0x18-0xa
   dw 0x40  ; WLINK changed 0x3a to 0x40.
   incbin 'pmodew133.exe', 0x1a, 0x20-0x1a
-  dd 0, 0, 0, 0, 0, 0, 0  ; To be filled with the CF header later.
+  emit_cf_header
+  dd 0  ; Padding.
   ;incbin 'le.bin.golden', 0, 0x3c
   ..@0x003c: dd le_header-file
   assert_at 0x40
@@ -282,7 +292,7 @@ fixup_page_table:  ; Number of dds: 1+num_pages. This is an index for fixup_reco
 fixup_record_table:  ; Relocations. https://github.com/yetmorecode/lxedit/blob/09de1f3d253cc9123b8392db1d466e586416fb33/lx.c#L6
 fixup_record_table_page_0:
 ; TODO(pts): Move the fixups after le.text_end, thus we know their count.
-le_fixups 23  ; There will be this many relocation, sets le_reloc_count.
+le_fixups 17  ; There will be this many relocation, sets le_reloc_count.
 fixup_record_table_end:
 imported_modules_name_table:
 imported_procedures_name_table:

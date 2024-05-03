@@ -18,6 +18,8 @@ rem NASM 0.98.39 (2005-01-15) was the last version without amd64 (`bits 64') sup
 set nasm=tools\nasm
 @echo on
 
+%nasm% -O999999999 -w+orphan-labels -f bin -o oixrun.oix oixrun.nasm
+@if errorlevel 1 exit /b 1
 %nasm% -O999999999 -w+orphan-labels -f obj -o wcfd32dos.obj wcfd32dos.nasm
 @if errorlevel 1 exit /b 1
 %nasm% -O999999999 -w+orphan-labels -f bin -o wcfd32dos.exe wcfd32dosexe.nasm
@@ -28,7 +30,9 @@ set nasm=tools\nasm
 @if errorlevel 1 exit /b 1
 %wlink% form win nt ru con=3.10 op stub=wcfd32dosp.exe op q op d op h=1 com h=0 n wcfd32win32.exe f wcfd32win32.obj
 @if errorlevel 1 exit /b 1
-%nasm% -O999999999 -w+orphan-labels -f bin -o wcfd32stub.bin wcfd32stub.nasm
+%nasm% -O999999999 -w+orphan-labels -f bin -o oixrun.exe wcfd32stub.nasm
+@if errorlevel 1 exit /b 1
+%nasm% -O999999999 -w+orphan-labels -f bin -DOIXRUN0 -o oixrun0.exe wcfd32stub.nasm
 @if errorlevel 1 exit /b 1
 %nasm% -O999999999 -w+orphan-labels -f bin -o wcfd32linux.bin wcfd32linux.nasm
 @if errorlevel 1 exit /b 1
@@ -39,13 +43,7 @@ del wcfd32win32.exe
 @if errorlevel 1 exit /b 1
 %nasm% -O999999999 -w+orphan-labels -f bin -DRUNPROG -DOIXRUN0 -o oixrun0 wcfd32linux.nasm
 @if errorlevel 1 exit /b 1
-%nasm% -O999999999 -w+orphan-labels -f bin -o oixrun.oix oixrun.nasm
-@if errorlevel 1 exit /b 1
 %nasm% -O999999999 -w+orphan-labels -f bin -DSELFPROG -DOIXRUN -o oixrun wcfd32linux.nasm
-@if errorlevel 1 exit /b 1
-%nasm% -O999999999 -w+orphan-labels -f bin -o oixrun0.exe -DOIXRUN0 oixrunexe.nasm
-@if errorlevel 1 exit /b 1
-%nasm% -O999999999 -w+orphan-labels -f bin -o oixrun.exe -DOIXRUN oixrunexe.nasm
 @if errorlevel 1 exit /b 1
 
 @echo off

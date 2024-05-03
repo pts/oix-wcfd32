@@ -11,6 +11,11 @@
 /run1/wcfd32stub
 /run1/wcfd32stub.bin
 /run1/wcfd32win32.exe
+/run1/m.nas
+/run1/m0.bin
+/run1/m.bin
+/run1/t0.bin
+/run1/t.bin
 /wasm*.exe
 /wlib*.exe
 /wcfd32dos.exe

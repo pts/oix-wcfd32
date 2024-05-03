@@ -61,8 +61,7 @@
 # TODO(pts): Make wcfd32linux.nasm autodetect and run on FreeBSD i386 (like https://github.com/pts/pts-pngout-20150319-i386/).
 # TODO(pts): Test the build on Windows 95.
 # TODO(pts): Do an automatic `rm` (unlink) and `chmod +x` for ELF executable output.
-# TODO(pts): Make the LE header fields in wcfd32dosexe.nasm smaller, especially remove the stack.
-# TODO(pts): Preload oixrun.oix to wcfd32dos.exe, don't let it contain `Memory allocation failed' 3 times, just once.
+# TODO(pts): Preload oixrun.oix to wcfd32win32.exe, don't let oixrun.exe contain `Memory allocation failed' 2 times, just once.
 #
 
 set -ex
@@ -75,6 +74,7 @@ export LC_ALL=C TZ=GMT  # For reproducible results.
 wlink=tools/wlink  # OpenWatcom 1.4 (2005-11-15) was the first one with a Linux binary release.
 nasm=tools/nasm    # NASM 0.98.39 (2005-01-15) was the last version without amd64 (`bits 64') support. Integers are still 32-bit.
 
+"$nasm" -O999999999 -w+orphan-labels -f bin -o oixrun.oix oixrun.nasm
 "$nasm" -O999999999 -w+orphan-labels -f obj -o wcfd32dos.obj wcfd32dos.nasm
 # Using the output name w.exe because WLiNK inserts the output filename
 # (without the .exe extension) to the program, and we want it short.
@@ -90,11 +90,12 @@ nasm=tools/nasm    # NASM 0.98.39 (2005-01-15) was the last version without amd6
 # for mwpestub LocalAlloc and HeapAlloc. It's not needed by Win32
 # LocalAlloc or mwpestub VirtualAlloc.
 #
-# This file is not reproducible (but wcfd32stub.bin and wcfd32stub are), because wlink
+# This file is not reproducible (but oixrun.exe and wcfd32stub are), because wlink
 # inserts the current build timestamp to the PE header.
 #"$wlink" @wcfd32import.lnk form win nt ru con=3.10 op stub=wcfd32dosp.exe op q op d op h=1 com h=0 n wcfd32win32.exe f wcfd32win32.obj
 "$wlink" form win nt ru con=3.10 op stub=wcfd32dosp.exe op q op d op h=1 com h=0 n wcfd32win32.exe f wcfd32win32.obj
-"$nasm" -O999999999 -w+orphan-labels -f bin -o wcfd32stub.bin wcfd32stub.nasm  # Final output: wcfd32stub.bin.  # incbin: wcfd32dos.exe, wcfd32dosp.exe, wcfd32win32.exe
+"$nasm" -O999999999 -w+orphan-labels -f bin -o oixrun.exe wcfd32stub.nasm  # Final output: oixrun.exe.  # incbin: wcfd32dos.exe, wcfd32dosp.exe, wcfd32win32.exe
+"$nasm" -O999999999 -w+orphan-labels -f bin -DOIXRUN0 -o oixrun0.exe wcfd32stub.nasm  # Final output: oixrun0.exe. -DOIXRUN0 doesn't make a difference, oixrun.oix is precompiled.
 "$nasm" -O999999999 -w+orphan-labels -f bin -o wcfd32linux.bin wcfd32linux.nasm
 rm -f wcfd32stub  # For correct permissions below.
 "$nasm" -O999999999 -w+orphan-labels -f bin -DLINUXPROG -o wcfd32stub wcfd32stub.nasm  # incbin: wcfd32linux.bin, wcfd32dos.exe, wcfd32dosp.exe, wcfd32win32.exe
@@ -106,12 +107,9 @@ chmod +x wcfd32linux  # Final output wcfd32linux i386 executable program.
 rm -f oixrun0  # For correct permissions below.
 "$nasm" -O999999999 -w+orphan-labels -f bin -DRUNPROG -DOIXRUN0 -o oixrun0 wcfd32linux.nasm  # Native Linux i386 implementation.
 chmod +x oixrun0  # Final output: oixrun0 i386 executable program.
-"$nasm" -O999999999 -w+orphan-labels -f bin -o oixrun.oix oixrun.nasm
 rm -f oixrun  # For correct permissions below.
 "$nasm" -O999999999 -w+orphan-labels -f bin -DSELFPROG -DOIXRUN -o oixrun wcfd32linux.nasm  # ELF-flavored OIX implementation using oixrun.oix, containing the relocation code twice. -DOIXRUN doesn't make a difference, oixrun.oix is precompiled.
 chmod +x oixrun  # Final output: oixrun i386 executable program.
-"$nasm" -O999999999 -w+orphan-labels -f bin -o oixrun0.exe -DOIXRUN0 oixrunexe.nasm  # -DOIXRUN0 doesn't make a difference, oixrun.oix is precompiled.
-"$nasm" -O999999999 -w+orphan-labels -f bin -o oixrun.exe -DOIXRUN oixrunexe.nasm
 # TODO(pts): Sync changes from build.sh to build.cmd.
 
 ls -l oixrun0.exe oixrun.exe oixrun0 oixrun oixrun.oix wcfd32stub
