@@ -71,6 +71,10 @@ unset WATCOM WLANG INCLUDE  # For wlink.
 unset LANG LANGUAGE LC_ALL LC_CTYPE LC_MESSAGES LC_NUMERIC LC_TIME TZ  # For reproducible results.
 export LC_ALL=C TZ=GMT  # For reproducible results.
 
+if test "$1" = clean; then
+  exec rm -f oixrun oixrun.exe oixrun0 oixrun0.exe w.exe wcfd32dos.exe wcfd32dosp.exe wcfd32linux wcfd32linux.bin wcfd32stub wcfd32win32.exe
+fi
+
 wlink=tools/wlink  # OpenWatcom 1.4 (2005-11-15) was the first one with a Linux binary release.
 nasm=tools/nasm    # NASM 0.98.39 (2005-01-15) was the last version without amd64 (`bits 64') support. Integers are still 32-bit.
 

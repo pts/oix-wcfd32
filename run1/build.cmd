@@ -16,8 +16,17 @@ rem OpenWatcom 1.4 (2005-11-15) was the first one with a Linux binary release.
 set wlink=tools\wlink
 rem NASM 0.98.39 (2005-01-15) was the last version without amd64 (`bits 64') support. Integers are still 32-bit.
 set nasm=tools\nasm
-@echo on
 
+if "%1" == "clean" goto clean
+goto compile
+:clean
+del oixrun oixrun.exe oixrun0 oixrun0.exe w.exe wcfd32dos.exe wcfd32dosp.exe wcfd32linux wcfd32linux.bin
+del wcfd32stub wcfd32win32.exe
+rem if errorlevel 1 exit /b 1  -- del fails if some of the files are missing; we don't propagate this.
+exit
+
+:compile
+@echo on
 %nasm% -O999999999 -w+orphan-labels -f bin -o oixrun.oix oixrun.nasm
 @if errorlevel 1 exit /b 1
 %nasm% -O999999999 -w+orphan-labels -f obj -o wcfd32dos.obj wcfd32dos.nasm
