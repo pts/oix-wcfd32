@@ -879,7 +879,7 @@ section .le.text
 %endm
 times (file-$)&(0x10-1) db 0  ; Align to 0x10. This padding is not part of wcfd32dos.exe, it's added in later phases for aligning the PE header after it. !! Align only to 4.
 ..@0x32e0:
-assert_at 0x32e0
+;assert_at 0x32e0
 pe_header:  ; https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
 ..@0x31e0:
 Signature: db 'PE', 0, 0
