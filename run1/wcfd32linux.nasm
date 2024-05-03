@@ -4,6 +4,30 @@
 ; !! Add O_LARGEFILE, make it work with large files (even if seeking doesn't work).
 ;
 
+%ifdef    STUB
+  %define STUB 1
+%else
+  %define STUB 0
+%endif
+%ifdef    RUNPROG
+  %define RUNPROG 1
+%else
+  %define RUNPROG 0
+%endif
+%ifdef    SELFPROG
+  %define SELFPROG 1
+%else
+  %define SELFPROG 0
+%endif
+%if STUB+RUNPROG+SELFPROG!=1
+  %error fatal: define exactly one of: -DSTUB, -DRUNPROG, -DSELFPROG
+  db 1/0
+%endif
+; The difference between RUNPROG (oixrun0) and SELFPROG (oixrun): SELFPROG
+; is also an OIX program (it contains a copy of the oixrun.oix image), and
+; thus it is anout 355 bytes longer. Please note that there is is no code
+; duplication bwetween oixrun0.oix and the runner.
+
 org 0x8048000  ; Typical Linux i386 executable program.
 bits 32
 cpu 386
@@ -15,7 +39,7 @@ file_header:	db 0x7F,'ELF',1,1,1,OSABI_Linux,0,0,0,0,0,0,0,0,2,0,3,0
 		dd program_header-file_header, 0, 0
 		dw program_header-file_header, 0x20, 1, 0, 0, 0
 program_header:	dd 1, 0, file_header, file_header
-%ifdef SELFPROG
+%if SELFPROG
 		dd program_end-file_header
 %else
 		dd prebss-file_header
@@ -27,7 +51,7 @@ program_header:	dd 1, 0, file_header, file_header
   times -(%1)+($-$$) db 0
 %endm
 
-%ifdef SELFPROG
+%if SELFPROG
   assert_at 0x54
   cf_header:
   .signature:	db 'CF', 0, 0
@@ -108,13 +132,13 @@ EXIT_FAILURE equ 1
 
 
 _start:  ; Linux i386 program entry point.
-%ifndef RUNPROG
-  %ifndef SELFPROG
+%if RUNPROG==0
+  %if SELFPROG==0
 		mov esi, bss  ; Value will be patched by wfcd32stub to WCFD32 program entry_vaddr during executable program file generation.
 		; Now: ESI: entry point address.
   %endif
 %endif
-%ifdef SELFPROG  ; Apply relocations.
+%if SELFPROG  ; Apply relocations.
 		mov edx, oix_image  ; Same as [cf_header.load_fofs]. Moving it without changing the ELF-32 phdr fields is not supported.
 		mov esi, [cf_header.reloc_rva]
 .apply_relocations:
@@ -141,7 +165,7 @@ _start:  ; Linux i386 program entry point.
 		add esi, edx
 %endif
 		pop edx  ; argc.
-%ifdef RUNPROG
+%if RUNPROG
 		pop eax  ; Ignore argv[0].
 		dec edx
 		jnz .have_argv1
@@ -182,7 +206,7 @@ _start:  ; Linux i386 program entry point.
 		cmp byte [eax], 0
 		jne .next_envvar
 %endif
-%ifdef RUNPROG
+%if RUNPROG
 		mov eax, edi
 		call load_wcfd32_program_image
 		cmp eax, -10
@@ -236,7 +260,7 @@ _start:  ; Linux i386 program entry point.
 .exit:		jmp handle_INT21H_FUNC_4CH_EXIT_PROCESS  ; Exit with exit code in AL.
 		; Not reached.
 
-%ifdef RUNPROG
+%if RUNPROG
   %define CONFIG_LOAD_FIND_CF_HEADER
   %define CONFIG_LOAD_SINGLE_READ
   %define CONFIG_LOAD_INT21H call wcfd32_near_syscall
@@ -1015,14 +1039,9 @@ concatenate_env:
 %ifdef DEBUG
   msg_oom:	db 'fatal: out of memory', 13, 10, 0
 %endif
-%ifdef RUNPROG
-  %ifdef OIXRUN0
-    msg_usage:	db 'Usage: oixrun0 <prog.oix> [<arg> ...]', 13, 10, 0
-  %elifdef OIXRUN
-    msg_usage:	db 'Usage: oixrun <prog.oix> [<arg> ...]', 13, 10, 0
-  %else
-    msg_usage:	db 'Usage: wcfd32linux <prog.oix> [<arg> ...]', 13, 10, 0
-  %endif
+
+%if RUNPROG
+  msg_usage:	db 'Usage: oixrun0 <prog.oix> [<arg> ...]', 13, 10, 0
 %endif
 
 ;section .data
@@ -1030,7 +1049,7 @@ concatenate_env:
 msg_unimplemented: db 'fatal: unimplemented syscall 0x',
 .hexdigits:	db '??', 13, 10, 0  ; The '??' part is read-write.
 
-%ifdef RUNPROG
+%if RUNPROG
   emit_load_errors
   prebss:
   bss_align equ ($$-$)&3
@@ -1047,7 +1066,7 @@ msg_unimplemented: db 'fatal: unimplemented syscall 0x',
   prebss:
   bss:  ; .bss must be empty so that the OIX program image can be appended.
 %endif
-%ifdef SELFPROG
+%if SELFPROG
   oix_image:	incbin 'oixrun.oix', 0x18
 %endif
 program_end:

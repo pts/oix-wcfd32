@@ -98,19 +98,16 @@ nasm=tools/nasm    # NASM 0.98.39 (2005-01-15) was the last version without amd6
 #"$wlink" @wcfd32import.lnk form win nt ru con=3.10 op stub=wcfd32dosp.exe op q op d op h=1 com h=0 n wcfd32win32.exe f wcfd32win32.obj
 "$wlink" form win nt ru con=3.10 op stub=wcfd32dosp.exe op q op d op h=1 com h=0 n wcfd32win32.exe f wcfd32win32.obj
 "$nasm" -O999999999 -w+orphan-labels -f bin -o oixrun.exe wcfd32stub.nasm  # Final output: oixrun.exe.  # incbin: wcfd32dos.exe, wcfd32dosp.exe, wcfd32win32.exe
-"$nasm" -O999999999 -w+orphan-labels -f bin -o wcfd32linux.bin wcfd32linux.nasm
+"$nasm" -O999999999 -w+orphan-labels -f bin -DSTUB -o wcfd32linux.bin wcfd32linux.nasm
 rm -f wcfd32stub  # For correct permissions below.
 "$nasm" -O999999999 -w+orphan-labels -f bin -DLINUXPROG -o wcfd32stub wcfd32stub.nasm  # incbin: wcfd32linux.bin, wcfd32dos.exe, wcfd32dosp.exe, wcfd32win32.exe
 chmod +x wcfd32stub  # Final output: wcfd32stub Linux i386 executable program.
 rm -f wcfd32win32.exe  # Get rid of non-reproducible file.
-rm -f wcfd32linux  # For correct permissions below.
-"$nasm" -O999999999 -w+orphan-labels -f bin -DRUNPROG -o wcfd32linux wcfd32linux.nasm
-chmod +x wcfd32linux  # Final output wcfd32linux i386 executable program.
 rm -f oixrun0  # For correct permissions below.
-"$nasm" -O999999999 -w+orphan-labels -f bin -DRUNPROG -DOIXRUN0 -o oixrun0 wcfd32linux.nasm  # Native Linux i386 implementation.
+"$nasm" -O999999999 -w+orphan-labels -f bin -DRUNPROG -o oixrun0 wcfd32linux.nasm  # Native Linux i386 implementation.
 chmod +x oixrun0  # Final output: oixrun0 i386 executable program.
 rm -f oixrun  # For correct permissions below.
-"$nasm" -O999999999 -w+orphan-labels -f bin -DSELFPROG -DOIXRUN -o oixrun wcfd32linux.nasm  # ELF-flavored OIX implementation using oixrun.oix, containing the relocation code twice. -DOIXRUN doesn't make a difference, oixrun.oix is precompiled.
+"$nasm" -O999999999 -w+orphan-labels -f bin -DSELFPROG -o oixrun wcfd32linux.nasm  # ELF-flavored OIX implementation using oixrun.oix, containing the relocation code twice. -DOIXRUN doesn't make a difference, oixrun.oix is precompiled.
 chmod +x oixrun  # Final output: oixrun i386 executable program.
 # TODO(pts): Sync changes from build.sh to build.cmd.
 
