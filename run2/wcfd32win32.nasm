@@ -22,101 +22,135 @@
 bits 32
 cpu 386
 
-%macro dllimport 1
-  import _%1 kernel32.dll %1  ; Adds import directive to the .obj file which WLINK uses to populate the PE import directory.  https://retrocomputing.stackexchange.com/a/29884
-  extern __imp__%1
+%macro emit_ifuncs 1
+  ; !! TODO(pts): Is it OK that this is not sorted? The spec doesn't say. WLINK seems to sort it.
+  ; WLINK will add even unused (i.e. no extern) import directives to the .exe, so we only list here what we really use.
+  ; Corresponding WLINK .lnk directives: import '_GetStdHandle' 'kernel32.dll'.GetStdHandle
+  %1 'GetStdHandle', GetStdHandle, 1  ;; HANDLE __stdcall GetStdHandle (DWORD nStdHandle);
+  %1 'WriteFile', WriteFile, 0  ;; BOOL __stdcall WriteFile (HANDLE hFile, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfBytesWritten, LPOVERLAPPED lpOverlapped);
+  %1 'ExitProcess', ExitProcess, 0  ;; void __stdcall __noreturn ExitProcess (UINT uExitCode);
+  %1 'GetFileType', GetFileType, 0  ;; DWORD __stdcall GetFileType (HANDLE hFile);
+  %1 'SetFilePointer', SetFilePointer, 1  ;; DWORD __stdcall SetFilePointer (HANDLE hFile, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, DWORD dwMoveMethod);
+  %1 'DeleteFileA', DeleteFileA, 0  ;; BOOL __stdcall DeleteFileA (LPCSTR lpFileName);
+  %1 'SetEndOfFile', SetEndOfFile, 1  ;; BOOL __stdcall SetEndOfFile (HANDLE hFile);
+  %1 'CloseHandle', CloseHandle, 0  ;; BOOL __stdcall CloseHandle (HANDLE hObject);
+  %1 'MoveFileA', MoveFileA, 0  ;; BOOL __stdcall MoveFileA (LPCSTR lpExistingFileName, LPCSTR lpNewFileName);
+  %1 'SetCurrentDirectoryA', SetCurrentDirectoryA, 1  ;; BOOL __stdcall SetCurrentDirectoryA (LPCSTR lpPathName);
+  %1 'GetLocalTime', GetLocalTime, 1  ;; void __stdcall GetLocalTime (LPSYSTEMTIME lpSystemTime);
+  %1 'GetLastError', GetLastError, 1  ;; DWORD __stdcall GetLastError ();
+  %1 'GetCurrentDirectoryA', GetCurrentDirectoryA, 1  ;; DWORD __stdcall GetCurrentDirectoryA (DWORD nBufferLength, LPSTR lpBuffer);
+  %1 'GetFileAttributesA', GetFileAttributesA, 1  ;; DWORD __stdcall GetFileAttributesA (LPCSTR lpFileName);
+  %1 'FindClose', FindClose, 0  ;; BOOL __stdcall FindClose (HANDLE hFindFile);
+  %1 'FindFirstFileA', FindFirstFileA, 1  ;; HANDLE __stdcall FindFirstFileA (LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindFileData);
+  %1 'FindNextFileA', FindNextFileA, 0  ;; BOOL __stdcall FindNextFileA (HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData);
+  %1 'LocalFileTimeToFileTime', LocalFileTimeToFileTime, 0  ;; BOOL __stdcall LocalFileTimeToFileTime (const FILETIME *lpLocalFileTime, LPFILETIME lpFileTime);
+  %1 'DosDateTimeToFileTime', DosDateTimeToFileTime, 0  ;; BOOL __stdcall DosDateTimeToFileTime (WORD wFatDate, WORD wFatTime, LPFILETIME lpFileTime);
+  %1 'FileTimeToDosDateTime', FileTimeToDosDateTime, 0  ;; BOOL __stdcall FileTimeToDosDateTime (const FILETIME *lpFileTime, LPWORD lpFatDate, LPWORD lpFatTime);
+  %1 'FileTimeToLocalFileTime', FileTimeToLocalFileTime, 0  ;; BOOL __stdcall FileTimeToLocalFileTime (const FILETIME *lpFileTime, LPFILETIME lpLocalFileTime);
+  %1 'GetFullPathNameA', GetFullPathNameA, 1  ;; DWORD __stdcall GetFullPathNameA (LPCSTR lpFileName, DWORD nBufferLength, LPSTR lpBuffer, LPSTR *lpFilePart);
+  %1 'SetFileTime', SetFileTime, 0  ;; BOOL __stdcall SetFileTime (HANDLE hFile, const FILETIME *lpCreationTime, const FILETIME *lpLastAccessTime, const FILETIME *lpLastWriteTime);
+  %1 'GetFileTime', GetFileTime, 0  ;; BOOL __stdcall GetFileTime (HANDLE hFile, LPFILETIME lpCreationTime, LPFILETIME lpLastAccessTime, LPFILETIME lpLastWriteTime);
+  %1 'ReadFile', ReadFile, 1  ;; BOOL __stdcall ReadFile (HANDLE hFile, LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead, LPOVERLAPPED lpOverlapped);
+  %1 'SetConsoleMode', SetConsoleMode, 1  ;; BOOL __stdcall SetConsoleMode (HANDLE hConsoleHandle, DWORD dwMode);
+  %1 'GetConsoleMode', GetConsoleMode, 1  ;; BOOL __stdcall GetConsoleMode (HANDLE hConsoleHandle, LPDWORD lpMode);
+  %1 'CreateFileA', CreateFileA, 0  ;; HANDLE __stdcall CreateFileA (LPCSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile);
+  %1 'SetConsoleCtrlHandler', SetConsoleCtrlHandler, 0  ;; BOOL __stdcall SetConsoleCtrlHandler (PHANDLER_ROUTINE HandlerRoutine, BOOL Add);
+  %1 'GetModuleFileNameA', GetModuleFileNameA, 1  ;; DWORD __stdcall GetModuleFileNameA (HMODULE hModule, LPSTR lpFilename, DWORD nSize);
+  %1 'GetEnvironmentStrings', GetEnvironmentStrings, 0  ;; LPCH __stdcall GetEnvironmentStrings ();
+  %1 'GetCommandLineA', GetCommandLineA, 0  ;; LPSTR __stdcall GetCommandLineA ();
+  %1 'GetCPInfo', GetCPInfo, 0  ;; BOOL __stdcall GetCPInfo (UINT CodePage, LPCPINFO lpCPInfo);
+  %1 'ReadConsoleInputA', ReadConsoleInputA, 0  ;; BOOL __stdcall ReadConsoleInputA (HANDLE hConsoleInput, PINPUT_RECORD lpBuffer, DWORD nLength, LPDWORD lpNumberOfEventsRead);
+  %1 'PeekConsoleInputA', PeekConsoleInputA, 0  ;; BOOL __stdcall PeekConsoleInputA (HANDLE hConsoleInput, PINPUT_RECORD lpBuffer, DWORD nLength, LPDWORD lpNumberOfEventsRead);
+  ;%1 'LocalAlloc',  LocalAlloc, 1  ;; HLOCAL __stdcall LocalAlloc (UINT uFlags, SIZE_T uBytes);
+  %1 'VirtualAlloc', VirtualAlloc, 1  ;; LPVOID __stdcall VirtualAlloc(LPVOID lpAddress, SIZE_T dwSize, DWORD flAllocationType, DWORD flProtect);
 %endm
 
-%define .text _TEXT
-%define .rodatastr CONST  ; Unused.
-%define .rodata CONST2
-%define .data _DATA
-%define .bss _BSS
+%ifndef PE  ; Compile directly with `nasm -f obj', to be linked with `wlink form win nt'.
+  %define pe.reloc.text.dd dd
+  %define pe.reloc.data.dd dd
+  %define pe.switch.to.text section .text
+  %define pe.switch.to.data section .data
+  %define pe.switch.to.bss section .bss
+  %define pe.resb resb
+  %macro pe.reloc 3+  ; %1 is number of bytes back from the end of the instruction (typically 4), %2 is PE_...REF(...), %3 is the instruction.
+    %define relval %2
+    %3
+    %undef  relval
+  %endm
+  %macro pe.call.imp 1
+    call [__imp__%1]
+  %endm
+  %define PE_TEXTREF(var) (var)
+  %define PE_DATAREF(var) (var)
+  %define PE_BSSREF(var) (var)
 
-; These declarations matter (!), otherwise the dllimport goes to a different section (!).
-section _TEXT  USE32 class=CODE align=1
-section CONST  USE32 class=DATA align=1  ; OpenWatcom generates align=4.
-section CONST2 USE32 class=DATA align=4
-section _DATA  USE32 class=DATA align=4
-section _BSS   USE32 class=BSS NOBITS align=4  ; NOBITS is ignored by NASM, but class=BSS works.
-group DGROUP CONST CONST2 _DATA _BSS
+  %define .text _TEXT
+  %define .rodatastr CONST  ; Unused.
+  %define .rodata CONST2
+  %define .data _DATA
+  %define .bss _BSS
 
-; WLINK will add even unused (i.e. no extern) import directives to the .exe, so we only list here what we really use.
-; Corresponding WLINK .lnk directives: import '_GetStdHandle' 'kernel32.dll'.GetStdHandle
-dllimport GetStdHandle  ;; HANDLE __stdcall GetStdHandle (DWORD nStdHandle);
-dllimport WriteFile  ;; BOOL __stdcall WriteFile (HANDLE hFile, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfBytesWritten, LPOVERLAPPED lpOverlapped);
-dllimport ExitProcess  ;; void __stdcall __noreturn ExitProcess (UINT uExitCode);
-dllimport GetFileType  ;; DWORD __stdcall GetFileType (HANDLE hFile);
-dllimport SetFilePointer  ;; DWORD __stdcall SetFilePointer (HANDLE hFile, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, DWORD dwMoveMethod);
-dllimport DeleteFileA  ;; BOOL __stdcall DeleteFileA (LPCSTR lpFileName);
-dllimport SetEndOfFile  ;; BOOL __stdcall SetEndOfFile (HANDLE hFile);
-dllimport CloseHandle  ;; BOOL __stdcall CloseHandle (HANDLE hObject);
-dllimport MoveFileA  ;; BOOL __stdcall MoveFileA (LPCSTR lpExistingFileName, LPCSTR lpNewFileName);
-dllimport SetCurrentDirectoryA  ;; BOOL __stdcall SetCurrentDirectoryA (LPCSTR lpPathName);
-dllimport GetLocalTime  ;; void __stdcall GetLocalTime (LPSYSTEMTIME lpSystemTime);
-dllimport GetLastError  ;; DWORD __stdcall GetLastError ();
-dllimport GetCurrentDirectoryA  ;; DWORD __stdcall GetCurrentDirectoryA (DWORD nBufferLength, LPSTR lpBuffer);
-dllimport GetFileAttributesA  ;; DWORD __stdcall GetFileAttributesA (LPCSTR lpFileName);
-dllimport FindClose  ;; BOOL __stdcall FindClose (HANDLE hFindFile);
-dllimport FindFirstFileA  ;; HANDLE __stdcall FindFirstFileA (LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindFileData);
-dllimport FindNextFileA  ;; BOOL __stdcall FindNextFileA (HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData);
-dllimport LocalFileTimeToFileTime  ;; BOOL __stdcall LocalFileTimeToFileTime (const FILETIME *lpLocalFileTime, LPFILETIME lpFileTime);
-dllimport DosDateTimeToFileTime  ;; BOOL __stdcall DosDateTimeToFileTime (WORD wFatDate, WORD wFatTime, LPFILETIME lpFileTime);
-dllimport FileTimeToDosDateTime  ;; BOOL __stdcall FileTimeToDosDateTime (const FILETIME *lpFileTime, LPWORD lpFatDate, LPWORD lpFatTime);
-dllimport FileTimeToLocalFileTime  ;; BOOL __stdcall FileTimeToLocalFileTime (const FILETIME *lpFileTime, LPFILETIME lpLocalFileTime);
-dllimport GetFullPathNameA  ;; DWORD __stdcall GetFullPathNameA (LPCSTR lpFileName, DWORD nBufferLength, LPSTR lpBuffer, LPSTR *lpFilePart);
-dllimport SetFileTime  ;; BOOL __stdcall SetFileTime (HANDLE hFile, const FILETIME *lpCreationTime, const FILETIME *lpLastAccessTime, const FILETIME *lpLastWriteTime);
-dllimport GetFileTime  ;; BOOL __stdcall GetFileTime (HANDLE hFile, LPFILETIME lpCreationTime, LPFILETIME lpLastAccessTime, LPFILETIME lpLastWriteTime);
-dllimport ReadFile  ;; BOOL __stdcall ReadFile (HANDLE hFile, LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead, LPOVERLAPPED lpOverlapped);
-dllimport SetConsoleMode  ;; BOOL __stdcall SetConsoleMode (HANDLE hConsoleHandle, DWORD dwMode);
-dllimport GetConsoleMode  ;; BOOL __stdcall GetConsoleMode (HANDLE hConsoleHandle, LPDWORD lpMode);
-dllimport CreateFileA  ;; HANDLE __stdcall CreateFileA (LPCSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile);
-dllimport SetConsoleCtrlHandler  ;; BOOL __stdcall SetConsoleCtrlHandler (PHANDLER_ROUTINE HandlerRoutine, BOOL Add);
-dllimport GetModuleFileNameA  ;; DWORD __stdcall GetModuleFileNameA (HMODULE hModule, LPSTR lpFilename, DWORD nSize);
-dllimport GetEnvironmentStrings  ;; LPCH __stdcall GetEnvironmentStrings ();
-dllimport GetCommandLineA  ;; LPSTR __stdcall GetCommandLineA ();
-dllimport GetCPInfo  ;; BOOL __stdcall GetCPInfo (UINT CodePage, LPCPINFO lpCPInfo);
-dllimport ReadConsoleInputA  ;; BOOL __stdcall ReadConsoleInputA (HANDLE hConsoleInput, PINPUT_RECORD lpBuffer, DWORD nLength, LPDWORD lpNumberOfEventsRead);
-dllimport PeekConsoleInputA  ;; BOOL __stdcall PeekConsoleInputA (HANDLE hConsoleInput, PINPUT_RECORD lpBuffer, DWORD nLength, LPDWORD lpNumberOfEventsRead);
-;dllimport LocalAlloc  ;; HLOCAL __stdcall LocalAlloc (UINT uFlags, SIZE_T uBytes);
-dllimport VirtualAlloc  ;; LPVOID __stdcall VirtualAlloc(LPVOID lpAddress, SIZE_T dwSize, DWORD flAllocationType, DWORD flProtect);
+  ; These declarations matter (!), otherwise the dllimport goes to a different section (!).
+  section _TEXT  USE32 class=CODE align=1
+  section CONST  USE32 class=DATA align=1  ; OpenWatcom generates align=4.
+  section CONST2 USE32 class=DATA align=4
+  section _DATA  USE32 class=DATA align=4
+  section _BSS   USE32 class=BSS NOBITS align=4  ; NOBITS is ignored by NASM, but class=BSS works.
+  group DGROUP CONST CONST2 _DATA _BSS
 
-NULL equ 0
+  %macro emit_ifunc_dllimport 3  ; %3 indicates whether the length of %2 is even: (0: odd, 1: even).
+    import _%2 kernel32.dll %2  ; Adds import directive to the .obj file which WLINK uses to populate the PE import directory.  https://retrocomputing.stackexchange.com/a/29884
+    extern __imp__%2
+  %endm
 
-WCFD32_OS_DOS equ 0
-WCFD32_OS_OS2 equ 1
-WCFD32_OS_WIN32 equ 2
-WCFD32_OS_WIN16 equ 3
-WCFD32_OS_UNKNOWN equ 4  ; Anything above 3 is unknown.
+  emit_ifuncs emit_ifunc_dllimport
+%endif
+
+%ifndef NULL
+  %define NULL NULL
+  NULL equ 0
+%endif
+
+%ifndef WCFD32_OS_DOS
+  %define WCFD32_OS_DOS WCFD32_OS_DOS
+  WCFD32_OS_DOS equ 0
+  WCFD32_OS_OS2 equ 1
+  WCFD32_OS_WIN32 equ 2
+  WCFD32_OS_WIN16 equ 3
+  WCFD32_OS_UNKNOWN equ 4  ; Anything above 3 is unknown.
+%endif
 
 STD_INPUT_HANDLE  equ -10
 STD_OUTPUT_HANDLE equ -11
 STD_ERROR_HANDLE  equ -12
 
-INT21H_FUNC_06H_DIRECT_CONSOLE_IO equ 0x6
-INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO equ 0x8
-INT21H_FUNC_19H_GET_CURRENT_DRIVE equ 0x19
-INT21H_FUNC_1AH_SET_DISK_TRANSFER_ADDRESS equ 0x1A
-INT21H_FUNC_2AH_GET_DATE        equ 0x2A
-INT21H_FUNC_2CH_GET_TIME        equ 0x2C
-INT21H_FUNC_3BH_CHDIR           equ 0x3B
-INT21H_FUNC_3CH_CREATE_FILE     equ 0x3C
-INT21H_FUNC_3DH_OPEN_FILE       equ 0x3D
-INT21H_FUNC_3EH_CLOSE_FILE      equ 0x3E
-INT21H_FUNC_3FH_READ_FROM_FILE  equ 0x3F
-INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE equ 0x40
-INT21H_FUNC_41H_DELETE_NAMED_FILE equ 0x41
-INT21H_FUNC_42H_SEEK_IN_FILE    equ 0x42
-INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES equ 0x43
-INT21H_FUNC_44H_IOCTL_IN_FILE   equ 0x44
-INT21H_FUNC_47H_GET_CURRENT_DIR equ 0x47
-INT21H_FUNC_48H_ALLOCATE_MEMORY equ 0x48
-INT21H_FUNC_4CH_EXIT_PROCESS    equ 0x4C
-INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE equ 0x4E
-INT21H_FUNC_4FH_FIND_NEXT_MATCHING_FILE equ 0x4F
-INT21H_FUNC_56H_RENAME_FILE     equ 0x56
-INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME equ 0x57
-INT21H_FUNC_60H_GET_FULL_FILENAME equ 0x60
+%ifndef INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE
+  %define INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE
+  INT21H_FUNC_06H_DIRECT_CONSOLE_IO equ 0x6
+  INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO equ 0x8
+  INT21H_FUNC_19H_GET_CURRENT_DRIVE equ 0x19
+  INT21H_FUNC_1AH_SET_DISK_TRANSFER_ADDRESS equ 0x1A
+  INT21H_FUNC_2AH_GET_DATE        equ 0x2A
+  INT21H_FUNC_2CH_GET_TIME        equ 0x2C
+  INT21H_FUNC_3BH_CHDIR           equ 0x3B
+  INT21H_FUNC_3CH_CREATE_FILE     equ 0x3C
+  INT21H_FUNC_3DH_OPEN_FILE       equ 0x3D
+  INT21H_FUNC_3EH_CLOSE_FILE      equ 0x3E
+  INT21H_FUNC_3FH_READ_FROM_FILE  equ 0x3F
+  INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE equ 0x40
+  INT21H_FUNC_41H_DELETE_NAMED_FILE equ 0x41
+  INT21H_FUNC_42H_SEEK_IN_FILE    equ 0x42
+  INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES equ 0x43
+  INT21H_FUNC_44H_IOCTL_IN_FILE   equ 0x44
+  INT21H_FUNC_47H_GET_CURRENT_DIR equ 0x47
+  INT21H_FUNC_48H_ALLOCATE_MEMORY equ 0x48
+  INT21H_FUNC_4CH_EXIT_PROCESS    equ 0x4C
+  INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE equ 0x4E
+  INT21H_FUNC_4FH_FIND_NEXT_MATCHING_FILE equ 0x4F
+  INT21H_FUNC_56H_RENAME_FILE     equ 0x56
+  INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME equ 0x57
+  INT21H_FUNC_60H_GET_FULL_FILENAME equ 0x60
+%endif
 
 EXCEPTION_INT_DIVIDE_BY_ZERO    equ -1073741676
 EXCEPTION_STACK_OVERFLOW        equ -1073741571
@@ -139,7 +173,7 @@ MEM_RESERVE equ 0x2000
 
 PAGE_EXECUTE_READWRITE equ 0x40
 
-section .text
+pe.switch.to.text  ; section .text
 
 ; char *__usercall getenv@<eax>(const char *name@<eax>)
 getenv:
@@ -149,7 +183,7 @@ getenv:
 		push esi
 		push edi
 		mov edi, eax
-		mov eax, [wcfd32_env_strings]
+		pe.reloc 4, PE_DATAREF(wcfd32win32_env_strings), mov eax, [relval]
 loc_41009B:
 		cmp byte [eax], 0
 		jz short loc_4100E8
@@ -282,9 +316,9 @@ literal_char_in_fmt:
 		jmp loc_410130
 end_of_fmt:
 		mov edx, esp	    ; r_edx
-		mov ebx, [MsgFileHandle]  ; r_ebx
+		pe.reloc 4, PE_DATAREF(MsgFileHandle), mov ebx, [relval]  ; r_ebx
 		mov ah, INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE  ; r_eax
-		call wcfd32_near_syscall
+		call wcfd32win32_near_syscall
 		rcl eax, 1
 		ror eax, 1
 		add esp, 80h
@@ -299,24 +333,25 @@ pop_esi_edx_ecx_ebx_ret:
 
 %undef  CONFIG_LOAD_FIND_CF_HEADER
 %define CONFIG_LOAD_SINGLE_READ
-%define CONFIG_LOAD_INT21H call wcfd32_near_syscall
+%define CONFIG_LOAD_INT21H call wcfd32win32_near_syscall
 %undef  CONFIG_LOAD_MALLOC_EAX  ; TODO(pts): Move malloc to a separate function, define this to make it shorter.
 %undef  CONFIG_LOAD_CLEAR_BSS  ; VirtualAlloc(...) already returns 0 bytes.
+%define CONFIG_LOAD_RELOCATED_DD pe.reloc.data.dd
 %include "wcfd32load.inc.nasm"
 
 DumpEnvironment:
 		push ebx
 		push edx
-		push fmt	     ; "Environment Variables:\r\n"
+		pe.reloc 4, PE_DATAREF(fmt), push relval	     ; "Environment Variables:\r\n"
 		call PrintMsg
-		mov edx, [wcfd32_env_strings]
+		pe.reloc 4, PE_DATAREF(wcfd32win32_env_strings), mov edx, [relval]
 		add esp, 4
 		xor bl, bl
 loc_410484:
 		cmp bl, [edx]
 		jz loc_410113
 		push edx
-		push aS	     ; "%s\r\n"
+		pe.reloc 4, PE_DATAREF(aS), push relval	     ; "%s\r\n"
 		call PrintMsg
 		add esp, 8
 loc_41049A:
@@ -330,9 +365,9 @@ loc_4104A7:
 		mov edx, eax
 		jmp loc_410484
 loc_410113:
-	       pop edx
-	       pop ebx
-	       ret
+		pop edx
+		pop ebx
+		ret
 
 ; Attributes: noreturn
 ; void __usercall __noreturn dump_registers_to_file_and_abort(void *arg1@<eax>, void *arg2@<edx>)
@@ -344,10 +379,10 @@ dump_registers_to_file_and_abort:
 		mov ebx, eax	    ; r_ebx
 		mov esi, edx	    ; r_esi
 		call dump_registers
-		mov edx, dump_filename  ; "_watcom_.dmp"
+		pe.reloc 4, PE_DATAREF(dump_filename), mov edx, relval  ; "_watcom_.dmp"
 		xor ecx, ecx	    ; r_ecx
 		mov ah, INT21H_FUNC_3CH_CREATE_FILE  ; r_eax
-		call wcfd32_near_syscall
+		call wcfd32win32_near_syscall
 		rcl eax, 1
 		ror eax, 1
 		mov edx, eax
@@ -355,28 +390,28 @@ dump_registers_to_file_and_abort:
 		jl error_skip_writing_dump_file
 		xor eax, eax
 		mov ax, dx	    ; AX := DOS filehandle.
-		mov edx, [wcfd32_program_filename]
+		pe.reloc 4, PE_DATAREF(wcfd32win32_program_filename), mov edx, [relval]
 		push edx
-		push aProgramS  ; "Program: %s\r\n"
-		mov [MsgFileHandle], eax
+		pe.reloc 4, PE_DATAREF(aProgramS), push relval  ; "Program: %s\r\n"
+		pe.reloc 4, PE_DATAREF(MsgFileHandle), mov [relval], eax
 		call PrintMsg
 		add esp, 8
-		mov ecx, [wcfd32_command_line]
+		pe.reloc 4, PE_DATAREF(wcfd32win32_command_line), mov ecx, [relval]
 		push ecx
-		push aCmdlineS  ; "CmdLine: %s\r\n"
+		pe.reloc 4, PE_DATAREF(aCmdlineS), push relval  ; "CmdLine: %s\r\n"
 		call PrintMsg
 		add esp, 8
 		mov edx, esi	    ; arg2
 		mov eax, ebx	    ; arg1
 		call dump_registers
 		call DumpEnvironment
-		mov ebx, [MsgFileHandle]  ; r_ebx
+		pe.reloc 4, PE_DATAREF(MsgFileHandle), mov ebx, [relval]  ; r_ebx
 		mov esi, 1	    ; r_esi
 		mov ah, INT21H_FUNC_3EH_CLOSE_FILE  ; r_eax
-		call wcfd32_near_syscall
+		call wcfd32win32_near_syscall
 		rcl eax, 1
 		ror eax, 1
-		mov [MsgFileHandle], esi
+		pe.reloc 4, PE_DATAREF(MsgFileHandle), mov [relval], esi
 error_skip_writing_dump_file:
 		push 8		     ; uExitCode
 		jmp exit_pushed
@@ -390,7 +425,7 @@ dump_registers:
 		push edi
 		push ebp
 		push eax
-		push aS_0     ; "**** %s ****\r\n"
+		pe.reloc 4, PE_DATAREF(aS_0), push relval     ; "**** %s ****\r\n"
 		call PrintMsg
 		add esp, 8
 		mov ebx, [edx+0C4h]
@@ -401,9 +436,9 @@ dump_registers:
 		push esi
 		mov edi, [edx+0BCh]
 		push edi
-		mov ebp, [image_base_for_debug]
+		pe.reloc 4, PE_BSSREF(image_base_for_debug), mov ebp, [relval]
 		push ebp
-		push aOsNtBaseaddrXC  ; "OS=NT BaseAddr=%X CS:EIP=%x:%X SS:ESP=%"...
+		pe.reloc 4, PE_DATAREF(aOsNtBaseaddrXC), push relval  ; "OS=NT BaseAddr=%X CS:EIP=%x:%X SS:ESP=%"...
 		call PrintMsg
 		add esp, 18h
 		mov eax, [edx+0A8h]
@@ -414,7 +449,7 @@ dump_registers:
 		push ecx
 		mov esi, [edx+0B0h]
 		push esi
-		push aEaxXEbxXEcxXEd  ; "EAX=%X EBX=%X ECX=%X EDX=%X\r\n"
+		pe.reloc 4, PE_DATAREF(aEaxXEbxXEcxXEd), push relval  ; "EAX=%X EBX=%X ECX=%X EDX=%X\r\n"
 		call PrintMsg
 		add esp, 14h
 		mov edi, [edx+0C0h]
@@ -425,7 +460,7 @@ dump_registers:
 		push eax
 		mov ebx, [edx+0A0h]
 		push ebx
-		push aEsiXEdiXEbpXFl  ; "ESI=%X EDI=%X EBP=%X FLG=%X\r\n"
+		pe.reloc 4, PE_DATAREF(aEsiXEdiXEbpXFl), push relval  ; "ESI=%X EDI=%X EBP=%X FLG=%X\r\n"
 		call PrintMsg
 		add esp, 14h
 		mov ecx, [edx+8Ch]
@@ -436,7 +471,7 @@ dump_registers:
 		push edi
 		mov ebp, [edx+98h]
 		push ebp
-		push aDsXEsXFsXGsX  ; "DS=%x ES=%x FS=%x GS=%x\r\n"
+		pe.reloc 4, PE_DATAREF(aDsXEsXFsXGsX), push relval  ; "DS=%x ES=%x FS=%x GS=%x\r\n"
 		xor ebx, ebx
 		call PrintMsg
 		add esp, 14h
@@ -446,20 +481,20 @@ loc_410603:
 		mov gs, esi
 		mov eax, [gs:ecx]
 		push eax
-		push fmt_percent_hx  ; "%X "
+		pe.reloc 4, PE_DATAREF(fmt_percent_hx), push relval  ; "%X "
 		inc ebx
 		add ecx, 4
 		call PrintMsg
 		add esp, 8
 		test bl, 7
 		jnz loc_41062C
-		push str_crlf  ; "\r\n"
+		pe.reloc 4, PE_DATAREF(str_crlf), push relval  ; "\r\n"
 		call PrintMsg
 		add esp, 4
 loc_41062C:
 		cmp ebx, 20h  ; ' '
 		jl loc_410603
-		push aCsEip   ; "CS:EIP -> "
+		pe.reloc 4, PE_DATAREF(aCsEip), push relval   ; "CS:EIP -> "
 		call PrintMsg
 		add esp, 4
 		mov ebx, [edx+0B8h]
@@ -471,14 +506,14 @@ loc_41064F:
 		xor ecx, ecx
 		mov cl, [gs:edx]
 		push ecx
-		push fmt_percent_h  ; "%h "
+		pe.reloc 4, PE_DATAREF(fmt_percent_h), push relval  ; "%h "
 		inc ebx
 		inc edx
 		call PrintMsg
 		add esp, 8
 		cmp ebx, 10h
 		jl loc_41064F
-		push str_crlf  ; "\r\n"
+		pe.reloc 4, PE_DATAREF(str_crlf), push relval  ; "\r\n"
 		call PrintMsg
 		add esp, 4
 		pop ebp
@@ -522,28 +557,28 @@ loc_4106CD:
 		jmp return_true
 handle_ctrl_c:
 		xor eax, eax
-		mov al, [had_ctrl_c]
+		pe.reloc 4, PE_BSSREF(had_ctrl_c), mov al, [relval]
 		cmp eax, 1
 		jz exit_eax
 		mov cl, 1
 		xor eax, eax
-		mov [had_ctrl_c], cl
+		pe.reloc 4, PE_BSSREF(had_ctrl_c), mov [relval], cl
 		pop ebx
 		ret 10h
 abort_on_EXCEPTION_ACCESS_VIOLATION:
-		mov eax, aAccessViolatio  ; "Access violation"
+		pe.reloc 4, PE_DATAREF(aAccessViolatio), mov eax, relval  ; "Access violation"
 		jmp loc_410720
 abort_on_EXCEPTION_PRIV_INSTRUCTION:
-		mov eax, aPrivilegedInst  ; "Privileged instruction"
+		pe.reloc 4, PE_DATAREF(aPrivilegedInst), mov eax, relval  ; "Privileged instruction"
 		jmp loc_410720
 abort_on_EXCEPTION_ILLEGAL_INSTRUCTION:
-		mov eax, aIllegalInstruc  ; "Illegal instruction"
+		pe.reloc 4, PE_DATAREF(aIllegalInstruc), mov eax, relval  ; "Illegal instruction"
 		jmp loc_410720
 abort_on_EXCEPTION_INT_DIVIDE_BY_ZERO:
-		mov eax, aIntegerDivideB  ; "Integer divide by 0"
+		pe.reloc 4, PE_DATAREF(aIntegerDivideB), mov eax, relval  ; "Integer divide by 0"
 		jmp loc_410720
 abort_on_EXCEPTION_STACK_OVERFLOW:
-		mov eax, aStackOverflow  ; "Stack overflow"
+		pe.reloc 4, PE_DATAREF(aStackOverflow), mov eax, relval  ; "Stack overflow"
 loc_410720:
 		call dump_registers_to_file_and_abort
 return_true:
@@ -563,18 +598,18 @@ ctrl_c_handler:
 		jnz loc_4107BE
 loc_410765:
 		xor eax, eax
-		mov al, [had_ctrl_c]
+		pe.reloc 4, PE_BSSREF(had_ctrl_c), mov al, [relval]
 		cmp eax, 1
 		jnz loc_410777
 exit_eax:
 		push eax	     ; uExitCode
 exit_pushed:
-		call [__imp__ExitProcess]
+		pe.call.imp ExitProcess
 		; Not reached.
 loc_410777:
 		mov ah, 1
-		mov ebx, [stdin_handle]
-		mov [had_ctrl_c], ah
+		pe.reloc 4, PE_BSSREF(stdin_handle), mov ebx, [relval]
+		pe.reloc 4, PE_BSSREF(had_ctrl_c), mov [relval], ah
 loc_410785:
 		lea eax, [esp+1Ch-8]
 		push eax	     ; lpNumberOfEventsRead
@@ -584,7 +619,7 @@ loc_410785:
 		xor ecx, ecx
 		push ebx	     ; hConsoleInput
 		mov dword [esp+2Ch-8], ecx
-		call [__imp__PeekConsoleInputA]
+		pe.call.imp PeekConsoleInputA
 		test eax, eax
 		jz loc_4107BE
 		cmp dword [esp+1Ch-8], 0
@@ -595,7 +630,7 @@ loc_410785:
 		lea eax, [esp+24h+ -1Ch]
 		push eax	     ; lpBuffer
 		push ebx	     ; hConsoleInput
-		call [__imp__ReadConsoleInputA]
+		pe.call.imp ReadConsoleInputA
 		test eax, eax
 		jnz loc_410785
 loc_4107BE:
@@ -614,7 +649,7 @@ add_seh_frame:
 		xor edx, edx
 		mov [ebx], eax
 		mov eax, ebx
-		mov dword [ebx+4], seh_handler
+		pe.reloc 4, PE_TEXTREF(seh_handler), mov dword [ebx+4], relval
 		mov [fs:edx], eax
 pop_edx_ebx_ret:
 		pop edx
@@ -622,16 +657,21 @@ pop_edx_ebx_ret:
 		ret
 
 ; Attributes: noreturn
-global _start
-_start:
-global _mainCRTStartup
-_mainCRTStartup:
-..start:
-		sub esp, 128h
+%ifdef PE
+  pe_start:
+%else
+  global _start
+  _start:
+  global _mainCRTStartup
+  _mainCRTStartup:
+  ..start:
+%endif
+		sub esp, 128h  ; ESP := var_wcfd32win32_program_filename_buf. !! TODO(pts): Make it much larger than 100h, if needed, call GetCommandLineA multiple times.
 		lea eax, [esp+13Ch-1Ch]  ;  frame
 		call add_seh_frame
 		call populate_stdio_handles
-		call [__imp__GetCommandLineA]
+		pe.call.imp GetCommandLineA
+		; !! TODO(pts): Use parse_first_arg instead, for compatibility.
 loc_4108C3:
 		xor edx, edx
 		mov dl, [eax]
@@ -664,21 +704,22 @@ loc_4108F8:
 		inc eax
 		jmp loc_4108EA
 loc_4108FB:
-		mov [wcfd32_command_line], eax
+		; !! Why does this need --mem-mb=3, but without mwperun.exe it's just --mem-mb=1? dosbox.nox.static --cmd --mem-mb=3 mwperun.exe oixrun.exe nasm.oix -O99999 -o t.bin m.nas
+		pe.reloc 4, PE_DATAREF(wcfd32win32_command_line), mov [relval], eax
 		;
-		call [__imp__GetEnvironmentStrings]
-		mov [wcfd32_env_strings], eax
+		pe.call.imp GetEnvironmentStrings
+		pe.reloc 4, PE_DATAREF(wcfd32win32_env_strings), mov [relval], eax
 		;
 		mov eax, esp
 		push 104h	     ; nSize
 		push eax	     ; lpFilename
 		push 0		     ; hModule
-		call [__imp__GetModuleFileNameA]
+		pe.call.imp GetModuleFileNameA
 		;
-		mov eax, esp	    ;  ; var_wcfd32_program_filename_buf.
+		mov eax, esp	    ;  ; var_wcfd32win32_program_filename_buf.
 		;call change_binnt_to_binw_in_full_pathname  ; No need to change the pathname, the program is self-contained.
-		mov [wcfd32_program_filename], eax
-		;mov eax, esp	    ;  ; var_wcfd32_program_filename_buf.
+		pe.reloc 4, PE_DATAREF(wcfd32win32_program_filename), mov [relval], eax
+		;mov eax, esp	    ;  ; var_wcfd32win32_program_filename_buf.
 		call load_wcfd32_program_image  ; Sets EAX and EDX.
 		;
 		cmp eax, -10
@@ -686,44 +727,44 @@ loc_4108FB:
 		neg eax
 		push eax  ; Save exit code for exit_pushed.
 		push edx
-		push dword [wcfd32_program_filename]
-		mov eax, [load_errors+eax*4]  ; English.
-		push eax	     ; fmt
+		pe.reloc 4, PE_DATAREF(wcfd32win32_program_filename), push dword [relval]
+		pe.reloc 4, PE_DATAREF(load_errors), mov eax, [relval+eax*4]  ; English.
+		push eax  ; fmt.
 		call PrintMsg
 		add esp, 0Ch  ; Clean up arguments of PrintMsg.
 		jmp exit_pushed
-.load_ok:	mov [image_base_for_debug], edx  ; Just for debugging.
+.load_ok:	pe.reloc 4, PE_BSSREF(image_base_for_debug), mov [relval], edx  ; Just for debugging.
 		push eax  ; Save entry point address.
 		push TRUE	     ; Add
-		push ctrl_c_handler  ; HandlerRoutine
-		call [__imp__SetConsoleCtrlHandler]
+		pe.reloc 4, PE_TEXTREF(ctrl_c_handler), push relval  ; HandlerRoutine
+		pe.call.imp SetConsoleCtrlHandler
 		;
 		; Now we call the entry point.
 		;
 		; Input: AH: operating system (WCFD32_OS_DOS or WCFD32_OS_WIN32).
-		; Input: BX: segment of the wcfd32_far_syscall syscall.
-		; Input: EDX: offset of the wcfd32_far_syscall syscall.
+		; Input: BX: segment of the wcfd32win32_far_syscall syscall.
+		; Input: EDX: offset of the wcfd32win32_far_syscall syscall.
 		; Input: ECX: must be 0 (unknown parameter).
-		; Input: EDI: wcfd32_param_struct
-		; Input: dword [wcfd32_param_struct]: program filename (ASCIIZ)
-		; Input: dword [wcfd32_param_struct+4]: command-line (ASCIIZ)
-		; Input: dword [wcfd32_param_struct+8]: environment variables (each ASCIIZ, terminated by a final NUL)
-		; Input: dword [wcfd32_param_struct+0xc]: 0 (wcfd32_break_flag_ptr)
-		; Input: dword [wcfd32_param_struct+0x10]: 0 (wcfd32_copyright)
-		; Input: dword [wcfd32_param_struct+0x14]: 0 (wcfd32_is_japanese)
-		; Input: dword [wcfd32_param_struct+0x18]: 0 (wcfd32_max_handle_for_os2)
+		; Input: EDI: wcfd32win32_param_struct
+		; Input: dword [wcfd32win32_param_struct]: program filename (ASCIIZ)
+		; Input: dword [wcfd32win32_param_struct+4]: command-line (ASCIIZ)
+		; Input: dword [wcfd32win32_param_struct+8]: environment variables (each ASCIIZ, terminated by a final NUL)
+		; Input: dword [wcfd32win32_param_struct+0xc]: 0 (PE_DATAREF(wcfd32win32_break_flag_ptr))
+		; Input: dword [wcfd32win32_param_struct+0x10]: 0 (PE_DATAREF(wcfd32win32_copyright))
+		; Input: dword [wcfd32win32_param_struct+0x14]: 0 (PE_DATAREF(wcfd32win32_is_japanese))
+		; Input: dword [wcfd32win32_param_struct+0x18]: 0 (PE_DATAREF(wcfd32win32_max_handle_for_os2))
 		; Call: far call.
 		; Output: EAX: exit code (0 for EXIT_SUCCESS).
 		pop esi  ; Entry point address.
 		push 0  ; Simulate that the break flag is always 0. WLIB needs it.
-		mov [wcfd32_break_flag_ptr], esp
+		pe.reloc 4, PE_DATAREF(wcfd32win32_break_flag_ptr), mov [relval], esp
 		xor ebx, ebx  ; Not needed by the ABI, just make it deterministic.
 		xor eax, eax  ; Not needed by the ABI, just make it deterministic.
 		xor ebp, ebp  ; Not needed by the ABI, just make it deterministic.
 		sub ecx, ecx  ; This is an unknown parameter, which we always set to 0.
-		mov edx, wcfd32_far_syscall
-		mov edi, wcfd32_param_struct
-		mov bx, cs  ; Segment of wcfd32_far_syscall for the far call.
+		pe.reloc 4, PE_TEXTREF(wcfd32win32_far_syscall), mov edx, relval
+		pe.reloc 4, PE_DATAREF(wcfd32win32_param_struct), mov edi, relval
+		mov bx, cs  ; Segment of wcfd32win32_far_syscall for the far call.
 		mov ah, WCFD32_OS_WIN32  ; The LX program in the DOS version sets this to WCFD32_OS_DOS.
 		push cs  ; For the `retf' of the far call.
 		call esi
@@ -732,20 +773,20 @@ loc_4108FB:
 		jmp exit_eax
 		; Not reached.
 
-wcfd32_far_syscall:  ; proc far
-		call wcfd32_near_syscall
+wcfd32win32_far_syscall:  ; proc far
+		call wcfd32win32_near_syscall
 		retf
 
-; unsigned __int8 __usercall wcfd32_near_syscall@<cf>(unsigned int r_eax@<eax>, unsigned int r_ebx@<ebx>, unsigned int r_ecx@<ecx>, unsigned int r_edx@<edx>, unsigned int r_esi@<esi>, unsigned int  dword  8 @<edi>)
-wcfd32_near_syscall:
-		push edi  ; [esi+0x14] in wcfd32_near_syscall_low.
-		push esi  ; [esi+0x10] in wcfd32_near_syscall_low.
-		push edx  ; [esi+0xc] in wcfd32_near_syscall_low.
-		push ecx  ; [esi+8] in wcfd32_near_syscall_low.
-		push ebx  ; [esi+4] in wcfd32_near_syscall_low.
-		push eax  ; [esi in wcfd32_near_syscall_low.
+; unsigned __int8 __usercall wcfd32win32_near_syscall@<cf>(unsigned int r_eax@<eax>, unsigned int r_ebx@<ebx>, unsigned int r_ecx@<ecx>, unsigned int r_edx@<edx>, unsigned int r_esi@<esi>, unsigned int  dword  8 @<edi>)
+wcfd32win32_near_syscall:
+		push edi  ; [esi+0x14] in wcfd32win32_near_syscall_low.
+		push esi  ; [esi+0x10] in wcfd32win32_near_syscall_low.
+		push edx  ; [esi+0xc] in wcfd32win32_near_syscall_low.
+		push ecx  ; [esi+8] in wcfd32win32_near_syscall_low.
+		push ebx  ; [esi+4] in wcfd32win32_near_syscall_low.
+		push eax  ; [esi in wcfd32win32_near_syscall_low.
 		mov eax, esp	    ; regs
-		call wcfd32_near_syscall_low
+		call wcfd32win32_near_syscall_low
 		sahf
 		pop eax
 		pop ebx
@@ -767,14 +808,14 @@ __open_file:
 		xor ebx, ebx
 		shl eax, 2
 loc_4109E0:
-		mov ebp, [stdin_handle+ebx]
+		pe.reloc 4, PE_BSSREF(stdin_handle), mov ebp, [relval+ebx]
 		test ebp, ebp
 		jz loc_410A00
 		add ebx, 4
 		inc esi
 		cmp ebx, other_stdio_handles.end-other_stdio_handles
 		jne loc_4109E0
-		mov dword [force_last_error], ERROR_TOO_MANY_OPEN_FILES
+		pe.reloc 8, PE_BSSREF(force_last_error), mov dword [relval], ERROR_TOO_MANY_OPEN_FILES
 loc_4109FC:
 		xor eax, eax
 		jmp loc_410A2A
@@ -789,10 +830,10 @@ loc_410A00:
 		push edx	     ; dwDesiredAccess
 		mov edx, [edi+0Ch]
 		push edx	     ; lpFileName
-		call [__imp__CreateFileA]
+		pe.call.imp CreateFileA
 		cmp eax, 0FFFFFFFFh
 		jz loc_4109FC
-		mov [stdin_handle+ebx], eax
+		pe.reloc 4, PE_BSSREF(stdin_handle), mov [relval+ebx], eax
 		mov eax, 1
 		mov [edi], esi
 loc_410A2A:
@@ -894,24 +935,24 @@ func_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO:
 		mov esi, eax
 		mov eax, esp
 		push eax	     ; lpMode
-		mov ebx, [stdin_handle]
+		pe.reloc 4, PE_BSSREF(stdin_handle), mov ebx, [relval]
 		push ebx	     ; hConsoleHandle
-		call [__imp__GetConsoleMode]
+		pe.call.imp GetConsoleMode
 		push 0		     ;  dword -18h
 		push ebx	     ; hConsoleHandle
-		call [__imp__SetConsoleMode]
+		pe.call.imp SetConsoleMode
 		push 0		     ; lpOverlapped
 		lea eax, [esp+1Ch-14h]
 		push eax	     ; lpNumberOfBytesRead
 		push 1		     ; nNumberOfBytesToRead
 		push esi	     ; lpBuffer
 		push ebx	     ; hFile
-		call [__imp__ReadFile]
+		pe.call.imp ReadFile
 		mov edx, dword [esp+18h-18h]
 		push edx	     ;  dword -18h
 		push ebx	     ; hConsoleHandle
 		mov esi, eax
-		call [__imp__SetConsoleMode]
+		pe.call.imp SetConsoleMode
 		mov eax, esi
 		add esp, 8
 		pop esi
@@ -933,7 +974,7 @@ func_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME:
 		jnz loc_410B82
 		xor eax, eax
 		mov ax, [ebx+4]
-		mov edx, [stdin_handle+eax*4]
+		pe.reloc 4, PE_BSSREF(stdin_handle), mov edx, [relval+eax*4]
 		mov eax, esp
 		push eax	     ; lpLastWriteTime
 		lea eax, [esp+34h+ -28h]
@@ -941,7 +982,7 @@ func_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME:
 		lea eax, [esp+38h+ -20h]
 		push eax	     ; lpCreationTime
 		push edx	     ; hFile
-		call [__imp__GetFileTime]
+		pe.call.imp GetFileTime
 		mov esi, eax
 		test eax, eax
 		jz loc_410BE7
@@ -958,7 +999,7 @@ loc_410B82:
 		jnz loc_410BE5
 		xor eax, eax
 		mov ax, [ebx+4]
-		mov ebp, [stdin_handle+eax*4]
+		pe.reloc 4, PE_BSSREF(stdin_handle), mov ebp, [relval+eax*4]
 		mov eax, esp
 		push eax	     ; lpLastWriteTime
 		lea eax, [esp+34h+ -28h]
@@ -966,7 +1007,7 @@ loc_410B82:
 		lea eax, [esp+38h+ -20h]
 		push eax	     ; lpCreationTime
 		push ebp	     ; hFile
-		call [__imp__GetFileTime]
+		pe.call.imp GetFileTime
 		mov esi, eax
 		test eax, eax
 		jz loc_410BE7
@@ -987,7 +1028,7 @@ loc_410B82:
 		push ebp	     ; hFile
 		movsd
 		movsd
-		call [__imp__SetFileTime]
+		pe.call.imp SetFileTime
 		mov esi, eax
 		jmp loc_410BE7
 loc_410BE5:
@@ -1013,13 +1054,13 @@ func_INT21H_FUNC_60H_GET_FULL_FILENAME:
 		push esi
 		sub esp, 4
 		mov ebx, eax
-		mov edx, aCon  ; "con"
+		pe.reloc 4, PE_DATAREF(aCon), mov edx, relval  ; "con"
 		mov eax, [eax+0Ch]
 		call strcmp
 		test eax, eax
 		jnz loc_410C1F
 		mov eax, [ebx+4]
-		mov ebx, dword [aCon]  ; "con"
+		pe.reloc 4, PE_DATAREF(aCon), mov ebx, dword [relval]  ; "con"
 		mov [eax], ebx
 		mov eax, 1
 		jmp loc_410C33
@@ -1032,7 +1073,7 @@ loc_410C1F:
 		push ecx	     ; nBufferLength
 		mov esi, [ebx+0Ch]
 		push esi	     ; lpFileName
-		call [__imp__GetFullPathNameA]
+		pe.call.imp GetFullPathNameA
 loc_410C33:
 		add esp, 4
 		pop esi
@@ -1049,12 +1090,12 @@ __MakeDOSDT:
 		mov edx, esp
 		push edx	     ; lpLocalFileTime
 		push eax	     ; lpFileTime
-		call [__imp__FileTimeToLocalFileTime]
+		pe.call.imp FileTimeToLocalFileTime
 		push ebx	     ; lpFatTime
 		push esi	     ; lpFatDate
 		lea eax, [esp+18h-10h]
 		push eax	     ; lpFileTime
-		call [__imp__FileTimeToDosDateTime]
+		pe.call.imp FileTimeToDosDateTime
 		add esp, 8
 		pop esi
 		pop ecx
@@ -1071,11 +1112,11 @@ __FromDOSDT:
 		xor ecx, ecx
 		mov cx, ax
 		push ecx	     ; wFatDate
-		call [__imp__DosDateTimeToFileTime]
+		pe.call.imp DosDateTimeToFileTime
 		push ebx	     ; lpFileTime
 		lea ebx, [esp+10h-0Ch]
 		push ebx	     ; lpLocalFileTime
-		call [__imp__LocalFileTimeToFileTime]
+		pe.call.imp LocalFileTimeToFileTime
 		add esp, 8
 		pop ecx
 		ret
@@ -1129,7 +1170,7 @@ loc_410CE6:
 		jnz loc_410CDF
 		push ebx	     ; lpFindFileData
 		push esi	     ; hFindFile
-		call [__imp__FindNextFileA]
+		pe.call.imp FindNextFileA
 		test eax, eax
 		jnz loc_410CD9
 loc_410CF6:
@@ -1152,7 +1193,7 @@ func_INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE:
 		mov edx, [esi+0Ch]
 		push edx	     ; lpFileName
 		xor ebx, ebx
-		call [__imp__FindFirstFileA]
+		pe.call.imp FindFirstFileA
 		mov ecx, eax
 		cmp eax, 0FFFFFFFFh
 		jnz loc_410D25
@@ -1212,7 +1253,7 @@ func_INT21H_FUNC_4FH_FIND_NEXT_MATCHING_FILE:
 		mov eax, esp
 		push eax	     ; lpFindFileData
 		push edi	     ; hFindFile
-		call [__imp__FindNextFileA]
+		pe.call.imp FindNextFileA
 		test eax, eax
 		jz loc_410DC8
 		mov ebx, esp
@@ -1228,7 +1269,7 @@ func_INT21H_FUNC_4FH_FIND_NEXT_MATCHING_FILE:
 		jmp loc_410DC8
 loc_410DC0:
 		push edi	     ; hFindFile
-		call [__imp__FindClose]
+		pe.call.imp FindClose
 		mov ebp, eax
 loc_410DC8:
 		mov eax, ebp
@@ -1247,7 +1288,7 @@ func_INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES:
 		jnz loc_410DFD
 		mov edx, [ebx+0Ch]
 		push edx	     ; lpFileName
-		call [__imp__GetFileAttributesA]
+		pe.call.imp GetFileAttributesA
 		mov edx, eax
 		cmp eax, 0FFFFFFFFh
 		jz loc_410E04
@@ -1273,7 +1314,7 @@ func_INT21H_FUNC_2AH_GET_CURRENT_DRIVE:
 		mov eax, esp
 		push eax	     ; lpBuffer
 		push 104h	     ; nBufferLength
-		call [__imp__GetCurrentDirectoryA]
+		pe.call.imp GetCurrentDirectoryA
 		xor eax, eax
 		mov al, byte [esp+10Ch-10Ch]
 		cmp al, 'A'
@@ -1287,43 +1328,9 @@ func_INT21H_FUNC_2AH_GET_CURRENT_DRIVE:
 		pop ecx
 		ret
 
-section .rodata
-
-dos_syscall_numbers db 60h, 57h, 56h, 4Fh, 4Eh, 4Ch, 48h, 47h, 44h, 43h, 42h
-		db 41h, 40h, 3Fh, 3Eh, 3Dh, 3Ch, 3Bh, 2Ch, 2Ah, 1Ah, 19h  ; Reverse order than dos_syscall_handlers.
-		db 8, 6
-		align 4
-dos_syscall_handlers:
-		dd handle_unsupported_int21h_function  ; jump table for switch statement
-		dd handle_INT21H_FUNC_06H_DIRECT_CONSOLE_IO  ; jumptable 00410ED7 case 1
-		dd handle_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO  ; jumptable 00410ED7 case 2
-		dd handle_INT21H_FUNC_2AH_GET_CURRENT_DRIVE  ; jumptable 00410ED7 case 3
-		dd handle_INT21H_FUNC_1AH_SET_DISK_TRANSFER_ADDRESS  ; jumptable 00410ED7 case 4
-		dd handle_INT21H_FUNC_2AH_GET_DATE  ; jumptable 00410ED7 case 5
-		dd handle_INT21H_FUNC_2CH_GET_TIME  ; jumptable 00410ED7 case 6
-		dd handle_INT21H_FUNC_3BH_CHDIR  ; jumptable 00410ED7 case 7
-		dd handle_INT21H_FUNC_3CH_CREATE_FILE  ; jumptable 00410ED7 case 8
-		dd handle_INT21H_FUNC_3DH_OPEN_FILE  ; jumptable 00410ED7 case 9
-		dd handle_INT21H_FUNC_3EH_CLOSE_FILE  ; jumptable 00410ED7 case 10
-		dd handle_INT21H_FUNC_3FH_READ_FROM_FILE  ; jumptable 00410ED7 case 11
-		dd handle_INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE  ; jumptable 00410ED7 case 12
-		dd handle_INT21H_FUNC_41H_DELETE_NAMED_FILE  ; jumptable 00410ED7 case 13
-		dd handle_INT21H_FUNC_42H_SEEK_IN_FILE  ; jumptable 00410ED7 case 14
-		dd handle_INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES  ; jumptable 00410ED7 case 15
-		dd handle_INT21H_FUNC_44H_IOCTL_IN_FILE  ; jumptable 00410ED7 case 16
-		dd handle_INT21H_FUNC_47H_GET_CURRENT_DIR  ; jumptable 00410ED7 case 17
-		dd handle_INT21H_FUNC_48H_ALLOCATE_MEMORY  ; jumptable 00410ED7 case 18
-		dd handle_INT21H_FUNC_4CH_EXIT_PROCESS  ; jumptable 00410ED7 case 19
-		dd handle_INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE  ; jumptable 00410ED7 case 20
-		dd handle_INT21H_FUNC_4FH_FIND_NEXT_MATCHING_FILE  ; jumptable 00410ED7 case 21
-		dd handle_INT21H_FUNC_56H_RENAME_FILE  ; jumptable 00410ED7 case 22
-		dd handle_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME  ; jumptable 00410ED7 case 23
-		dd handle_INT21H_FUNC_60H_GET_FULL_FILENAME  ; jumptable 00410ED7 case 24
-
-section .text
 ; Returns flags in AH. Modifies regs in place.
-; unsigned __int8 __usercall wcfd32_near_syscall_low@<ah>(struct dos_int21h_regs *regs@<eax>)
-wcfd32_near_syscall_low:
+; unsigned __int8 __usercall wcfd32win32_near_syscall_low@<ah>(struct dos_int21h_regs *regs@<eax>)
+wcfd32win32_near_syscall_low:
 		push ebx
 		push ecx
 		push edx
@@ -1334,11 +1341,11 @@ wcfd32_near_syscall_low:
 		mov esi, eax
 		xor edx, edx
 		mov ecx, 19h
-		mov [force_last_error], edx  ; ERROR_SUCCESS. Don't force the last error.
-		mov edi, dos_syscall_numbers
+		pe.reloc 4, PE_BSSREF(force_last_error), mov [relval], edx  ; ERROR_SUCCESS. Don't force the last error.
+		pe.reloc 4, PE_DATAREF(dos_syscall_numbers), mov edi, relval
 		mov al, [eax+1]
 		repne scasb
-		jmp [dos_syscall_handlers+ecx*4]  ; switch 25 cases
+		pe.reloc 4, PE_DATAREF(dos_syscall_handlers), jmp [relval+ecx*4]  ; switch 25 cases
 handle_INT21H_FUNC_06H_DIRECT_CONSOLE_IO:
 		push 0		     ; jumptable 00410ED7 case 1
 		lea eax, [esp+34h-20h]
@@ -1346,20 +1353,20 @@ handle_INT21H_FUNC_06H_DIRECT_CONSOLE_IO:
 		push 1		     ; nNumberOfBytesToWrite
 		lea eax, [esi+0Ch]
 		push eax	     ; lpBuffer
-		mov edx, [stdout_handle]
+		pe.reloc 4, PE_BSSREF(stdout_handle), mov edx, [relval]
 		push edx	     ; hFile
 loc_410EF3:
-		call [__imp__WriteFile]
+		pe.call.imp WriteFile
 done_handling:
 		mov ebp, eax  ; EBP := EAX; EAX := junk.
 loc_410EFA:
 		xor eax, eax  ; Set CF=0 (success) in returned flags.
 		test ebp, ebp
 		jnz loc_410BE9
-		mov eax, [force_last_error]
+		pe.reloc 4, PE_BSSREF(force_last_error),  mov eax, [relval]
 		test eax, eax
 		jnz dos_error_with_code
-		call [__imp__GetLastError]
+		pe.call.imp GetLastError
 dos_error_with_code:
 		mov [esi], eax  ; Return DOS error code in AX.
 dos_error:
@@ -1378,7 +1385,7 @@ handle_INT21H_FUNC_2AH_GET_CURRENT_DRIVE:
 handle_INT21H_FUNC_1AH_SET_DISK_TRANSFER_ADDRESS:
 		mov eax, [esi+0Ch]  ; jumptable 00410ED7 case 4
 		xor ebp, ebp  ; Force error.
-		mov [dta_addr], eax
+		pe.reloc 4, PE_BSSREF(dta_addr), mov [relval], eax
 		jmp loc_410EFA  ; Force success.
 handle_INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE:
 		mov eax, esi	    ; jumptable 00410ED7 case 20
@@ -1396,7 +1403,7 @@ handle_INT21H_FUNC_47H_GET_CURRENT_DIR:
 		mov edx, [esi+10h]  ; jumptable 00410ED7 case 17
 		push edx	     ; lpBuffer
 		push 40h	     ; nBufferLength; DOS supports only 64 bytes.
-		call [__imp__GetCurrentDirectoryA]
+		pe.call.imp GetCurrentDirectoryA
 		mov ebp, eax  ; Number of characters written to the buffer.
 		test eax, eax
 		jz .bad
@@ -1415,7 +1422,7 @@ handle_INT21H_FUNC_47H_GET_CURRENT_DIR:
 handle_INT21H_FUNC_2AH_GET_DATE:
 		mov eax, esp	    ; jumptable 00410ED7 case 5
 		push eax	     ; lpSystemTime
-		call [__imp__GetLocalTime]
+		pe.call.imp GetLocalTime
 		mov al, byte [esp+30h-2Ch]
 		mov [esi], al
 		mov eax, dword [esp+30h-30h]
@@ -1431,7 +1438,7 @@ loc_410FB5:
 handle_INT21H_FUNC_2CH_GET_TIME:
 		mov eax, esp	    ; jumptable 00410ED7 case 6
 		push eax	     ; lpSystemTime
-		call [__imp__GetLocalTime]
+		pe.call.imp GetLocalTime
 		mov al, byte [esp+30h-28h]
 		mov [esi+9], al
 		mov al, byte [esp+30h-26h]
@@ -1448,7 +1455,7 @@ handle_INT21H_FUNC_2CH_GET_TIME:
 handle_INT21H_FUNC_3BH_CHDIR:
 		mov ebp, [esi+0Ch]  ; jumptable 00410ED7 case 7
 		push ebp	     ; lpPathName
-		call [__imp__SetCurrentDirectoryA]
+		pe.call.imp SetCurrentDirectoryA
 		jmp done_handling
 handle_INT21H_FUNC_3CH_CREATE_FILE:
 		mov eax, esi	    ; jumptable 00410ED7 case 8
@@ -1463,16 +1470,16 @@ handle_INT21H_FUNC_56H_RENAME_FILE:
 		push ebx	     ; lpNewFileName
 		mov ecx, [esi+0Ch]
 		push ecx	     ; lpExistingFileName
-		call [__imp__MoveFileA]
+		pe.call.imp MoveFileA
 		jmp done_handling
 handle_INT21H_FUNC_3EH_CLOSE_FILE:
 		xor eax, eax	    ; jumptable 00410ED7 case 10
 		mov ax, [esi+4]
-		mov edx, [stdin_handle+eax*4]
+		pe.reloc 4, PE_BSSREF(stdin_handle), mov edx, [relval+eax*4]
 		xor edi, edi
 		push edx	     ; hObject
-		mov [stdin_handle+eax*4], edi
-		call [__imp__CloseHandle]
+		pe.reloc 4, PE_BSSREF(stdin_handle), mov [relval+eax*4], edi
+		pe.call.imp CloseHandle
 		jmp done_handling
 handle_INT21H_FUNC_3FH_READ_FROM_FILE:
 		push edx	     ; jumptable 00410ED7 case 11
@@ -1483,20 +1490,20 @@ handle_INT21H_FUNC_3FH_READ_FROM_FILE:
 		mov ecx, [esi+0Ch]
 		mov ax, [esi+4]
 		push ecx	     ; lpBuffer
-		mov eax, [stdin_handle+eax*4]
+		pe.reloc 4, PE_BSSREF(stdin_handle), mov eax, [relval+eax*4]
 		push eax	     ; hFile
-		call [__imp__ReadFile]
+		pe.call.imp ReadFile
 		jmp done_handling
 handle_INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE:
 		xor eax, eax	    ; jumptable 00410ED7 case 12
 		mov ax, [esi+4]
 		mov edi, [esi+8]
-		mov eax, [stdin_handle+eax*4]
+		pe.reloc 4, PE_BSSREF(stdin_handle), mov eax, [relval+eax*4]
 		test edi, edi
 		jnz loc_411090
 		push eax	     ; hFile
 		mov [esi], edx
-		call [__imp__SetEndOfFile]
+		pe.call.imp SetEndOfFile
 		jmp done_handling
 loc_411090:
 		push edx
@@ -1509,12 +1516,12 @@ loc_411090:
 handle_INT21H_FUNC_41H_DELETE_NAMED_FILE:
 		mov ecx, [esi+0Ch]  ; jumptable 00410ED7 case 13
 		push ecx	     ; lpFileName
-		call [__imp__DeleteFileA]
+		pe.call.imp DeleteFileA
 		jmp done_handling
 handle_INT21H_FUNC_42H_SEEK_IN_FILE:
 		xor eax, eax	    ; jumptable 00410ED7 case 14
 		mov ax, [esi+4]
-		mov ebx, [stdin_handle+eax*4]
+		pe.reloc 4, PE_BSSREF(stdin_handle), mov ebx, [relval+eax*4]
 		xor eax, eax
 		mov al, [esi]
 		push eax	     ; dwMoveMethod
@@ -1526,7 +1533,7 @@ handle_INT21H_FUNC_42H_SEEK_IN_FILE:
 		add eax, edx
 		push eax	     ; lDistanceToMove
 		push ebx	     ; hFile
-		call [__imp__SetFilePointer]
+		pe.call.imp SetFilePointer
 		mov [esi], eax
 		shr eax, 10h
 		mov ebx, [esi]
@@ -1555,7 +1562,7 @@ handle_INT21H_FUNC_48H_ALLOCATE_MEMORY:
 		;
 		push ebp	     ; uBytes
 		push edx	     ; uFlags, 0.
-		call [__imp__LocalAlloc]
+		pe.call.imp LocalAlloc
 		test eax, eax
 		jnz .alloced
 		mov al, 8  ; DOS error: insufficient memory.
@@ -1574,11 +1581,11 @@ handle_INT21H_FUNC_48H_ALLOCATE_MEMORY:
 		;push eax
 		;call PrintMsg
 		;add esp, 8
-.try_fit:	mov eax, [malloc_base]
-		sub eax, [malloc_rest]
-		sub [malloc_rest], ebp
+.try_fit:	pe.reloc 4, PE_BSSREF(wcfd32win32_malloc_base), mov eax, [relval]
+		pe.reloc 4, PE_BSSREF(wcfd32win32_malloc_rest), sub eax, [relval]
+		pe.reloc 4, PE_BSSREF(wcfd32win32_malloc_rest), sub [relval], ebp
 		jc .full  ; We actually waste the rest of the current block, but for WASM it's zero waste.
-		add eax, [malloc_capacity]
+		pe.reloc 4, PE_BSSREF(wcfd32win32_malloc_capacity), add eax, [relval]
 		;push eax
 		;push '!'
 		;mov eax, esp
@@ -1595,13 +1602,13 @@ handle_INT21H_FUNC_48H_ALLOCATE_MEMORY:
 		mov ebx, ebp
 		add ebx, 0xfff
 		and ebx, ~0xfff  ; Round up to multiple of 4096 bytes (page size).
-.try_alloc:	mov eax, [malloc_base]
-		add eax, [malloc_capacity]
+.try_alloc:	pe.reloc 4, PE_BSSREF(wcfd32win32_malloc_base), mov eax, [relval]
+		pe.reloc 4, PE_BSSREF(wcfd32win32_malloc_capacity), add eax, [relval]
 		push PAGE_EXECUTE_READWRITE  ; flProtect
 		push MEM_COMMIT|MEM_RESERVE  ; flAllocationType
 		push ebx  ; dwSize
 		push eax  ; lpAddress
-		call [__imp__VirtualAlloc]
+		pe.call.imp VirtualAlloc
 		;push eax
 		;push '*'
 		;mov eax, esp
@@ -1611,11 +1618,11 @@ handle_INT21H_FUNC_48H_ALLOCATE_MEMORY:
 		;pop eax
 		test eax, eax
 		jz .no_extend
-		cmp dword [malloc_base], 0
+		pe.reloc 5, PE_BSSREF(wcfd32win32_malloc_base), cmp dword [relval], strict byte 0
 		jne .extended
-		mov [malloc_base], eax
-.extended:	add [malloc_rest], ebx
-		add [malloc_capacity], ebx
+		pe.reloc 4, PE_BSSREF(wcfd32win32_malloc_base), mov [relval], eax
+.extended:	pe.reloc 4, PE_BSSREF(wcfd32win32_malloc_rest), add [relval], ebx
+		pe.reloc 4, PE_BSSREF(wcfd32win32_malloc_capacity), add [relval], ebx
 		;push '#'
 		;mov eax, esp
 		;push eax
@@ -1623,11 +1630,11 @@ handle_INT21H_FUNC_48H_ALLOCATE_MEMORY:
 		;add esp, 8
 		jmp .try_fit  ; It will fit now.
 .no_extend:	xor eax, eax
-		cmp [malloc_base], eax
+		pe.reloc 4, PE_BSSREF(wcfd32win32_malloc_base), cmp [relval], eax
 		je .no_alloc
-		mov [malloc_base], eax
-		mov [malloc_capacity], eax
-		mov [malloc_rest], eax
+		pe.reloc 4, PE_BSSREF(wcfd32win32_malloc_base), mov [relval], eax
+		pe.reloc 4, PE_BSSREF(wcfd32win32_malloc_capacity), mov [relval], eax
+		pe.reloc 4, PE_BSSREF(wcfd32win32_malloc_rest), mov [relval], eax
 		;push '+'
 		;mov eax, esp
 		;push eax
@@ -1677,9 +1684,9 @@ handle_INT21H_FUNC_44H_IOCTL_IN_FILE:
 		xor eax, eax
 		mov ax, [esi+4]
 		mov dword [esi+0Ch], 0
-		mov eax, [stdin_handle+eax*4]
+		pe.reloc 4, PE_BSSREF(stdin_handle), mov eax, [relval+eax*4]
 		push eax	     ; hFile
-		call [__imp__GetFileType]
+		pe.call.imp GetFileType
 		cmp eax, 2
 		jnz .skip
 		mov dword [esi+0Ch], 80h
@@ -1689,7 +1696,7 @@ handle_unsupported_int21h_function:
 		xor eax, eax	    ; jumptable 00410ED7 case 0
 		mov al, [esi+1]
 		push eax
-		push aUnsupportedInt  ; "Unsupported int 21h function AH=%h\r\n"
+		pe.reloc 4, PE_DATAREF(aUnsupportedInt), push relval  ; "Unsupported int 21h function AH=%h\r\n"
 		call PrintMsg
 		add esp, 8
 		push 2
@@ -1700,14 +1707,14 @@ populate_stdio_handles:
 		push ecx
 		push edx
 		push STD_INPUT_HANDLE  ; nStdHandle
-		call [__imp__GetStdHandle]
+		pe.call.imp GetStdHandle
 		push STD_OUTPUT_HANDLE  ; nStdHandle
-		mov [stdin_handle], eax
-		call [__imp__GetStdHandle]
+		pe.reloc 4, PE_BSSREF(stdin_handle), mov [relval], eax
+		pe.call.imp GetStdHandle
 		push STD_ERROR_HANDLE  ; nStdHandle
-		mov [stdout_handle], eax
-		call [__imp__GetStdHandle]
-		mov [stderr_handle], eax
+		pe.reloc 4, PE_BSSREF(stdout_handle), mov [relval], eax
+		pe.call.imp GetStdHandle
+		pe.reloc 4, PE_BSSREF(stderr_handle), mov [relval], eax
 		pop edx
 		pop ecx
 		ret
@@ -1804,7 +1811,39 @@ strncpy:  ; char* __watcall strncpy(char *dest, const char *src, size_t n);
 		pop ecx  ; Restore.
 		ret
 
-section .rodata
+;section .rodata  ; WLINK merges data and .rodata.
+pe.switch.to.data  ; section .data
+
+dos_syscall_numbers db 60h, 57h, 56h, 4Fh, 4Eh, 4Ch, 48h, 47h, 44h, 43h, 42h
+		db 41h, 40h, 3Fh, 3Eh, 3Dh, 3Ch, 3Bh, 2Ch, 2Ah, 1Ah, 19h  ; Reverse order than dos_syscall_handlers.
+		db 8, 6
+		align 4
+dos_syscall_handlers:
+		pe.reloc.text.dd handle_unsupported_int21h_function  ; jump table for switch statement
+		pe.reloc.text.dd handle_INT21H_FUNC_06H_DIRECT_CONSOLE_IO  ; jumptable 00410ED7 case 1
+		pe.reloc.text.dd handle_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO  ; jumptable 00410ED7 case 2
+		pe.reloc.text.dd handle_INT21H_FUNC_2AH_GET_CURRENT_DRIVE  ; jumptable 00410ED7 case 3
+		pe.reloc.text.dd handle_INT21H_FUNC_1AH_SET_DISK_TRANSFER_ADDRESS  ; jumptable 00410ED7 case 4
+		pe.reloc.text.dd handle_INT21H_FUNC_2AH_GET_DATE  ; jumptable 00410ED7 case 5
+		pe.reloc.text.dd handle_INT21H_FUNC_2CH_GET_TIME  ; jumptable 00410ED7 case 6
+		pe.reloc.text.dd handle_INT21H_FUNC_3BH_CHDIR  ; jumptable 00410ED7 case 7
+		pe.reloc.text.dd handle_INT21H_FUNC_3CH_CREATE_FILE  ; jumptable 00410ED7 case 8
+		pe.reloc.text.dd handle_INT21H_FUNC_3DH_OPEN_FILE  ; jumptable 00410ED7 case 9
+		pe.reloc.text.dd handle_INT21H_FUNC_3EH_CLOSE_FILE  ; jumptable 00410ED7 case 10
+		pe.reloc.text.dd handle_INT21H_FUNC_3FH_READ_FROM_FILE  ; jumptable 00410ED7 case 11
+		pe.reloc.text.dd handle_INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE  ; jumptable 00410ED7 case 12
+		pe.reloc.text.dd handle_INT21H_FUNC_41H_DELETE_NAMED_FILE  ; jumptable 00410ED7 case 13
+		pe.reloc.text.dd handle_INT21H_FUNC_42H_SEEK_IN_FILE  ; jumptable 00410ED7 case 14
+		pe.reloc.text.dd handle_INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES  ; jumptable 00410ED7 case 15
+		pe.reloc.text.dd handle_INT21H_FUNC_44H_IOCTL_IN_FILE  ; jumptable 00410ED7 case 16
+		pe.reloc.text.dd handle_INT21H_FUNC_47H_GET_CURRENT_DIR  ; jumptable 00410ED7 case 17
+		pe.reloc.text.dd handle_INT21H_FUNC_48H_ALLOCATE_MEMORY  ; jumptable 00410ED7 case 18
+		pe.reloc.text.dd handle_INT21H_FUNC_4CH_EXIT_PROCESS  ; jumptable 00410ED7 case 19
+		pe.reloc.text.dd handle_INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE  ; jumptable 00410ED7 case 20
+		pe.reloc.text.dd handle_INT21H_FUNC_4FH_FIND_NEXT_MATCHING_FILE  ; jumptable 00410ED7 case 21
+		pe.reloc.text.dd handle_INT21H_FUNC_56H_RENAME_FILE  ; jumptable 00410ED7 case 22
+		pe.reloc.text.dd handle_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME  ; jumptable 00410ED7 case 23
+		pe.reloc.text.dd handle_INT21H_FUNC_60H_GET_FULL_FILENAME  ; jumptable 00410ED7 case 24
 
 ; char fmt[]
 fmt		db 'Environment Variables:',0Dh,0Ah,0
@@ -1845,32 +1884,30 @@ empty_str	db 0
 
 emit_load_errors
 
-section .data
-
 ; unsigned int MsgFileHandle
 MsgFileHandle dd FILENO_STDOUT
-wcfd32_param_struct:  ; Contains 7 dd fields, see below.
-  wcfd32_program_filename dd empty_str  ; ""
-  wcfd32_command_line dd empty_str  ; ""
-  wcfd32_env_strings dd empty_env
-  wcfd32_break_flag_ptr dd 0  ; !! TODO(pts): Set it on Ctrl-<Break>.
-  wcfd32_copyright dd 0
-  wcfd32_is_japanese dd 0
-  wcfd32_max_handle_for_os2 dd 0
+wcfd32win32_param_struct:  ; Contains 7 pe.reloc.data.dd fields, see below.
+  wcfd32win32_program_filename pe.reloc.data.dd empty_str  ; ""
+  wcfd32win32_command_line pe.reloc.data.dd empty_str  ; ""
+  wcfd32win32_env_strings pe.reloc.data.dd empty_env
+  wcfd32win32_break_flag_ptr dd 0  ; !! TODO(pts): Set it on Ctrl-<Break>.
+  wcfd32win32_copyright dd 0
+  wcfd32win32_is_japanese dd 0
+  wcfd32win32_max_handle_for_os2 dd 0
 
-section .bss
+pe.switch.to.bss  ; !! TODO(pts): Get rid of .bss entirely.
 
-image_base_for_debug resd 1
+image_base_for_debug pe.resb 4
 ; HANDLE stdin_handle
-stdin_handle	resd 1
+stdin_handle	pe.resb 4
 ; HANDLE stdout_handle
-stdout_handle	resd 1
-stderr_handle	resd 1
-other_stdio_handles resd 61  ; 64 in total.
+stdout_handle	pe.resb 4
+stderr_handle	pe.resb 4
+other_stdio_handles pe.resb 4*61  ; 64 in total.
 .end:
-dta_addr	resd 1
-force_last_error resd 1
-malloc_base	resd 1  ; Address of the currently allocated block.
-malloc_capacity	resd 1  ; Total number of bytes in the currently allocated block.
-malloc_rest	resd 1  ; Number of bytes available at the end of the currently allocated block.
-had_ctrl_c	resb 1
+dta_addr	pe.resb 4
+force_last_error pe.resb 4
+wcfd32win32_malloc_base	pe.resb 4  ; Address of the currently allocated block.
+wcfd32win32_malloc_capacity	pe.resb 4  ; Total number of bytes in the currently allocated block.
+wcfd32win32_malloc_rest	pe.resb 4  ; Number of bytes available at the end of the currently allocated block.
+had_ctrl_c	pe.resb 1
