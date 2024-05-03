@@ -19,9 +19,12 @@
 bits 32
 cpu 386
 
-%macro assert_le 2  ; If false, NASM issueas a warning, and continues compilation.
-  times (%2)-(%1) times 0 db 0
-%endm
+%ifndef assert_le
+  %macro assert_le 2  ; If false, NASM issueas a warning, and continues compilation.
+    times (%2)-(%1) times 0 db 0
+  %endm
+  %define assert_le assert_le
+%endif
 
 %ifnidn __OUTPUT_FORMAT__, bin
   %define .le.text _TEXT
@@ -49,6 +52,7 @@ cpu 386
   relocated_le.text %1, dd (relval)
 %endm
 
+%define INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE
 INT21H_FUNC_06H_DIRECT_CONSOLE_IO equ 0x6
 INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO equ 0x8
 INT21H_FUNC_19H_GET_CURRENT_DRIVE equ 0x19
@@ -74,6 +78,8 @@ INT21H_FUNC_56H_RENAME_FILE     equ 0x56
 INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME equ 0x57
 INT21H_FUNC_60H_GET_FULL_FILENAME equ 0x60
 
+%define NULL NULL
+%define WCFD32_OS_DOS WCFD32_OS_DOS
 WCFD32_OS_DOS equ 0
 WCFD32_OS_OS2 equ 1
 WCFD32_OS_WIN32 equ 2

@@ -23,6 +23,11 @@ cpu 386
   times -(%1)+(%2) times 0 db 0
 %endm
 
+%macro assert_le 2  ; If false, NASM issueas a warning, and continues compilation.
+  times (%2)-(%1) times 0 db 0
+%endm
+%define assert_le assert_le
+
 ; --- Relocation and fixup generation.
 ;
 ; fixup record source (in .type, dl in PMODE/W _relocate2).
@@ -95,6 +100,9 @@ le.stack_size equ 0x1000  ; !! TODO(pts): Is this enough for a real-world progra
 ;le.stack_size equ 0x100000
 
 file:
+%ifdef PE
+  header_section:
+%endif
 mz_header:
 .signature:	db 'MZ'
 .lastsize:	dw (dos_stub_end-file)&0x1ff
@@ -136,9 +144,60 @@ assert_at 0xa
   times (file-$)&(0x10-1) db 0  ; dos_image must be aligned to 0x10.
   dos_image:
   assert_at 0x40
-  incbin 'pmodew133.exe', 0x20, 0x2e-0x20  ; Copy the DOS stub image.
-  db 0  ; Disable displaying of PMODE/W copyright message.
-  incbin 'pmodew133.exe', 0x2f, 0x1ee3-0x2f ; Copy the DOS stub image.
+  ; PMODE/W config (struct cfg). The /... flags are for pmwsetup.exe.
+  pmodew_config:
+  %if 0  ; PMODE/W 1.33 defaults.
+  .pagetables	db 4		; /V number of page tables under VCPI; Number of VCPI page tables to allocate. Each page table needs 4 KiB, and gives 4 MiB of memory for VCPI. These are allocated only for VCPI.
+  .selectors	dw 0x100	; /S max selectors under VCPI/XMS/raw; VCPI/XMS/Raw maximum selectors.
+  .rmstacklen	dw 0x40		; /R real mode stack length, in para; Real mode stack length (in paragraphs).
+  .pmstacklen	dw 0x80		; /P protected mode stack length, in para; Protected mode stack length (in paragraphs).
+  .rmstacks	db 8		; /N real mode stack nesting; Real mode stack nesting.
+  .pmstacks	db 8		; /E protected mode stack nesting; Protected mode stack nesting.
+  .callbacks	db 0x20		; /C number of real mode callbacks; Number of real mode callbacks.
+  .mode		db 1		; /M mode bits; VCPI/DPMI detection mode (0=DPMI first, 1=VCPI first).
+  .pamapping	db 1		; /A physical address mappings; Number of physical address mapping page tables.
+  .crap		dw 0		; Unused.
+  .options	db 1		; /B option flags; Display copyright message at startup (0=No, 1=Yes).
+  .extmax	dd 0x7fffffff	; /X maximum extended memory to allocate; Maximum extended memory to allocate (in bytes).
+  .lowmin	dw 0		; /L amount of low memory to try and save; Low memory to reserve (in paragraphs)
+  %elif 0  ; PMODE/W 1.33 defaults, but hide the copyright message.
+  .pagetables	db 4
+  .selectors	dw 0x100
+  .rmstacklen	dw 0x40
+  .pmstacklen	dw 0x80
+  .rmstacks	db 8
+  .pmstacks	db 8
+  .callbacks	db 0x20
+  .mode		db 1
+  .pamapping	db 1
+  .crap		dw 0
+  .options	db 0
+  .extmax	dd 0x7fffffff
+  .lowmin	dw 0
+  %else  ; Settings optimized to save conventional memory for WCFD32.
+  ; We tweak these settings to get some extra free conventional memory. By
+  ; default, DOSBox has 40546 paragraphs (~633 KiB) free, kvikdos has 40688
+  ; paragraphs (~635 KiB) free. Out of this, PMODE/W and the runner
+  ; wcfd32dos.nasm (including 4 KiB of stack for the program) uses 1943
+  ; paragraphs (~30 KiB) with these tweaks, and 3735 paragraphs (~58 KiB) with
+  ; the PMODE/W defaults. Thus these tweaks save about ~28 KiB of conventional
+  ; memory.
+  .pagetables	db 0x10  ; Not a problem, only allocated for VCPI and if high memory (above 1 MiB) is available.
+  .selectors	dw 0x10  ; Doesn't save much.
+  .rmstacklen	dw 0x40
+  .pmstacklen	dw 0x40
+  .rmstacks	db 1
+  .pmstacks	db 1
+  .callbacks	db 0
+  .mode		db 0  ; DPMI first. It gives more memory.
+  .pamapping	db 0
+  .crap		dw 0
+  .options	db 0
+  .extmax	dd 0x7fffffff
+  .lowmin	dw 0
+  %endif
+  .end: assert_at (pmodew_config-$$)+0x15
+  incbin 'pmodew133.exe', 0x35, 0x1ee3-0x35 ; Copy the DOS stub image.
   db le_ofs-file  ; Change the file offset from 0x3c to 0x38 at which PMODE/W looks for the LE header offset. This changes the compressed stream. Fortunately it doesn't affect subsequent repeat copies in this case.
   incbin 'pmodew133.exe', 0x1ee4 ; Copy the DOS stub image.
 %else
@@ -208,7 +267,7 @@ dd objid_le.text  ; Initial object CS number.
 dd le.start-le.text  ; Initial EIP. Entry point.
 ..@0x2d20:
 dd objid_le.text  ; Initial object SS number.
-dd le.text_stack_end-le.text  ; Initial ESP. PMODE/W sets ESP to this + the SS object base.  ; Initial ESP.  !!! -8 doesn't help.  !!! doesn't make a difference
+dd le.text_stack_end-le.text  ; Initial ESP. PMODE/W sets ESP to this + the SS object base.  ; Initial ESP.
 dd 0x1000  ; Memory page size. Always 0x1000 for i386.
 dd le.text_end-le.text  ; 0x31a. Bytes on last page.
 ..@0x2d30:
@@ -306,13 +365,309 @@ le.text_stack equ $+((le.text-$)&3)  ; Align to 4.
 le.text_stack_end equ le.text_stack+le.stack_size
 times 0x1000-($-le.text) times 0 db 0; Check that .le.text size is at most 0x1000 bytes (single page).
 assert_eq le_reloc_count, le_found_reloc_count  ; Upon a difference, update the value of `le_fixups'.
-
 section .le.text
 
+; Generate a Win32 PE .exe executable purely in `nasm -f bin', without the
+; need for `wlink form win nt'.
+;
+; This is a preliminary implementation, there is lots of room for optimization.
 %ifdef PE
+; Example, to be defined in wcfd32win32.nasm:
+; %macro emit_ifuncs 1
+;   %1 'WriteFile', WriteFile, 0
+;   %1 'ExitProcess', ExitProcess, 0
+; %endm
+%macro emit_ifunc_ptr 3
+  dd ifunc_%2+(idata_rva-pe.idata)
+%endm
+%macro emit_ifunc_ptr_label 3
+  __imp__%2: dd ifunc_%2+(idata_rva-pe.idata)
+%endm
+%macro emit_ifunc_name 3  ; !! Can we do it without padding (%3 == 0 always)?
+  %assign PE_IFUNC_NUMBER PE_IFUNC_NUMBER+1  ; !! Can we use all-zero ifunc_numbers?
+  ifunc_%2: db PE_IFUNC_NUMBER, 0, %1, 0
+  times %3 db 0
+%endm
+%macro pe.reloc.in.data.text.dd 1
+  %assign THIS_RELOC_AT $-pe.data
+  %assign  PE_RELOC_PADDING_IN_DATA PE_RELOC_PADDING_IN_DATA^1
+  %xdefine PE_RELOCS_IN_DATA PE_RELOCS_IN_DATA PER32|THIS_RELOC_AT,
+  dd image_base+(text_rva-pe.text)+(%1)
+%endm
+%macro pe.reloc.in.data.data.dd 1
+  %assign THIS_RELOC_AT $-pe.data
+  %assign  PE_RELOC_PADDING_IN_DATA PE_RELOC_PADDING_IN_DATA^1
+  %xdefine PE_RELOCS_IN_DATA PE_RELOCS_IN_DATA PER32|THIS_RELOC_AT,
+  dd image_base+(data_rva-pe.data)+(%1)
+%endm
+%macro pe.switch.to.text 0
+%endm
+%macro pe.switch.to.data 0
+  %define pe.switch.to.text DO_NOT_SWITCH_BACK_TO_TEXT
+  %define pe.switch.to.data times 0 nop  ; Just nothing (idempotent).
+  pe.text.uend:
+  times (file-$)&0x1ff db 0  ; Align to PE file alignment.
+  pe.text.end:
+  pe.idata:
+  import_directory_table0:  ; One for each DLL.
+  ..@0x4400:
+  .ImportLookupTableRVA: dd import_lookup_table+(idata_rva-pe.idata)
+  .TimeDateStamp: dd 0
+  .ForwarderChain: dd 0
+  .NameRVA: dd import_dll_name+(idata_rva-pe.idata)
+  ..@0x4410:
+  .ImportAddressTableRVA: dd import_address_table+(idata_rva-pe.idata)
+  ..@0x4414:
+  times 5 dd 0  ; Indicates that there is no more imported DLL.
+  import_lookup_table:
+  ..@0x4428:
+  %define PE_RELOCS_IN_DATA
+  %define PE_RELOC_PADDING_IN_DATA 0
+  %define pe.reloc.text.dd pe.reloc.in.data.text.dd
+  %define pe.reloc.data.dd pe.reloc.in.data.data.dd
+  emit_ifuncs emit_ifunc_ptr
+  ..@0x44b8:
+  dd 0  ; End of import lookup table.
+  import_address_table:  ; !! Don't repeat this, overlap it with the import_lookup_table.
+  ..@0x44bc:
+  emit_ifuncs emit_ifunc_ptr_label
+  ..@0x454c:
+  dd 0  ; End of import address table.
+  import_dll_name:
+  ..@0x4550:
+  db 'kernel32.dll', 0, 0
+  ..@0x454e:
+  %define PE_IFUNC_NUMBER 0
+  emit_ifuncs emit_ifunc_name
+  pe.idata.dirend:
+  times (file-$)&0x1ff db 0  ; Align to PE file alignment.
+  pe.idata.end:
+  pe.data:
+%endm
+%macro pe.switch.to.bss 0
+  %ifndef pe.switch.to.data
+    pe.switch.to.data
+  %endif
+  %define pe.switch.to.data DO_NOT_SWITCH_BACK_TO_DATA
+  %define pe.switch.to.bss  times 0 nop  ; Just nothing (idempotent).
+  %define pe.resb pe.macro.resb
+%endm
+%define PE_RELOCS_IN_TEXT
+%define PE_RELOC_PADDING_IN_TEXT 0
+%macro pe.reloc.above 1
+  %assign THIS_RELOC_AT $-(%1)-pe.text
+  %assign  PE_RELOC_PADDING_IN_TEXT PE_RELOC_PADDING_IN_TEXT^1
+  %xdefine PE_RELOCS_IN_TEXT PE_RELOCS_IN_TEXT PER32|THIS_RELOC_AT,
+%endm
+%macro pe.reloc 3+  ; %1 is number of bytes back from the end of the instruction (typically 4), %2 is PE_...REF(...), %3 is the instruction.
+  %define relval %2
+  %3
+  %undef  relval
+  pe.reloc.above %1
+%endm
+%define PE_TEXTREF(var)  ((var)+image_base+(text_rva-pe.text))
+%define PE_DATAREF(var)  ((var)+image_base+(data_rva-pe.data))
+%define PE_BSSREF(var)   ((var)+image_base+(data_rva-pe.data))  ; pe.bss is within pe.data.
+%define PE_IDATAREF(var) ((var)+image_base+(idata_rva-pe.idata))
+%macro pe.call.imp 1
+  call [PE_IDATAREF(__imp__%1)]
+  pe.reloc.above 4
+%endm
+%macro pe.jmp.imp 1
+  jmp [PE_IDATAREF(__imp__%1)]
+  pe.reloc.above 4
+%endm
+%macro pe.macro.resb 1
+  times (%1) db 0  ; !! Overlap with the beginning of pe.text.
+%endm
 times (file-$)&(0x10-1) db 0  ; Align to 0x10. This padding is not part of wcfd32dos.exe, it's added in later phases for aligning the PE header after it. !! Align only to 4.
+..@0x32e0:
+assert_at 0x32e0
+pe_header:  ; https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
 ..@0x31e0:
-assert_at 0x31e0
-pe_header:
-incbin 'lepe.bin.golden', 0x31e0  ; PE header follows after further processing.
+Signature: db 'PE', 0, 0
+..@0x31e4:
+coff_header:
+IMAGE_FILE_MACHINE_I386 equ 0x014c
+.Machine: dw IMAGE_FILE_MACHINE_I386
+.NumberOfSections: dw (section_header.end-section_header)/0x28
+.TimeDateStamp: dd 0  ; Forced to 0 for reproducibility.
+.PointerToSymbolTable: dd 0
+..@0x31f0:
+.NumberOfSymbols: dd 0
+.SizeOfOptionalHeader: dw optional_header.end-optional_header
+IMAGE_FILE_EXECUTABLE_IMAGE equ 2
+IMAGE_FILE_LINE_NUMS_STRIPPED equ 4  ; !! Add.
+IMAGE_FILE_LOCAL_SYMS_STRIPPED equ 8  ; !! Add.
+IMAGE_FILE_BYTES_REVERSED_LO equ 0x80  ; !! Deprecated, shouldn't be specified.
+IMAGE_FILE_32BIT_MACHINE equ 0x100
+IMAGE_FILE_DEBUG_STRIPPED equ 0x200  ; !! Add.
+IMAGE_FILE_DLL equ 0x2000
+.Characteristics: dw IMAGE_FILE_EXECUTABLE_IMAGE|IMAGE_FILE_BYTES_REVERSED_LO|IMAGE_FILE_32BIT_MACHINE
+optional_header:
+PE32_MAGIC equ 0x010b
+.Magic: dw PE32_MAGIC
+.MajorLinkerVersion: db 2
+.MinorLinkerVersion: db 18
+.SizeOfCode: dd pe.text.end-pe.text
+..@0x3200:
+.SizeOfInitializedData: dd 0x800  ; !! why? Can we set it to 0? How do we get it?
+.SizeOfUninitializedData: dd 0  ; !! why 0? Can we set it to 0?
+.AddressOfEntryPoint: dd pe_start+(text_rva-pe.text)
+header_rva equ 0
+text_rva equ 0x4000
+idata_rva equ 0x5000
+data_rva equ 0x6000
+reloc_rva equ 0x8000
+.BaseOfCode: dd text_rva
+..@0x3210:
+.BaseOfData: dd idata_rva
+;image_base equ 0x10000000  ; Default for DLLs.
+image_base equ 0x400000  ; Default for executables.
+.ImageBase: dd image_base
+.SectionAlignment: dd 0x1000  ; Typical minimum for Windows NT.
+.FileAlignment: dd 0x200  ; Typical minimum for Windows NT.
+..@0x3220:
+.MajorOperatingSystemVersion: dw 1
+.MinorOperatingSystemVersion: dw 0xb
+.MajorImageVersion: dw 0
+.MinorImageVersion: dw 0
+.MajorSubsystemVersion: dw 3
+.MinorSubsystemVersion: dw 10
+.Win32VersionValue: dd 0
+.SizeOfImage: dd reloc_rva+((pe.reloc.end-pe.reloc+0xfff)&~0xfff)  ; TODO(pts): Merge sections.
+.SizeOfHeaders: dd header_section.end-header_section  ; Must be aligned to FileAlignment, but Windows accepts anything.
+..@0x3230:
+.CheckSum: dd 0
+IMAGE_SUBSYSTEM_WINDOWS_GUI equ 2
+IMAGE_SUBSYSTEM_WINDOWS_CUI equ 3  ; Console.
+.Subsystem: dw IMAGE_SUBSYSTEM_WINDOWS_CUI
+.DllCharacteristics: dw 0
+..@0x3240:
+; `option heapsize=' is ignored by WLINK, SizeOfHeapReserve will always be
+; 0. `commit heap=' is saved to SizeOfHeapCommit. SizeOfHeapCommit matters
+; for mwpestub LocalAlloc and HeapAlloc. It's not needed by Win32
+; LocalAlloc or mwpestub VirtualAlloc.
+.SizeOfStackReserve: dd 0x1000
+.SizeOfStackCommit: dd 0x1000
+.SizeOfHeapReserve: dd 1
+.SizeOfHeapCommit: dd 0
+..@0x3250:
+.LoaderFlags: dd 0
+.NumberOfRvaAndSizes: dd (optional_header.end-data_directories)>>3  ; !! 6 is the minimum count accepted by WDOSX. It crashes for less. What about Win32?
+data_directories:
+..@0x3258:
+dir0_export_table: dd 0, 0  ; `dd rva, size'.
+..@0x3260:
+dir1_import_table: dd idata_rva, pe.idata.dirend-pe.idata
+dir2_resource_table: dd 0, 0
+..@0x3270:
+dir3_exception_table: dd 0, 0
+dir4_cretificate_table: dd 0, 0
+..@0x3280:
+dir5_base_relocation_table: dd reloc_rva, pe.reloc.dirend-pe.reloc
+..@0x3288:
+times 10 dd 0, 0
+optional_header.end:
+section_header:
+..@0x32d8:
+IMAGE_SCN_CNT_CODE equ 0x20
+IMAGE_SCN_CNT_INITIALIZED_DATA equ 0x40
+IMAGE_SCN_MEM_DISCARDABLE equ 0x2000000
+IMAGE_SCN_MEM_EXECUTE equ 0x20000000
+IMAGE_SCN_MEM_READ equ 0x40000000
+IMAGE_SCN_MEM_WRITE equ 0x80000000
+section0_text:  ; !! Merge all sections to .text.
+.Name: db '.text', 0, 0, 0
+.VirtualSize: dd pe.text.uend-pe.text
+.VirtualAddress: dd text_rva
+.SizeOfRawData: dd pe.text.end-pe.text
+.PointerToRawData: dd pe.text-file
+.PointerToRelocations: dd 0
+.PointerToLineNumbers: dd 0
+.NumberOfRelocations: dw 0
+.NumberOfLineNumbers: dw 0
+.Characteristics: dd IMAGE_SCN_CNT_CODE|IMAGE_SCN_MEM_EXECUTE|IMAGE_SCN_MEM_READ
+..@0x32f0:
+section1_idata:
+.Name: db '.idata', 0, 0
+.VirtualSize: dd pe.idata.dirend-pe.idata
+.VirtualAddress: dd idata_rva
+.SizeOfRawData: dd pe.idata.end-pe.idata
+.PointerToRawData: dd pe.idata-file
+.PointerToRelocations: dd 0
+.PointerToLineNumbers: dd 0
+.NumberOfRelocations: dw 0
+.NumberOfLineNumbers: dw 0
+.Characteristics: dd IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_READ|IMAGE_SCN_MEM_WRITE
+..@0x3328:
+section2_data:
+.Name: db '.data', 0, 0, 0
+.VirtualSize: dd pe.data.uend-pe.data+pe.bss.size
+.VirtualAddress: dd data_rva
+.SizeOfRawData: dd pe.data.end-pe.data
+.PointerToRawData: dd pe.data-file
+.PointerToRelocations: dd 0
+.PointerToLineNumbers: dd 0
+.NumberOfRelocations: dw 0
+.NumberOfLineNumbers: dw 0
+.Characteristics: dd IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_READ|IMAGE_SCN_MEM_WRITE
+..@0x3350:
+section3_reloc:
+.Name: db '.reloc', 0, 0
+.VirtualSize: dd 0  ; Process, but don't load.
+.VirtualAddress: dd reloc_rva
+.SizeOfRawData: dd pe.reloc.end-pe.reloc
+.PointerToRawData: dd pe.reloc-file
+.PointerToRelocations: dd 0
+.PointerToLineNumbers: dd 0
+.NumberOfRelocations: dw 0
+.NumberOfLineNumbers: dw 0
+.Characteristics: dd IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_DISCARDABLE|IMAGE_SCN_MEM_READ
+..@0x3378:
+section_header.end:
+times (file-$)&0x1ff db 0  ; Align to PE file alignment.
+header_section.end:
+pe.text:
+%include 'wcfd32win32.nasm'
+%ifndef pe.switch.to.data
+  pe.switch.to.data
 %endif
+pe.data.uend:
+pe.bss.size equ 0
+times (file-$)&0x1ff db 0  ; Align to PE file alignment.
+pe.data.end:
+pe.reloc:
+..@0x4c00:
+IMAGE_REL_BASED_HIGHLOW equ 3  ; 32-bit offset.
+PER32 equ IMAGE_REL_BASED_HIGHLOW<<12  ; The low 12 bits is the offset.
+
+reloc_block0: dd text_rva, .end-reloc_block0  ; Block start.
+..@0x4c08:
+%ifnidn (PE_RELOCS_IN_TEXT), ()
+  dw PE_RELOCS_IN_TEXT
+  times PE_RELOC_PADDING_IN_TEXT dw 0  ; The PE spec says that each block must start on a 4-byte boundary, so we add padding. !! TODO(pts): No end padding, just start padding.
+%endif
+.end:
+..@0x4d5c:
+reloc_block1: dd data_rva, .end-reloc_block1  ; Block start.
+..@0x4d54:
+%ifnidn (PE_RELOCS_IN_DATA), ()
+  dw PE_RELOCS_IN_DATA
+  times PE_RELOC_PADDING_IN_DATA dw 0  ; The PE spec says that each block must start on a 4-byte boundary, so we add padding. !! TODO(pts): No end padding, just start padding.
+%endif
+..@0x4d9c:
+.end:
+pe.reloc.dirend:
+times (file-$)&0x1ff db 0  ; Align to PE file alignment.
+pe.reloc.end:
+
+; Check that section data isn't too long so that if fits their allocated address range.
+assert_le pe.text.uend-pe.text, idata_rva-text_rva
+assert_le pe.idata.dirend-pe.idata, data_rva-idata_rva
+assert_le pe.data.uend-pe.data+pe.bss.size, reloc_rva-data_rva
+; Check that relocations fit to a single page (their offset is 12 bits each).
+assert_le pe.text.uend-pe.text, 0x1000  ; Limit imposed by reloc_block0.
+assert_le pe.data.uend-pe.data, 0x1000  ; Limit imposed by reloc_block1.
+
+%endif  ; %ifdef PE.

@@ -292,98 +292,17 @@ fatal_cf_not_found: db 'fatal: CF header not found', 10, 0
 fatal_alloc:	db 'fatal: error allocating memory', 10, 0
 %endif  ; LINUXPROG
 
-; This is independent of `bits 16' or `bits 32'.
 stub:
 mz_header:
-incbin 'wcfd32dos.exe', 0, 6  ; 'MZ' signature and image size.
-incbin 'wcfd32dosp.exe', 6, 0x20-6  ; wcfd32dos.exe and wcfd32dosp.exe are identical here.
-cf_header:  ; The 32-bit DOS loader finds it at mz_header.hdrsize. Must be aligned to 0x10.
-		db 'CF', 0, 0          ; +0x00. Signature.
-.load_fofs:	;dd wcfd32_load_fofs  ; +0x04. load_fofs.
-;.load_size:	;dd wcfd32_load_size  ; +0x08. load_size.
-;.reloc_rva:	;dd wcfd32_reloc_rva  ; +0x0c. reloc_rva.
-;.mem_size:	;dd wcfd32_mem_size   ; +0x10. mem_size.
-;.entry_rva:	;dd wcfd32_entry_rva  ; +0x14. entry_rva.
-.load_size equ cf_header+8
-.reloc_rva equ cf_header+0xc
-.mem_size equ cf_header+0x10
-.entry_rva equ cf_header+0x14
-		incbin 'wcfd32dos.exe', 0x24, 0x14
-		; End.                 ; +0x18. Size.
-incbin 'wcfd32dosp.exe', 0x3c, 4  ; wcfd32dos.exe and wcfd32dosp.exe are identical here.
-		dd pe_header-mz_header  ;incbin 'wcfd32win32.exe', 0x3c, 4  ; !! TODO(pts): Check that this dword == pe_header.
-;incbin 'wcfd32dosp.exe', 0x40, 0xe  ; wcfd32dos.exe and wcfd32dosp.exe are identical here.
-; PMODE/W config (struct cfg). The /... flags are for pmwsetup.exe.
-pmodew_config:
-
-%if 0  ; PMODE/W 1.33 defaults.
-.pagetables	db 4		; /V number of page tables under VCPI; Number of VCPI page tables to allocate. Each page table needs 4 KiB, and gives 4 MiB of memory for VCPI. These are allocated only for VCPI.
-.selectors	dw 0x100	; /S max selectors under VCPI/XMS/raw; VCPI/XMS/Raw maximum selectors.
-.rmstacklen	dw 0x40		; /R real mode stack length, in para; Real mode stack length (in paragraphs).
-.pmstacklen	dw 0x80		; /P protected mode stack length, in para; Protected mode stack length (in paragraphs).
-.rmstacks	db 8		; /N real mode stack nesting; Real mode stack nesting.
-.pmstacks	db 8		; /E protected mode stack nesting; Protected mode stack nesting.
-.callbacks	db 0x20		; /C number of real mode callbacks; Number of real mode callbacks.
-.mode		db 1		; /M mode bits; VCPI/DPMI detection mode (0=DPMI first, 1=VCPI first).
-.pamapping	db 1		; /A physical address mappings; Number of physical address mapping page tables.
-.crap		dw 0		; Unused.
-.options	db 1		; /B option flags; Display copyright message at startup (0=No, 1=Yes).
-.extmax		dd 0x7fffffff	; /X maximum extended memory to allocate; Maximum extended memory to allocate (in bytes).
-.lowmin		dw 0		; /L amount of low memory to try and save; Low memory to reserve (in paragraphs)
-%elif 0  ; PMODE/W 1.33 defaults, but hide the copyright message.
-.pagetables	db 4
-.selectors	dw 0x100
-.rmstacklen	dw 0x40
-.pmstacklen	dw 0x80
-.rmstacks	db 8
-.pmstacks	db 8
-.callbacks	db 0x20
-.mode		db 1
-.pamapping	db 1
-.crap		dw 0
-.options	db 0
-.extmax		dd 0x7fffffff
-.lowmin		dw 0
-%else  ; Settings optimized to save conventional memory for WCFD32.
-; We tweak these settings to get some extra free conventional memory. By
-; default, DOSBox has 40546 paragraphs (~633 KiB) free, kvikdos has 40688
-; paragraphs (~635 KiB) free. Out of this, PMODE/W and the runner
-; wcfd32dos.nasm (including 4 KiB of stack for the program) uses 1943
-; paragraphs (~30 KiB) with these tweaks, and 3735 paragraphs (~58 KiB) with
-; the PMODE/W defaults. Thus these tweaks save about ~28 KiB of conventional
-; memory.
-.pagetables	db 0x10  ; Not a problem, only allocated for VCPI and if high memory (above 1 MiB) is available.
-.selectors	dw 0x10  ; Doesn't save much.
-.rmstacklen	dw 0x40
-.pmstacklen	dw 0x40
-.rmstacks	db 1
-.pmstacks	db 1
-.callbacks	db 0
-.mode		db 0  ; DPMI first. It gives more memory.
-.pamapping	db 0
-.crap		dw 0
-.options	db 0
-.extmax		dd 0x7fffffff
-.lowmin		dw 0
-%endif
-.end: assert_at (pmodew_config-$$)+0x15
-;db 'PMODE/W v1.'...
-incbin 'wcfd32dosp.exe', 0x55, 0x1f03-0x55  ; wcfd32dos.exe and wcfd32dosp.exe are identical here.
-; Replace the 0x3c byte so that the PMODE/W DOS stub will find the LE image offset at fofs 0x38 instead of 0x3c.
-; !! TODO(pts): Check that an actual 0x3c byte was replaced.
-; TODO(pts): Check that decompression is still successful.
-		db 0x38
-incbin 'wcfd32dosp.exe', 0x1f03+1  ; We use wcfd32dosp.exe here, because wcfd32dos.exe doesn't have the alignment of the PE header to 4.
-pe_header:
-; TODO(pts): Build the PE manually (with relocations!). Merge .idata and .reloc to .data. Exclude trailing NUL bytes from .data. Overlap .text and .data.
-incbin 'wcfd32win32.exe', pe_header-mz_header, 8
-TimeDateStamp:	dd 0  ; Make the build reproducible by specifying a constant timestamp.
-incbin 'wcfd32win32.exe', pe_header-mz_header+0xc, 0xf8-0xc
-db '.text', 0, 0, 0  ; Overwrite 'AUTO' PE section name.
-incbin 'wcfd32win32.exe', pe_header-mz_header+0xf8+8, 0x50-8
-db '.data', 0, 0, 0  ; Overwrite 'DGROUP' PE section name.
-incbin 'wcfd32win32.exe', pe_header-mz_header+0xf8+0x50+8
-
+cf_header equ mz_header+0x20
+cf_header.signature equ cf_header+0  ; "CF\0\0".
+cf_header.load_fofs equ cf_header+4
+cf_header.load_size equ cf_header+8
+cf_header.reloc_rva equ cf_header+0xc
+cf_header.mem_size  equ cf_header+0x10
+cf_header.entry_rva equ cf_header+0x14
+cf_header.end equ cf_header+0x18
+incbin 'oixrun.exe'
 stub_end:
 
 %ifdef LINUXPROG

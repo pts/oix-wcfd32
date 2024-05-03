@@ -14,12 +14,6 @@ cd %~dp0
 set b=/b 1
 :not_nt
 @if errorlevel 1 exit %b%
-rem Make sure the system Watcom files are not used by WLINK.
-set WATCOM=
-set WLANG=
-set INCLUDE=
-rem OpenWatcom 1.4 (2005-11-15) was the first one with a Linux binary release.
-set wlink=tools\wlink
 rem NASM 0.98.39 (2005-01-15) was the last version without amd64 (`bits 64') support. Integers are still 32-bit.
 set nasm=tools\nasm
 
@@ -39,21 +33,14 @@ exit
 @if errorlevel 1 exit %b%
 %nasm% -O999999999 -w+orphan-labels -f bin -o wcfd32dos.exe wcfd32dosexe.nasm
 @if errorlevel 1 exit %b%
-%nasm% -O999999999 -w+orphan-labels -f bin -o wcfd32dosp.exe wcfd32dosp.nasm
-@if errorlevel 1 exit %b%
 %nasm% -O999999999 -w+orphan-labels -f obj -o wcfd32win32.obj wcfd32win32.nasm
 @if errorlevel 1 exit %b%
-@rem %wlink% form win nt ru con=3.10 op stub=wcfd32dosp.exe op q op d op h=1 com h=0 n wcfd32win32.exe f wcfd32win32.obj
-@rem @if errorlevel 1 exit %b%
-@rem %nasm% -O999999999 -w+orphan-labels -f bin -o oixrun.exe wcfd32stub.nasm
-@rem @if errorlevel 1 exit %b%
-@rem %nasm% -O999999999 -w+orphan-labels -f bin -DOIXRUN0 -o oixrun0.exe wcfd32stub.nasm
-@rem @if errorlevel 1 exit %b%
+%nasm% -O999999999 -w+orphan-labels -f bin -DPE -o oixrun.exe wcfd32dosexe.nasm
+@if errorlevel 1 exit %b%
 %nasm% -O999999999 -w+orphan-labels -f bin -o wcfd32linux.bin wcfd32linux.nasm
 @if errorlevel 1 exit %b%
-@rem %nasm% -O999999999 -w+orphan-labels -f bin -DLINUXPROG -o wcfd32stub wcfd32stub.nasm
-@rem @if errorlevel 1 exit %b%
-del wcfd32win32.exe
+%nasm% -O999999999 -w+orphan-labels -f bin -DLINUXPROG -o wcfd32stub wcfd32stub.nasm
+@if errorlevel 1 exit %b%
 %nasm% -O999999999 -w+orphan-labels -f bin -DRUNPROG -o wcfd32linux wcfd32linux.nasm
 @if errorlevel 1 exit %b%
 %nasm% -O999999999 -w+orphan-labels -f bin -DRUNPROG -DOIXRUN0 -o oixrun0 wcfd32linux.nasm
