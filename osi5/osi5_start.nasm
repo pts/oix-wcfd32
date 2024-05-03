@@ -452,7 +452,7 @@ WEAK..mini___M_start_flush_opened:   ; Fallback, tools/elfofix will convert it t
 ;     } else if (c == '"') {
 ;       is_quote ^= 1;
 ;     } else if (!is_quote && (c == ' ' || c == '\t' || c == '\n' || c == '\v')) {
-;       if (p == pw) ++p;  /* Don't clobber the rest with '\0' below. */
+;       if (p -1 != pw) --p;  /* Don't clobber the rest with '\0' below. */
 ;      after_arg:
 ;       *pw = '\0';
 ;       return (char*)p;
