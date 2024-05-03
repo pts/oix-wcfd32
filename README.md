@@ -257,8 +257,8 @@ The relocation table is an array of 16-bit little-endian integers. It
 consists of 0 or more nonempty blocks and then a terminating 0 integer. An
 empty relocation table is just the terminating 2 zero bytes. Most of the
 relocations take only 2 bytes (a single integer). This is rather nicely
-packed, because for example LE relocations take at least 7 bytes, and Win32
-PE relocations take 4 bytes.
+packed, like Win32 PE relocations. LE relocations are longer, they take at
+least 7 bytes.
 
 Here is how to apply the relocations:
 
