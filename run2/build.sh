@@ -61,6 +61,7 @@
 # TODO(pts): Make wcfd32linux.nasm autodetect and run on FreeBSD i386 (like https://github.com/pts/pts-pngout-20150319-i386/).
 # TODO(pts): Do an automatic `rm` (unlink) and `chmod +x` for ELF executable output.
 # TODO(pts): Preload oixrun.oix to wcfd32win32.exe, don't let oixrun.exe contain `Memory allocation failed' 2 times, just once. This is possible by overlapping the end of the LE image with the beginning of the PE image. the winning is 211 file bytes, and the loss is more virtual memory usage.
+# TODO(pts): Make the size of the command-line unlimited on Windows, currently it's 0x100 bytes.
 #
 
 set -ex
