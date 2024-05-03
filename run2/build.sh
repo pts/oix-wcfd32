@@ -76,7 +76,7 @@ fi
 nasm=tools/nasm    # NASM 0.98.39 (2005-01-15) was the last version without amd64 (`bits 64') support. Integers are still 32-bit.
 
 "$nasm" -O999999999 -w+orphan-labels -f bin -o oixrun.oix oixrun.nasm
-"$nasm" -O999999999 -w+orphan-labels -f bin -DPE -o oixrun.exe wcfd32dosexe.nasm
+"$nasm" -O999999999 -w+orphan-labels -f bin -o oixrun.exe wcfd32exe.nasm
 "$nasm" -O999999999 -w+orphan-labels -f bin -o wcfd32linux.bin wcfd32linux.nasm
 rm -f wcfd32stub  # For correct permissions below.
 "$nasm" -O999999999 -w+orphan-labels -f bin -DLINUXPROG -o wcfd32stub wcfd32stub.nasm  # incbin: wcfd32linux.bin, wcfd32dos.exe, wcfd32dosp.exe, wcfd32win32.exe

@@ -1,5 +1,5 @@
 ;
-; wcfd32dosexe.nasm: builds oixrun.exe, a combined MZ (PMODE/W), LE (DOS 32-bit runner) and Win32 PE (Win32 runner), CF (oixrun.oix) executable
+; wcfd32exe.nasm: builds oixrun.exe, a combined MZ (PMODE/W), LE (DOS 32-bit runner) and Win32 PE (Win32 runner), CF (oixrun.oix) executable
 ; by pts@fazekas.hu at Tue Apr 30 04:49:07 CEST 2024
 ;
 ; This contains a manual replacement for: wlink form os2 le op stub=pmodew133.exe op q n w.exe f wcfd32dos.obj
@@ -1598,15 +1598,7 @@ pop_edx_ebx_ret:
 		ret
 
 ; Attributes: noreturn
-%ifdef PE
-  pe_start:
-%else
-  global _start
-  _start:
-  global _mainCRTStartup
-  _mainCRTStartup:
-  ..start:
-%endif
+pe_start:
 		sub esp, 128h  ; ESP := var_wcfd32win32_program_filename_buf. !! TODO(pts): Make it much larger than 100h, if needed, call GetCommandLineA multiple times.
 		lea eax, [esp+13Ch-1Ch]  ;  frame
 		call add_seh_frame
