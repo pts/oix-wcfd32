@@ -434,11 +434,14 @@ simple and short .cmd script
 [build.cmd](https://github.com/pts/oix-wcfd32/blob/master/run1/build.cmd)
 (run it as `build.cmd` from within the cmd.exe Command Prompt window after
 cloning the Git repository). (On Windows 95, copy or rename *build.cmd* to
-*build.bat*, and then run it.) It's also possible to run *build.sh* in Wine,
-like this `wine cmd /c build.cmd`. As of the writing of this paragraph, the
-build automation script runs NASM 13 times and WLINK 2 times, producing
-multiple temporary files and final output files. It all happens in less than
-a second on a modern system.
+*build.bat*, and then run it.) (The minimum version of Windows which can run
+*build.cmd* is Windows NT 3.5, because earlier Windows versions didn't have
+long filename support. Please note that Windows Nt 3.5 can't exit early on
+failure.) It's also possible to run *build.cmd* in Wine, like this `wine cmd
+/c build.cmd`. As of the writing of this paragraph, the build automation
+script runs NASM 13 times and WLINK 2 times, producing multiple temporary
+files and final output files. It all happens in less than a second on a
+modern system.
 
 The build process of the runtime:
 
