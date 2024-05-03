@@ -433,7 +433,8 @@ it as `sh build.sh` after cloning the Git repository), and for Win32 is the
 simple and short .cmd script
 [build.cmd](https://github.com/pts/oix-wcfd32/blob/master/run1/build.cmd)
 (run it as `build.cmd` from within the cmd.exe Command Prompt window after
-cloning the Git repository). It's also possible to run *build.sh* in Wine,
+cloning the Git repository). (On Windows 95, copy or rename *build.cmd* to
+*build.bat*, and then run it.) It's also possible to run *build.sh* in Wine,
 like this `wine cmd /c build.cmd`. As of the writing of this paragraph, the
 build automation script runs NASM 13 times and WLINK 2 times, producing
 multiple temporary files and final output files. It all happens in less than
