@@ -43,16 +43,16 @@ exit
 @if errorlevel 1 exit %b%
 %nasm% -O999999999 -w+orphan-labels -f obj -o wcfd32win32.obj wcfd32win32.nasm
 @if errorlevel 1 exit %b%
-%wlink% form win nt ru con=3.10 op stub=wcfd32dosp.exe op q op d op h=1 com h=0 n wcfd32win32.exe f wcfd32win32.obj
-@if errorlevel 1 exit %b%
-%nasm% -O999999999 -w+orphan-labels -f bin -o oixrun.exe wcfd32stub.nasm
-@if errorlevel 1 exit %b%
-%nasm% -O999999999 -w+orphan-labels -f bin -DOIXRUN0 -o oixrun0.exe wcfd32stub.nasm
-@if errorlevel 1 exit %b%
+@rem %wlink% form win nt ru con=3.10 op stub=wcfd32dosp.exe op q op d op h=1 com h=0 n wcfd32win32.exe f wcfd32win32.obj
+@rem @if errorlevel 1 exit %b%
+@rem %nasm% -O999999999 -w+orphan-labels -f bin -o oixrun.exe wcfd32stub.nasm
+@rem @if errorlevel 1 exit %b%
+@rem %nasm% -O999999999 -w+orphan-labels -f bin -DOIXRUN0 -o oixrun0.exe wcfd32stub.nasm
+@rem @if errorlevel 1 exit %b%
 %nasm% -O999999999 -w+orphan-labels -f bin -o wcfd32linux.bin wcfd32linux.nasm
 @if errorlevel 1 exit %b%
-%nasm% -O999999999 -w+orphan-labels -f bin -DLINUXPROG -o wcfd32stub wcfd32stub.nasm
-@if errorlevel 1 exit %b%
+@rem %nasm% -O999999999 -w+orphan-labels -f bin -DLINUXPROG -o wcfd32stub wcfd32stub.nasm
+@rem @if errorlevel 1 exit %b%
 del wcfd32win32.exe
 %nasm% -O999999999 -w+orphan-labels -f bin -DRUNPROG -o wcfd32linux wcfd32linux.nasm
 @if errorlevel 1 exit %b%
@@ -62,7 +62,7 @@ del wcfd32win32.exe
 @if errorlevel 1 exit %b%
 
 @echo off
-dir wcfd32stub.
+@rem dir wcfd32stub.
 dir oixrun*.*x*
 if "%OS" == "" exit
 echo %~nx0 OK. >&2
