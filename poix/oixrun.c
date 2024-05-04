@@ -120,6 +120,8 @@ static void bad_sbrk(void) {
 
 static char *brk0, *brk1;
 
+#define IS_BRK_ERROR(x) ((unsigned)(x) + 1 <= 1U)  /* 0 and -1 are errors. */
+
 /* Allocate a read-write-execute memory block size. */
 static void *alloc(unsigned size) {
 #ifndef USE_SBRK
@@ -130,12 +132,12 @@ static void *alloc(unsigned size) {
   if (size == 0) return NULL;
   while ((unsigned)(brk1 - brk0) < size) {
 #ifdef USE_SBRK  /* Typically sbrk(2) doesn't allocate read-write-execute memory (which we need), not even with `gcc -static -Wl,-N. But it succeds with `minicc --diet'. */
-    if (!(brk1 = sbrk(0))) bad_sbrk();  /* This is fatal, it shouldn't be NULL. */
+    if (IS_BRK_ERROR(brk1 = sbrk(0))) bad_sbrk();  /* This is fatal, it shouldn't be NULL. */
     if (!brk0) brk0 = brk1;  /* Initialization at first call. */
     if ((unsigned)(brk1 - brk0) >= size) break;
     /* TODO(pts): Allocate more than necessary, to save on system call round-trip time. */
-    if (!sbrk(size - (brk1 - brk0))) bad_sbrk();  /* This is fatal, it shouldn't be NULL. */
-    if (!(brk1 = sbrk(0))) bad_sbrk();  /* This is fatal, it shouldn't be NULL. */
+    if (IS_BRK_ERROR(sbrk(size - (brk1 - brk0)))) bad_sbrk();  /* This is fatal, it shouldn't be NULL. */
+    if (IS_BRK_ERROR(brk1 = sbrk(0))) bad_sbrk();  /* This is fatal, it shouldn't be NULL. */
     if ((unsigned)(brk1 - brk0) < size) return NULL;  /* Not enough memory. */
     break;
 #else  /* Use mmap(2) or VirtualAlloc(2). */
