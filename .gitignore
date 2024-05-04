@@ -16,6 +16,12 @@
 /run[0-9]/m.bin
 /run[0-9]/t0.bin
 /run[0-9]/t.bin
+/poix/m.nas
+/poix/oixrun
+/poix/t.bin
+/poix/t0.bin
+/poix/tramp.bin
+/poix/tramp.h
 /wasm*.exe
 /wlib*.exe
 /wcfd32dos.exe

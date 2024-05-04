@@ -462,6 +462,17 @@ will be possible, but it is especially tricky for LE (32-bit DOS) and PE
 (Win32) executables with relocation. After that point building the runtime
 will depend on NASM only.
 
+## The POSIX C reference implementation
+
+The file *poix/oixrun.c* is a reference implementation of the *oixrun*
+runner tool, written in C, using the POSIX library functions (e.g. open(2),
+lseek(2), sbrk(2)). It should compile on any Unix system with a C compiler.
+It doesn't do any CPU emulation, so it works only if the target is the i386
+CPU in 32-bit protected mode.
+
+The reference implementation uses a short trampoline function implemented in
+NASM assembly, otherwise it's written in C89.
+
 ## Watcom resource data
 
 Some Watcom program files (such as WASM, WLIB and WLINK, but not *wcc* or
