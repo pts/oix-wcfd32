@@ -51,7 +51,6 @@ tramp2:  ; Only works as a near call.
 		mov ebx, cs  ; Segment of handle_far_syscall.
 		push byte 0  ; Sentinel in case the function does a retf (far return). OIX entry points do.
 		push ebx  ; CS, assuming nonzero.
-		push cs  ; Work with both near and far.
 		xor ebp, ebp  ; Not needed by the ABI, just make it deterministic.
 		sub ecx, ecx  ; Stack limit, which we always set to 0.
 		call esi  ; Far or near call to the program entry point. Return value in EAX.
