@@ -2632,7 +2632,7 @@ handle_unsupported_int21h_function:
 		pe.reloc 4, PE_DATAREF(aUnsupportedInt), push relval  ; "Unsupported int 21h function AH=%h\r\n"
 		call PrintMsg
 		add esp, 8
-		push 2
+		push 2  ; TODO(pts): Why not 1 (invalid function)? What does DOS do? */
 		pop eax
 		jmp dos_error_with_code
 
