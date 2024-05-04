@@ -393,7 +393,6 @@ static unsigned break_flag;
 
 int main(int argc, char **argv) {
   struct tramp_args ta;
-  typedef struct tramp_args *t;
   char *tramp386_copy;
   int fd;
   struct cf_header hdr;
@@ -422,7 +421,15 @@ int main(int argc, char **argv) {
   ta.copyright = NULL;
   ta.is_japanese = 0;
   ta.max_handle_for_os2 = 0;
-  /* Pass it 5 times in case the active C calling convention passes some arguments in registers EAX, EBX, ECX and EDX. https://en.wikipedia.org/wiki/X86_calling_conventions */
+  /* Passing the argument twice and using varargs (`...') is a trick to make
+   * this call work with any calling convention. The tramp function expects
+   * the &ta argument on the stack. By using varargs, we enforce stack and
+   * caller-pops calling convention for the `...' arguments. The first
+   * argument may still be passed on the stack. So we pass it twice, and one
+   * will end up on the stack.
+   *
+   * https://en.wikipedia.org/wiki/X86_calling_conventions
+   */
   /* Without __extension__, `gcc -ansi -pedantic' reports: warning: ISO C forbids conversion of object pointer to function pointer type */
-  return (__extension__ (int(*)(t, t, t, t, t))tramp386_copy)(&ta, &ta, &ta, &ta, &ta);
+  return (__extension__ (int(*)(struct tramp_args*, ...))tramp386_copy)(&ta, &ta);
 }
