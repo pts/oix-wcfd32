@@ -1,5 +1,5 @@
 /*
- * oixrun.c: an OIX program runner reference implementation in (mostly) POSIX C, for i386 only
+ * oixrun.c: an OIX program runner reference implementation in C, for POSIX and Win32, for i386 only
  * by pts@fazekas.hu at Sat May  4 01:51:30 CEST 2024
  *
  * Pass -DUSE_SBRK if your system has sbrk(2), but not mmap(2).
@@ -8,6 +8,10 @@
  * !! TODO(pts): Do some extra snity checks that we are compiling for i386. Even at runtime: try to disassemble a simple function: void tryf(void) { return 0x12345678; }
  * !! TODO(pts): Make it work with minicc.
  */
+
+#if !defined(_WIN32) && defined(__NT__)  /* __NT__ is Watcom C, but it also defines _WIN32 with `owcc -bwin32'. */
+#  define _WIN32 1
+#endif
 
 /* Make functions like sbrk(2) available. */
 #define _DEFAULT_SOURCE
@@ -21,9 +25,22 @@
 #include <stdio.h>  /* rename(...). */
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>  /* sbrk(...). */
-#ifndef USE_SBRK
+#ifdef _WIN32
+#  include <io.h>  /* chsize(...). */
+#  ifdef __WATCOMC__  /* Maybe h/nt is not on the include path. */
+     void* __stdcall VirtualAlloc(void *, unsigned, unsigned, unsigned);
+#  else
+#    include <windows.h>
+#  endif
+#else
+#  include <unistd.h>  /* sbrk(...), ftruncate(...). */
+#endif
+#if !defined(USE_SBRK) && !defined(_WIN32)
 #  include <sys/mman.h>  /* mmap(...). */
+#endif
+
+#ifndef   O_BINARY  /* Mostly on _WIN32. */
+#  define O_BINARY 0
 #endif
 
 #if !defined(__GNUC__) && !defined(__extension__)
@@ -45,6 +62,23 @@
 #  else  /* TODO(pts): Add some runtime (disassembly) checks. */
 #    error CPU architecture not detected. If you are sure you have i386, then recompile with -D__386
 #  endif
+#endif
+
+#if defined(_WIN32) && defined(__WATCOMC__)
+  /* Overrides lib386/nt/clib3r.lib / mbcupper.o
+   * Source: https://github.com/open-watcom/open-watcom-v2/blob/master/bld/clib/mbyte/c/mbcupper.c
+   * Overridden implementation calls CharUpperA in USER32.DLL:
+   * https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-charuppera
+   *
+   * This function is a transitive dependency of _cstart() with main() in
+   * OpenWatcom. By overridding it, we remove the transitive dependency of all
+   * .exe files compiled with `owcc -bwin32' on USER32.DLL.
+   *
+   * This is a simplified implementation, it keeps non-ASCII characters intact.
+   */
+  unsigned int _mbctoupper(unsigned int c) {
+    return (c - 'a' + 0U <= 'z' - 'a' + 0U)  ? c + 'A' - 'a' : c;
+  }
 #endif
 
 typedef char assert_sizeof_short[sizeof(short) == 2 ? 1 : -1];
@@ -104,14 +138,27 @@ static void *alloc(unsigned size) {
     if (!(brk1 = sbrk(0))) bad_sbrk();  /* This is fatal, it shouldn't be NULL. */
     if ((unsigned)(brk1 - brk0) < size) return NULL;  /* Not enough memory. */
     break;
-#else  /* Use mmap(2). */
+#else  /* Use mmap(2) or VirtualAlloc(2). */
     /* TODO(pts): Write a more efficient memory allocator, and write one
      * which tries to allocate less if more is not available.
      */
     psize = (size + 0xfff) & ~0xfff;  /* Round up to page boundary. */
     if (!psize) return NULL;  /* Not enough memory. */
     if (!(psize >> 18)) psize = 1 << 18;  /* Round up less than 256 KiB to 256 KiB. */
+#ifdef _WIN32  /* Use VirtualAlloc(...). */
+#ifndef   PAGE_EXECUTE_READWRITE
+#  define PAGE_EXECUTE_READWRITE 0x40
+#endif
+#ifndef   MEM_COMMIT
+#  define MEM_COMMIT 0x1000
+#endif
+#ifndef   MEM_RESERVE
+#  define MEM_RESERVE 0x2000
+#endif
+    if (!(brk0 = VirtualAlloc(NULL, psize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE))) return NULL;  /* Not enough memory. */
+#else  /* Use mmap(2). */
     if (!(brk0 = mmap(NULL, psize, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0))) return NULL;  /* Not enough memory. */
+#endif
     /* TODO(pts): Use the rest of the previous brk0...brk1 for smaller amounts. */
     brk1 = brk0 + psize;
     break;
@@ -210,7 +257,11 @@ static void handle_syscall(struct pushad_regs *r) {
       if ((int)r->eax < 0) { r->eax = ERR_WRITE_FAULT; goto do_error; }  /* TODO(pts): Better. */
     } else {  /* Truncate. */
       if ((pos = lseek(bx, 0, SEEK_CUR)) == -1) { r->eax = ERR_SEEK; goto do_error; }
+#ifdef _WIN32
+      if (chsize(bx, pos) != 0) { r->eax = ERR_GEN_FAILURE; goto do_error; }
+#else
       if (ftruncate(bx, pos) != 0) { r->eax = ERR_GEN_FAILURE; goto do_error; }
+#endif
       r->eax = 0;
     }
   } else if (ah == INT21H_FUNC_3FH_READ_FROM_FILE) {
@@ -225,7 +276,7 @@ static void handle_syscall(struct pushad_regs *r) {
     /* Ignore attributes in CX. */
     fd = O_RDWR | O_CREAT | O_TRUNC;
    do_open:
-    if ((fd = open((void*)r->edx, fd, 0666)) < 0) {
+    if ((fd = open((void*)r->edx, fd | O_BINARY, 0666)) < 0) {
      do_ferr:
       r->eax = (errno == ENOENT || errno == ENOTDIR) ? ERR_FILE_NOT_FOUND : (errno == EACCES) ? ERR_ACCESS_DENIED : ERR_BAD_FORMAT;
       goto do_error;
@@ -398,11 +449,16 @@ int main(int argc, char **argv) {
   struct cf_header hdr;
   char *image;
   (void)argc; (void)argv;
+#if defined(_WIN32) && O_BINARY
+  setmode(0, O_BINARY);
+  setmode(1, O_BINARY);
+  setmode(2, O_BINARY);
+#endif
   if (!argv[0] || !argv[1]) fatal("Usage: oixrun <prog.oix> [<arg> ...]\r\n");
   /* TODO(pts): binmode(...) etc. On POSIX it's not needed. */
   if (!(tramp386_copy = alloc(sizeof(tramp386)))) fatal("fatal: initial alloc failed\r\n");
   memcpy(tramp386_copy, tramp386, sizeof(tramp386));
-  if ((fd = open(argv[1], O_RDONLY)) < 0) fatal("fatal: error opening OIX program\r\n");
+  if ((fd = open(argv[1], O_RDONLY | O_BINARY)) < 0) fatal("fatal: error opening OIX program\r\n");
   find_cf_header(fd, &hdr);
   /* TODO(pts): Do some bounds-checking on the cf_header fields. */
   if (!(image = alloc(hdr.mem_size))) fatal("fatal: not enough memory for program image\r\n");

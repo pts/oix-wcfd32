@@ -466,12 +466,15 @@ will depend on NASM only.
 
 The file *poix/oixrun.c* is a reference implementation of the *oixrun*
 runner tool, written in C, using the POSIX library functions (e.g. open(2),
-lseek(2), sbrk(2)). It should compile on any Unix system with a C compiler.
-It doesn't do any CPU emulation, so it works only if the target is the i386
-CPU in 32-bit protected mode.
+lseek(2), mmap(2), sbrk(2)). It should compile on any Unix system with a C
+compiler. It also supports (and autodetects) Win32 as a target, on Win32 it
+uses VirtualAlloc(...) instead of mmap(2). It doesn't do any CPU emulation,
+so it works only if the target is the i386 CPU in 32-bit protected mode.
 
 The reference implementation uses a short trampoline function implemented in
-NASM assembly, otherwise it's written in C89.
+NASM assembly, otherwise it's written in C89. The trampoline function is
+neede to translate between real and far calls, and to work with any C
+calling convention.
 
 ## Watcom resource data
 
