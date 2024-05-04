@@ -2,6 +2,8 @@
  * oixrun.c: an OIX program runner reference implementation in (mostly) POSIX C, for i386 only
  * by pts@fazekas.hu at Sat May  4 01:51:30 CEST 2024
  *
+ * Pass -DUSE_SBRK if your system has sbrk(2), but not mmap(2).
+ *
  * TODO(pts): Check for i386, little-endian, 32-bit mode etc. system. Start with C #ifdef()s.
  * !! TODO(pts): Do some extra snity checks that we are compiling for i386. Even at runtime: try to disassemble a simple function: void tryf(void) { return 0x12345678; }
  * !! TODO(pts): Make it work with minicc.
@@ -20,6 +22,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>  /* sbrk(...). */
+#ifndef USE_SBRK
+#  include <sys/mman.h>  /* mmap(...). */
+#endif
 
 #if !defined(__GNUC__) && !defined(__extension__)
 #  define __extension__
@@ -73,20 +78,24 @@ static void fatal(char const *msg) {
   exit(125);
 }
 
+#ifdef USE_SBRK
 static void bad_sbrk(void) {
   fatal("fatal: sbrk failure\r\n");  /* Not an out-of-memory error. */
 }
+#endif
 
 static char *brk0, *brk1;
 
-static void *alloc(size_t size) {
-  /* !! How to allocate read-write-execute memory reliably? Use mmap(2), and keep sbrk(2) as a fallback.
-   * !! It fails with GCC and glibc, even with `gcc -static -Wl,-N . It succeeds with minicc --diet.
-   */
+/* Allocate a read-write-execute memory block size. */
+static void *alloc(unsigned size) {
+#ifndef USE_SBRK
+  unsigned psize;
+#endif
   void *result;
-  size = (size+3) & ~3;  /* 4-byte alignment. */
+  size = (size + 3) & ~3;  /* 4-byte alignment. */
   if (size == 0) return NULL;
   while ((unsigned)(brk1 - brk0) < size) {
+#ifdef USE_SBRK  /* Typically sbrk(2) doesn't allocate read-write-execute memory (which we need), not even with `gcc -static -Wl,-N. But it succeds with `minicc --diet'. */
     if (!(brk1 = sbrk(0))) bad_sbrk();  /* This is fatal, it shouldn't be NULL. */
     if (!brk0) brk0 = brk1;  /* Initialization at first call. */
     if ((unsigned)(brk1 - brk0) >= size) break;
@@ -95,6 +104,18 @@ static void *alloc(size_t size) {
     if (!(brk1 = sbrk(0))) bad_sbrk();  /* This is fatal, it shouldn't be NULL. */
     if ((unsigned)(brk1 - brk0) < size) return NULL;  /* Not enough memory. */
     break;
+#else  /* Use mmap(2). */
+    /* TODO(pts): Write a more efficient memory allocator, and write one
+     * which tries to allocate less if more is not available.
+     */
+    psize = (size + 0xfff) & ~0xfff;  /* Round up to page boundary. */
+    if (!psize) return NULL;  /* Not enough memory. */
+    if (!(psize >> 18)) psize = 1 << 18;  /* Round up less than 256 KiB to 256 KiB. */
+    if (!(brk0 = mmap(NULL, psize, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0))) return NULL;  /* Not enough memory. */
+    /* TODO(pts): Use the rest of the previous brk0...brk1 for smaller amounts. */
+    brk1 = brk0 + psize;
+    break;
+#endif
   }
   result = brk0;
   brk0 += size;
