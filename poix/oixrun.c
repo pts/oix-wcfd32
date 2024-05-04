@@ -469,7 +469,6 @@ int main(int argc, char **argv) {
   close(fd);
   apply_relocations(image, (const unsigned short*)(image + hdr.reloc_rva));
   ta.c_handler = handle_syscall;
-  /* TODO(pts): Apply relocations. */
   ta.program_entry = image + hdr.entry_rva;
   ta.operating_system = OS_WIN32;  /* A plausible lie. */
   ta.program_filename = argv[1];
@@ -477,15 +476,13 @@ int main(int argc, char **argv) {
   ta.copyright = NULL;
   ta.is_japanese = 0;
   ta.max_handle_for_os2 = 0;
-  /* Passing the argument twice and using varargs (`...') is a trick to make
-   * this call work with any calling convention. The tramp function expects
-   * the &ta argument on the stack. By using varargs, we enforce stack and
-   * caller-pops calling convention for the `...' arguments. The first
-   * argument may still be passed on the stack. So we pass it twice, and one
-   * will end up on the stack.
+  /* We use varargs (`...') to force caller-pops calling convention (Watcom
+   * default __watcall isn't one if not all arguments fit in registers. We push
+   * two NULL pointers so that at least one ends up on the stack, and tramp can
+   * use it to detect a far call.
    *
    * https://en.wikipedia.org/wiki/X86_calling_conventions
    */
   /* Without __extension__, `gcc -ansi -pedantic' reports: warning: ISO C forbids conversion of object pointer to function pointer type */
-  return (__extension__ (int(*)(struct tramp_args*, ...))tramp386_copy)(&ta, &ta);
+  return (__extension__ (int(*)(void*, ...))tramp386_copy)(NULL, NULL, &ta);
 }

@@ -5,7 +5,7 @@ cpu 386
 
 ; struct tramp_args {
 ;   void (*c_handler)(struct pushad_regs *r);  /* Will be saved to EDX. Must be a near call. */
-;   char *entry;  /* Will be jumped to. */
+;   char *program_entry;  /* Will be jumped to. */
 ;   unsigned operating_system;  /* Will be saved to AH. */
 ;   char *program_filename;  /* EDI will be set to its address (OIX param_struct). */
 ;   char *command_line;
@@ -15,6 +15,14 @@ cpu 386
 ;   unsigned is_japanese;
 ;   unsigned max_handle_for_os2;
 ; };
+;
+; All function pointers are 32-bit near (i.e. no segment part). But this trampoline can take both near and far calls:
+;
+; * tramp works when called as either near or far call.
+; * tramp calls `program_entry' so that it works if program_entry expects a near or far call.
+; * handle_far_syscall expects to be called as a far call. This is part of the OIX ABI, and can't be reliably autodetected.
+; * handle_far_syscall calls c_handler is called as a near call. TODO(pts): Make it work as either.
+;
 
 tramp:  ; Only works as a near call.
 		jmp strict short tramp2
@@ -37,10 +45,18 @@ handle_far_syscall:  ; We assume far call (`retf'), we can't autodetect without 
 
 tramp2:  ; Only works as a near call.
 		pushad
-		mov esi, [esp+0x24]  ; ESI := address of the struct tramp_args.
-		lodsd  ; EAX := c_handler.
+		lea esi, [esp+0x24]  ; ESI := address of the struct tramp_args pointer, or return CS in a far call.
 		call .me
 .me:		pop ebp  ; For position-independent code with ebp-.me+
+		lodsd
+		test eax, eax
+		jz strict short .skip  ; It was a near call, `ret' below will suffice.
+		mov byte [ebp-.me+.ret], 0xcb  ; Replace ret with retf, to support return from far call.
+.skip:		lodsd
+		test eax, eax
+		jz strict short .skip
+.got_args:	xchg esi, eax ; ESI := address of c_handler; EAX := junk. Previously it was address of struct tramp_args
+		lodsd  ; EAX := c_handler.
 		lea edx, [ebp-.me+handle_far_syscall]
 		mov [ebp-.me+handle_far_syscall.c_handler], eax  ; This needs read-write-execute memory.
 		lodsd  ; EAX := program_entry.
@@ -59,4 +75,4 @@ tramp2:  ; Only works as a near call.
 		jnz .pop_again
 		mov [esp+0x1c], eax  ; Overwrite the EAX saved by pushad.
 		popad
-		ret  ; TODO(pts): Autodetect retf (and far call to c_handler). We already support multiple calling conventions.
+.ret:		ret
