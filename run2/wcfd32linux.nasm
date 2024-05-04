@@ -379,7 +379,7 @@ handle_INT21H_FUNC_3FH_READ_FROM_FILE:  ; Read from file. EBX is the file descri
 		; Not reached.
 
 handle_INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE:  ; Write to or truncate file. EBX is the file descriptor. ECX is the number of bytes to read. EDX is the data pointer. Returns: CF indicating failure; EAX (if CF=0) is the filehandle (high word is 0). EAX (if CF=1) is DOS error code (high word is 0).
-		push ebx
+		push ebx  ; !! TODO(pts): Only use BX as the filehandle.
 		push ecx
 		push edx
 		jecxz .truncate
@@ -408,6 +408,7 @@ handle_common:
 .both:		mov ebx, edx
 		mov edx, 666q
 		push SYS_open  ; This push-pop technique works as long as 0 <= SYS_* < 0x80.
+		; !! TODO(pts): Fail of EAX (file descriptor) > 0xffff.
 .cax:		pop eax
 		int 0x80  ; Linux i386 syscall.
 .test_pop_xret:	test eax, eax
