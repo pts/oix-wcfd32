@@ -2,6 +2,8 @@
  * oixrun.c: an OIX program runner reference implementation in C, for POSIX and Win32, for i386 only
  * by pts@fazekas.hu at Sat May  4 01:51:30 CEST 2024
  *
+ * Compile with Digital Mars C compiler for Win32: dmc -v0 -3 -w2 -o+space oixrun.c
+ *
  * Pass -DUSE_SBRK if your system has sbrk(2), but not mmap(2).
  *
  * TODO(pts): Check for i386, little-endian, 32-bit mode etc. system. Start with C #ifdef()s.
@@ -27,8 +29,8 @@
 #include <string.h>
 #ifdef _WIN32
 #  include <io.h>  /* chsize(...). */
-#  ifdef __WATCOMC__  /* Maybe h/nt is not on the include path. */
-     void* __stdcall VirtualAlloc(void *lpAddress, unsigned dwSize, unsigned flAllocationType, unsigned flProtect);
+#  if defined(__WATCOMC__) || defined(__SC__)  /* Maybe h/nt (for __WATCOMC__) is not on the include path. */
+    void* __stdcall VirtualAlloc(void *lpAddress, unsigned dwSize, unsigned flAllocationType, unsigned flProtect);
 #  else
 #    include <windows.h>
 #  endif
@@ -78,6 +80,19 @@
    */
   unsigned int _mbctoupper(unsigned int c) {
     return (c - 'a' + 0U <= 'z' - 'a' + 0U)  ? c + 'A' - 'a' : c;
+  }
+#endif
+
+#if defined(_WIN32) && defined(__SC__)  /* Digital Mars C compiler. */
+  /* Overrides win32/w32fater.o. The _win32_faterr(...) function is a
+   * transitive dependency of the DMC libc (dm/lib/snn.lib). It calls
+   * MessageBoxA, which we don't want to call, to avoid the dependency on
+   * USER32.DLL. So we just call write(2) from here.
+   * TODO(pts): Call GetStdHandle and WriteConsole instead. Is it needed?
+   */
+  void _win32_faterr(const char *msg) {
+    (void)!write(2, msg, strlen(msg));
+    exit(1);
   }
 #endif
 
