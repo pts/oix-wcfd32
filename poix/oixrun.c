@@ -6,10 +6,19 @@
  * Compile with Clang for any Unix: clang -m32 -march=i386 -s -Os -W -Wall -ansi -pedantic -o oixrun oixrun.c
  * Compile with TinyCC for Linux: tcc -s -Os -W -Wall -o oixrun oixrun.c
  * Compile with minicc (https://github.com/pts/minilibc686) for Linux i386: minicc -ansi -pedantic -o oixrun oixrun.c
- # Compile with OpenWatcom v2 C compiler for Win32: owcc -bwin32 -march=i386 -s -Os -W -Wall -Wno-n201 -std=c89 -o oixrun.exe oixrun.c
+ * Compile with OpenWatcom v2 C compiler for Win32: owcc -bwin32 -march=i386 -s -Os -W -Wall -Wno-n201 -std=c89 -o oixrun.exe oixrun.c
  * Compile with Digital Mars C compiler for Win32: dmc -v0 -3 -w2 -o+space oixrun.c
  *
- * Pass -DUSE_SBRK if your system has sbrk(2), but not mmap(2).
+ * This is the reference implementation, meaning that in case of ambiguity
+ * this implementation (among the multiple implementations in WCFD32,
+ * especially in run1/, run2/, run3/ etc.) is definitive.
+ *
+ * This implementation was written by pts from scratch, by looking at
+ * OpenWatcom 1.0 sources only.
+ *
+ * Pass -DUSE_SBRK if your system has sbrk(2), but not mmap(2). On most
+ * systems, sbrk(2) doesn't allocate read-write-execute memory, but oixrun
+ * needs it, so we use mmap(2) by default instead.
  *
  * TODO(pts): Check for i386, little-endian, 32-bit mode etc. system. Start with C #ifdef()s.
  * !! TODO(pts): Do some extra sanity checks that we are compiling for i386. Even at runtime: try to disassemble a simple function: void tryf(void) { return 0x12345678; }
@@ -341,12 +350,12 @@ static void handle_syscall(struct pushad_regs *r) {
     if (close(bx) != 0) { r->eax = ERR_INVALID_HANDLE; goto do_error; }
   } else if (ah == INT21H_FUNC_42H_SEEK_IN_FILE) {
     if ((pos = lseek(bx, r->ecx << 16 | (unsigned short)r->edx, (unsigned char)r->eax)) == -1) { r->eax = ERR_SEEK; goto do_error; }
-    r->edx = (unsigned)pos >> 16;  /* Zero-extend. */
-    r->eax = pos;  /* Don't clobber to 16 bits, int21nt.c doesn't do it either. */
+    r->edx = (unsigned)pos >> 16;  /* Zero-extend. The PMODE/W DOS extender doesn't zero-extend it, but WCFD32 fixes it. */
+    r->eax = pos;  /* Don't clobber to 16 bits, int21nt.c doesn't do it either. The PMODE/W DOS extender clobbers it, but WCFD32 fixes it. */
   } else if (ah == INT21H_FUNC_44H_IOCTL_IN_FILE) {
     if ((r->eax & 0xff) != 0) goto do_invalid;
     /* Get device information. */
-    r->edx = isatty(bx) ? 0x80 : 0;  /* 0x80 indicates character device. */  /* We set the entire EDX (not only DX), just like int21nt.c does it. The PMODE/W DOS extender sets only DX. */
+    r->edx = isatty(bx) ? 0x80 : 0;  /* 0x80 indicates character device. */  /* We set the entire EDX (not only DX), just like int21nt.c does it. The PMODE/W DOS extender sets only DX, but WCFD32 fixes it. */
   } else if (ah == INT21H_FUNC_41H_DELETE_NAMED_FILE) {
     if (unlink((const char*)r->edx) != 0) goto do_ferr;
   } else if (ah == INT21H_FUNC_56H_RENAME_FILE) {
@@ -609,7 +618,7 @@ static unsigned break_flag;
       /*@0x54*/  "\x89\x44\x24\x1C"      /* mov [esp+0x1c], eax */
       /*@0x58*/  "\x61"                  /* popa */
       /*@0x59*/  "\xC3"                  /* ret */
-    ;
+      /*@0x5A*/;
 #endif
 
 int main(int argc, char **argv) {
@@ -647,7 +656,7 @@ int main(int argc, char **argv) {
   ta.operating_system = OS_WIN32;  /* A plausible lie. */
   ta.stack_low = NULL;
   ta.program_filename = argv[1];
-  ta.break_flag_ptr = &break_flag;  /* break_flag is always zero. WLIB relies on non-NULL pointer. */
+  ta.break_flag_ptr = &break_flag;  /* break_flag is always zero. WLIB relies on non-NULL pointer. */  /* TODO(pts): Catch SIGINT, set break_flag = 1. */
   ta.copyright = NULL;
   ta.is_japanese = 0;
   ta.max_handle_for_os2 = 0;
