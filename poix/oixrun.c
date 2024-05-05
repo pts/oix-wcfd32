@@ -379,6 +379,22 @@ static void handle_syscall(struct pushad_regs *r) {
     if (*(const char*)r->eax != 0) goto do_invalid;
     r->ecx = 0;  /* Fake file time. */
     r->edx = 1 << 5 | 1;  /* Fake file date. */
+  } else if (ah == INT21H_FUNC_60H_GET_FULL_FILENAME) {
+    /* This is a deprecated API, please don't call it from new software.
+     * This is different from https://stanislavs.org/helppc/int_21-60.html ,
+     * see int21nt.c. This gives the input pathname in EDX.
+     * binw/wasm.exe in Watcom C/C++ 10.6, 11.0b and 11.0c call this when
+     * assembling, and it puts the result to the THEADR header as the
+     * filename.
+     *
+     * We just fake it by returning the input unmodified.
+     */
+    unsigned size = strlen((const char*)r->edx);
+#ifdef DEBUG_MORE
+    fprintf(stderr, "warning: trying to get full filename of: (%s)\r\n", (const char*)r->edx);
+#endif
+    if (r->ecx <= size) { r->eax = ERR_BAD_LENGTH; goto do_error; }  /* No way to query the required size. */
+    memcpy((char*)r->ebx, (char*)r->edx, size + 1);
   } else { do_invalid:
     /* binw/wlib.exe in Watcom C/C++ 11.0b and 11.0c call these when creating library:
      * INT21H_FUNC_19H_GET_CURRENT_DRIVE = 0x19,

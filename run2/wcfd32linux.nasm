@@ -285,6 +285,8 @@ wcfd32_far_syscall: ; proc far
 		je strict short handle_far_INT21H_FUNC_56H_RENAME_FILE
 		cmp ah, INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME
 		je strict short handle_far_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME
+		cmp ah, INT21H_FUNC_60H_GET_FULL_FILENAME
+		je strict short handle_far_INT21H_FUNC_60H_GET_FULL_FILENAME
 		push esi
 		mov esi, handle_unimplemented
 		cmp ah, 0x3c
@@ -350,6 +352,42 @@ handle_far_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME:
 		xor ecx, ecx  ; Fake file time.
 		mov edx, 1<<5|1  ; Fake file date.
 		clc
+		retf
+
+handle_far_INT21H_FUNC_60H_GET_FULL_FILENAME:
+		; This is different from https://stanislavs.org/helppc/int_21-60.html ,
+		; see int21nt.c. This gives the input pathname in EDX.
+		; binw/wasm.exe in Watcom C/C++ 10.6, 11.0b and 11.0c call this when
+		; assembling, and it puts the result to the THEADR header as the
+		; filename.
+		;
+		; We just fake it by returning the input unmodified.
+		;
+		; !! Do it on 32-bit DOS as well.
+		push esi
+		xor esi, esi
+.next:		cmp byte [edx+esi], 0
+		je .found
+		inc esi
+		jmp .next
+.found:		cmp ecx, esi
+		jbe .err
+		push edi
+		push ecx
+		mov ecx, esi
+		inc ecx
+		mov esi, edx
+		mov edi, ebx
+		rep movsb
+		pop ecx
+		pop edi
+		clc
+		pop esi
+		retf
+.err:		push 0x18  ; ERR_BAD_LENGTH.
+		pop eax
+		stc
+		pop esi
 		retf
 
 handle_INT21H_FUNC_3DH_OPEN_FILE:  ; Open file. AL is access mode (0, 1 or 2). EDX points to the filename. Returns: CF indicating failure; EAX (if CF=0) is the filehandle (high word is 0). EAX (if CF=1) is DOS error code (high word is 0).

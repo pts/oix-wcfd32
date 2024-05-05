@@ -41,6 +41,7 @@
 #   self-contained Win32--DOS program .exe. Eventually this will be replaced
 #   with oixconv, oixconv.exe and oixconv.oix.
 #
+# TODO(pts): $ dosbox.nox.static --cmd --mem-mb=2 oixrun.exe wasmx106.exe  -->  Error: could not open message resource file.
 # TODO(pts): In `-DLINUXPROG -o wcfd32stub', include oixstub.exe, a version of oixrun.exe which doesn't contain oixrun.oix.
 # TODO(pts): Really fix oixrun.oix parse_first_arg argument parsing bug triggered by wcfd32win32.nasm.
 # TODO(pts): Add usage message for oixconv.
