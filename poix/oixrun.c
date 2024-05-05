@@ -21,6 +21,8 @@
  * needs it, so we use mmap(2) by default instead.
  *
  * TODO(pts): Check for i386, little-endian, 32-bit mode etc. system. Start with C #ifdef()s.
+ * !! TODO(pts): segfault after many reads, or in isatty (~/prg/trusty.i386.dir/tmp/minilibc686/pathbin/minicc -DDEBUG --gcc=4.8 --diet -ansi -pedantic -o oixrun oixrun.c && ./oixrun ../exe/wasmx105.exe), also with glibc.; where is the ABI bug?
+ *    It's only wasmx105.exe (not wasmx106.exe), the former modifies the gs segment register (and forgets to change it back): https://www.labcorner.de/the-gs-segment-and-stack-smashing-protection/
  * !! TODO(pts): Do some extra sanity checks that we are compiling for i386. Even at runtime: try to disassemble a simple function: void tryf(void) { return 0x12345678; }
  * !! TODO(pts): How to pass the pointer to the bottom of the stack? Document it.
  */
@@ -307,6 +309,9 @@ static void handle_syscall(struct pushad_regs *r) {
   const unsigned bx = (unsigned short)r->ebx;
   int pos, fd;
   CLC(r); /* Success. TODO(pts): Some calls don't chage CF. */
+#ifdef DEBUG
+    fprintf(stderr, "info: trying OIX function: 0x%02x\r\n", ah);
+#endif
   if (ah == INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE) {
     if (r->ecx != 0) {
       r->eax = write(bx, (const void*)r->edx, r->ecx);
@@ -361,6 +366,9 @@ static void handle_syscall(struct pushad_regs *r) {
   } else if (ah == INT21H_FUNC_56H_RENAME_FILE) {
     if (rename((const char*)r->edx, (const char*)r->edi) != 0) goto do_ferr;
   } else { do_invalid:
+#ifdef DEBUG
+    fprintf(stderr, "warning: unknown OIX function: 0x%02x\r\n", ah);
+#endif
     /* TODO(pts): Implement more of the API. */
     r->eax = ERR_INVALID_FUNCTION;  /* TODO(pts): What does DOS do? */
    do_error:
