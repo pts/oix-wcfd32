@@ -306,8 +306,8 @@ static void handle_syscall(struct pushad_regs *r) {
   const unsigned char ah = r->eax >> 8;
   const unsigned bx = (unsigned short)r->ebx;
   int pos, fd;
-  CLC(r); /* Success. TODO(pts): Some calls don't chage CF. */
-#ifdef DEBUG
+  char c;
+#ifdef DEBUG_MORE
     fprintf(stderr, "info: trying OIX function: 0x%02x\r\n", ah);
 #endif
   if (ah == INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE) {
@@ -363,6 +363,14 @@ static void handle_syscall(struct pushad_regs *r) {
     if (unlink((const char*)r->edx) != 0) goto do_ferr;
   } else if (ah == INT21H_FUNC_56H_RENAME_FILE) {
     if (rename((const char*)r->edx, (const char*)r->edi) != 0) goto do_ferr;
+  } else if (ah == INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO) {
+    /* This is a deprecated API, please don't call it from new software.
+     * binw/wasm.exe and binw/wlib.exe in Watcom C/C++ 10.0a, 10.5, 10.6, 11.0b and 11.0c use it.
+     * We do a good-enough fallback implementation: we read 1 byte from stdin, it will be echoed.
+     */
+    if (read(0, &c, 1) != 1) c = '\n';
+    *(char*)&r->eax = c;  /* Only change AL. */
+    return;  /* Don't change CF. */
   } else { do_invalid:
 #ifdef DEBUG
     fprintf(stderr, "warning: unknown OIX function: 0x%02x\r\n", ah);
@@ -371,7 +379,9 @@ static void handle_syscall(struct pushad_regs *r) {
     r->eax = ERR_INVALID_FUNCTION;  /* TODO(pts): What does DOS do? */
    do_error:
     STC(r);
+    return;
   }
+  CLC(r); /* Success. */
 }
 
 /* Returns the number of bytes needed by append_arg_quoted(arg).
