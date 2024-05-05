@@ -500,7 +500,7 @@ static void find_cf_header(int fd, struct cf_header *hdr) {
     *hdr = *(struct cf_header*)p;
     return;
   }
-  if ((unsigned)got >= 0x54 && *(const unsigned*)buf == ELF_SIGNATURE && *(const unsigned*)(p = buf + 54) == CF_SIGNATURE) goto found;
+  if ((unsigned)got >= 0x54 && *(const unsigned*)(p = buf) == ELF_SIGNATURE && *(const unsigned*)(p = buf + 54) == CF_SIGNATURE) goto found;
   if ((unsigned)got >= 0x20 && *(const unsigned*)(p = buf + 0x20) == CF_SIGNATURE) goto found;
   if ((unsigned)got >= 0xa && (u = *(const unsigned short*)(buf + 8) << 4) <= (unsigned)got && *(const unsigned*)(p = buf + u) == CF_SIGNATURE) goto found;
   fatal("fatal: CF signature not found\r\n");
