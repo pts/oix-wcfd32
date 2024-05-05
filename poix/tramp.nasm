@@ -6,6 +6,7 @@ cpu 386
 ; struct tramp_args {
 ;   void (*c_handler)(struct pushad_regs *r);  /* Will be saved to EDX. Must be a near call. */
 ;   char *program_entry;  /* Will be jumped to. */
+;   char *stack_low;  /* Can be set to NULL to indicate that the stack low limit is unknown. */
 ;   unsigned operating_system;  /* Will be saved to AH. */
 ;   char *program_filename;  /* EDI will be set to its address (OIX param_struct). */
 ;   char *command_line;
@@ -61,14 +62,16 @@ tramp2:  ; Only works as a near call.
 		mov [ebp-.me+handle_far_syscall.c_handler], eax  ; This needs read-write-execute memory.
 		lodsd  ; EAX := program_entry.
 		xchg edi, eax  ; EDI := EAX (program entry point); EAX := junk.
+		lodsd  ; EAX := stack_low.
+		xchg ecx, eax  ; ECX := EAX (stack low); EAX := junk.
 		lodsd  ; EAX := operating_system.
+		movzx eax, al  ; Make sure to use only the low byte.
 		shl eax, 8  ; AH := operating_system.
-		xchg edi, esi  ; EDI := ESI (OIX param_struct), ESI := EDI (program entry point).
+		xchg edi, esi  ; EDI := ESI (OIX param_struct); ESI := EDI (program entry point).
 		mov ebx, cs  ; Segment of handle_far_syscall.
 		push byte 0  ; Sentinel in case the function does a retf (far return). OIX entry points do.
 		push ebx  ; CS, assuming nonzero.
-		xor ebp, ebp  ; Not needed by the ABI, just make it deterministic.
-		sub ecx, ecx  ; Stack limit, which we always set to 0.
+		sub ebp, ebp  ; Not needed by the ABI, just make it deterministic. Also initializes many flags in EFLAGS.
 		call esi  ; Far or near call to the program entry point. Return value in EAX.
 .pop_again:	pop ebx  ; Find sentinel.
 		test ebx, ebx

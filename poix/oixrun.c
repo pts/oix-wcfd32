@@ -115,9 +115,10 @@ typedef char assert_sizeof_pushad_regs[sizeof(struct pushad_regs) == 0x24 ? 1 : 
 
 struct tramp_args {
   void (*c_handler)(struct pushad_regs *r);
-  char *program_entry;
-  unsigned operating_system;
-  /* Order of elements from here matter, same as in the OIX param struct. */
+  char *program_entry;  /* Will be jumped to. */
+  char *stack_low;  /* Can be set to NULL to indicate that the stack low limit is unknown. */
+  unsigned operating_system;  /* Only the low byte is relevant. Will be saved to AH. */
+  /* Order of elements from here matter, same as in the OIX param struct (struct pgmparms). */
   char *program_filename;
   char *command_line;
   char *env_strings;
@@ -516,6 +517,7 @@ int main(int argc, char **argv) {
   ta.c_handler = handle_syscall;
   ta.program_entry = image + hdr.entry_rva;
   ta.operating_system = OS_WIN32;  /* A plausible lie. */
+  ta.stack_low = NULL;
   ta.program_filename = argv[1];
   ta.break_flag_ptr = &break_flag;  /* break_flag is always zero. WLIB relies on non-NULL pointer. */
   ta.copyright = NULL;
