@@ -688,6 +688,8 @@ wcfd32_far_syscall:  ; proc far
                 je strict short .handle_INT21H_FUNC_44H_IOCTL_IN_FILE
                 cmp ah, INT21H_FUNC_42H_SEEK_IN_FILE
                 je strict short .handle_INT21H_FUNC_42H_SEEK_IN_FILE
+                cmp ah, INT21H_FUNC_60H_GET_FULL_FILENAME
+		je strict short .handle_far_INT21H_FUNC_60H_GET_FULL_FILENAME
 		cmp ah, INT21H_FUNC_48H_ALLOCATE_MEMORY
 		jne .not_48h
 		mov eax, ebx
@@ -733,6 +735,39 @@ wcfd32_far_syscall:  ; proc far
 		movzx edx, dx  ; Set high word of EDX to 0, for compatibility with int21nt.c and oixrun.c.
 		clc
 		jmp strict short .done
+.handle_far_INT21H_FUNC_60H_GET_FULL_FILENAME:
+		; This is different from https://stanislavs.org/helppc/int_21-60.html ,
+		; see int21nt.c. This gives the input pathname in EDX.
+		; binw/wasm.exe in Watcom C/C++ 10.6, 11.0b and 11.0c call this when
+		; assembling, and it puts the result to the THEADR header as the
+		; filename.
+		;
+		; We just fake it by returning the input unmodified.
+		push esi
+		xor esi, esi
+.next:		cmp byte [edx+esi], 0
+		je .found
+		inc esi
+		jmp .next
+.found:		cmp ecx, esi
+		jbe .err
+		push edi
+		push ecx
+		mov ecx, esi
+		inc ecx
+		mov esi, edx
+		mov edi, ebx
+		rep movsb
+		pop ecx
+		pop edi
+		clc
+		pop esi
+		retf
+.err:		push 0x18  ; ERR_BAD_LENGTH.
+		pop eax
+		stc
+		pop esi
+		retf
 
 %ifdef DEBUG
 debug_syscall:	push eax
