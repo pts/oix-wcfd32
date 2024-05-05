@@ -6,7 +6,7 @@
  * Compile with Clang for any Unix: clang -m32 -march=i386 -s -Os -W -Wall -ansi -pedantic -o oixrun oixrun.c
  * Compile with TinyCC for Linux: tcc -s -Os -W -Wall -o oixrun oixrun.c
  * Compile with minicc (https://github.com/pts/minilibc686) for Linux i386: minicc -ansi -pedantic -o oixrun oixrun.c
- # Compile with OpenWatcom v2 C compiler for Win32: owcc -bwin32 -march=i386 -s -Os -W -Wall -std=c89 -o oixrun.exe oixrun.c
+ # Compile with OpenWatcom v2 C compiler for Win32: owcc -bwin32 -march=i386 -s -Os -W -Wall -Wno-n201 -std=c89 -o oixrun.exe oixrun.c
  * Compile with Digital Mars C compiler for Win32: dmc -v0 -3 -w2 -o+space oixrun.c
  *
  * Pass -DUSE_SBRK if your system has sbrk(2), but not mmap(2).
@@ -25,7 +25,6 @@
 #define _XOPEN_SOURCE 500
 #define _SVID_SOURCE
 
-#include "tramp.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stddef.h>
@@ -447,7 +446,7 @@ static void apply_relocations(char *image_base, const unsigned short *rp) {
       at += *rp++;  /* !! Apply this optimization to other implementations. */
       *(unsigned*)at += (unsigned)image_base;  /* Apply single relocation. */
     } while (--count);
-  }    
+  }
 }
 
 struct cf_header {
@@ -483,6 +482,125 @@ static void find_cf_header(int fd, struct cf_header *hdr) {
 extern char **environ;
 
 static unsigned break_flag;
+
+#ifdef USE_TRAMP_H
+#  include "tramp.h"  /* Defines const char tramp386[] = {...}; */
+#else  /* NASM source code precompiled. */
+/* ; All function pointers are 32-bit near (i.e. no segment part). But this trampoline can take both near and far calls:
+ * ;
+ * ; * tramp works when called as either near or far call.
+ * ; * tramp calls `program_entry' so that it works if program_entry expects a near or far call.
+ * ; * handle_far_syscall expects to be called as a far call. This is part of the OIX ABI, and can't be reliably autodetected.
+ * ; * handle_far_syscall calls c_handler is called as a near call. TODO(pts): Make it work as either.
+ *
+ * bits 32
+ * cpu 386
+ * tramp:  ; Only works as a near call.
+ * 		jmp strict short tramp2
+ *
+ * handle_far_syscall:  ; We assume far call (`retf'), we can't autodetect without active cooperation (stack pushing) from the program.
+ * 		pushfd
+ * 		pushad
+ * 		mov eax, esp  ; EAX := (address of struct pushad_regs).
+ * 		push eax  ; For the cdecl calling convention.
+ * 		mov ebx, eax  ; Make it work with any calling convention by making EAX, EBX, ECX and EDX the same. https://en.wikipedia.org/wiki/X86_calling_conventions
+ * 		mov ecx, eax
+ * 		mov edx, eax
+ * 		db 0xbe  ; mov esi, ...
+ * .c_handler:	dd 0  ; Will be populated by tramp.
+ * 		call esi
+ * 		pop eax  ; Clean up the argument of c_handler from the stack.
+ * 		popad
+ * 		popfd
+ * 		retf
+ *
+ * tramp2:  ; Only works as a near call.
+ * 		pushad
+ * 		lea esi, [esp+0x24]  ; ESI := address of the struct tramp_args pointer, or return CS in a far call.
+ * 		call .me
+ * .me:		pop ebp  ; For position-independent code with ebp-.me+
+ * 		lodsd
+ * 		test eax, eax
+ * 		jz strict short .skip  ; It was a near call, `ret' below will suffice.
+ * 		mov byte [ebp-.me+.ret], 0xcb  ; Replace ret with retf, to support return from far call.
+ * .skip:		lodsd
+ * 		test eax, eax
+ * 		jz strict short .skip
+ * .got_args:	xchg esi, eax ; ESI := address of c_handler; EAX := junk. Previously it was address of struct tramp_args
+ * 		lodsd  ; EAX := c_handler.
+ * 		lea edx, [ebp-.me+handle_far_syscall]
+ * 		mov [ebp-.me+handle_far_syscall.c_handler], eax  ; This needs read-write-execute memory.
+ * 		lodsd  ; EAX := program_entry.
+ * 		xchg edi, eax  ; EDI := EAX (program entry point); EAX := junk.
+ * 		lodsd  ; EAX := stack_low.
+ * 		xchg ecx, eax  ; ECX := EAX (stack low); EAX := junk.
+ * 		lodsd  ; EAX := operating_system.
+ * 		movzx eax, al  ; Make sure to use only the low byte.
+ * 		shl eax, 8  ; AH := operating_system.
+ * 		xchg edi, esi  ; EDI := ESI (OIX param_struct); ESI := EDI (program entry point).
+ * 		mov ebx, cs  ; Segment of handle_far_syscall.
+ * 		push byte 0  ; Sentinel in case the function does a retf (far return). OIX entry points do.
+ * 		push ebx  ; CS, assuming nonzero.
+ * 		sub ebp, ebp  ; Not needed by the ABI, just make it deterministic. Also initializes many flags in EFLAGS.
+ * 		call esi  ; Far or near call to the program entry point. Return value in EAX.
+ * .pop_again:	pop ebx  ; Find sentinel.
+ * 		test ebx, ebx
+ * 		jnz .pop_again
+ * 		mov [esp+0x1c], eax  ; Overwrite the EAX saved by pushad.
+ * 		popad
+ * .ret:		ret
+ */
+  static const char tramp386[] =
+      /*@0x00*/  "\xEB\x16"              /* jmp short 0x18 */
+      /*@0x02*/  "\x9C"                  /* pushf */
+      /*@0x03*/  "\x60"                  /* pusha */
+      /*@0x04*/  "\x89\xE0"              /* mov eax, esp */
+      /*@0x06*/  "\x50"                  /* push eax */
+      /*@0x07*/  "\x89\xC3"              /* mov ebx, eax */
+      /*@0x09*/  "\x89\xC1"              /* mov ecx, eax */
+      /*@0x0B*/  "\x89\xC2"              /* mov edx, eax */
+      /*@0x0D*/  "\xBE\x00\x00\x00\x00"  /* mov esi, 0x0 */
+      /*@0x12*/  "\xFF\xD6"              /* call esi */
+      /*@0x14*/  "\x58"                  /* pop eax */
+      /*@0x15*/  "\x61"                  /* popa */
+      /*@0x16*/  "\x9D"                  /* popf */
+      /*@0x17*/  "\xCB"                  /* retf */
+      /*@0x18*/  "\x60"                  /* pusha */
+      /*@0x19*/  "\x8D\x74\x24\x24"      /* lea esi, [esp+0x24] */
+      /*@0x1D*/  "\xE8\x00\x00\x00\x00"  /* call 0x22 */
+      /*@0x22*/  "\x5D"                  /* pop ebp */
+      /*@0x23*/  "\xAD"                  /* lodsd */
+      /*@0x24*/  "\x85\xC0"              /* test eax, eax */
+      /*@0x26*/  "\x74\x04"              /* jz 0x2c */
+      /*@0x28*/  "\xC6\x45\x37\xCB"      /* mov byte [ebp+0x37], 0xcb */
+      /*@0x2C*/  "\xAD"                  /* lodsd */
+      /*@0x2D*/  "\x85\xC0"              /* test eax, eax */
+      /*@0x2F*/  "\x74\xFB"              /* jz 0x2c */
+      /*@0x31*/  "\x96"                  /* xchg eax, esi */
+      /*@0x32*/  "\xAD"                  /* lodsd */
+      /*@0x33*/  "\x8D\x55\xE0"          /* lea edx, [ebp-0x20] */
+      /*@0x36*/  "\x89\x45\xEC"          /* mov [ebp-0x14], eax */
+      /*@0x39*/  "\xAD"                  /* lodsd */
+      /*@0x3A*/  "\x97"                  /* xchg eax, edi */
+      /*@0x3B*/  "\xAD"                  /* lodsd */
+      /*@0x3C*/  "\x91"                  /* xchg eax, ecx */
+      /*@0x3D*/  "\xAD"                  /* lodsd */
+      /*@0x3E*/  "\x0F\xB6\xC0"          /* movzx eax, al */
+      /*@0x41*/  "\xC1\xE0\x08"          /* shl eax, 0x8 */
+      /*@0x44*/  "\x87\xFE"              /* xchg edi, esi */
+      /*@0x46*/  "\x8C\xCB"              /* mov ebx, cs */
+      /*@0x48*/  "\x6A\x00"              /* push byte +0x0 */
+      /*@0x4A*/  "\x53"                  /* push ebx */
+      /*@0x4B*/  "\x31\xED"              /* xor ebp, ebp */
+      /*@0x4D*/  "\xFF\xD6"              /* call esi */
+      /*@0x4F*/  "\x5B"                  /* pop ebx */
+      /*@0x50*/  "\x85\xDB"              /* test ebx, ebx */
+      /*@0x52*/  "\x75\xFB"              /* jnz 0x4f */
+      /*@0x54*/  "\x89\x44\x24\x1C"      /* mov [esp+0x1c], eax */
+      /*@0x58*/  "\x61"                  /* popa */
+      /*@0x59*/  "\xC3"                  /* ret */
+    ;
+#endif
 
 int main(int argc, char **argv) {
   struct tramp_args ta;
