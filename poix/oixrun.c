@@ -5,8 +5,8 @@
  * Pass -DUSE_SBRK if your system has sbrk(2), but not mmap(2).
  *
  * TODO(pts): Check for i386, little-endian, 32-bit mode etc. system. Start with C #ifdef()s.
- * !! TODO(pts): Do some extra snity checks that we are compiling for i386. Even at runtime: try to disassemble a simple function: void tryf(void) { return 0x12345678; }
- * !! TODO(pts): Make it work with minicc.
+ * !! TODO(pts): Do some extra sanity checks that we are compiling for i386. Even at runtime: try to disassemble a simple function: void tryf(void) { return 0x12345678; }
+ * !! TODO(pts): How to pass the pointer to the bottom of the stack? Document it.
  */
 
 #if !defined(_WIN32) && defined(__NT__)  /* __NT__ is Watcom C, but it also defines _WIN32 with `owcc -bwin32'. */
