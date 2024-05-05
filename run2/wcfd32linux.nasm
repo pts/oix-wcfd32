@@ -1,5 +1,6 @@
 ; by pts@fazekas.hu at Tue Apr 23 14:15:16 CEST 2024
 ;
+; !! Make error codes the same as in oixrun.c.
 ; !! Make it work on FreeBSD as well as Linux.
 ; !! Add O_LARGEFILE, make it work with large files (even if seeking doesn't work).
 ;

@@ -468,7 +468,7 @@ static void apply_relocations(char *image_base, const unsigned short *rp) {
   unsigned count;
   char *at;
   while ((count = *rp++)) {
-    at = image_base + (*rp++ << 16);
+    at = image_base + ((unsigned)*rp++ << 16);
     do {
       at += *rp++;  /* !! Apply this optimization to other implementations. */
       *(unsigned*)at += (unsigned)image_base;  /* Apply single relocation. */
@@ -550,7 +550,7 @@ static unsigned break_flag;
  * 		test eax, eax
  * 		jz strict short .skip  ; It was a near call, `ret' below will suffice.
  * 		mov byte [ebp-.me+.ret], 0xcb  ; Replace ret with retf, to support return from far call.
- * .skip:		lodsd
+ * .skip:	lodsd
  * 		test eax, eax
  * 		jz strict short .skip
  * .got_args:	xchg esi, eax ; ESI := address of c_handler; EAX := junk. Previously it was address of struct tramp_args
