@@ -286,7 +286,13 @@ enum oix_syscall_t {
   INT21H_FUNC_60H_GET_FULL_FILENAME = 0x60
 };
 
-/* The program calls this callback to do I/O and other system functions. */
+/* The program calls this callback to do I/O and other system functions.
+ *
+ * For comparison, see the function __Int21C in bld/w32loadr/int21nt.c in
+ * the OpenWatcom 1.0 sources
+ * (https://openwatcom.org/ftp/source/open_watcom_1.0.0-src.zip), which
+ * implements the OIX syscall ABI using the Win32 API.
+ */
 static void handle_syscall(struct pushad_regs *r) {
   const unsigned char ah = r->eax >> 8;
   const unsigned bx = (unsigned short)r->ebx;
@@ -322,8 +328,12 @@ static void handle_syscall(struct pushad_regs *r) {
       r->eax = (errno == ENOENT || errno == ENOTDIR) ? ERR_FILE_NOT_FOUND : (errno == EACCES) ? ERR_ACCESS_DENIED : ERR_BAD_FORMAT;
       goto do_error;
     }
-    if ((unsigned)fd > 0xffff) { r->eax = ERR_TOO_MANY_OPEN_FILES; goto do_error; }
-    r->eax = fd;
+    /* The ABI only allows 16-bit filehandles. So we fail of the POSIX
+     * system gives us larger ones (extremely rare, it gives out filehandles
+     * from 0, increasing 1 by 1).
+     */
+    if ((unsigned)fd > 0xffff) { close(fd); r->eax = ERR_TOO_MANY_OPEN_FILES; goto do_error; }
+    r->eax = fd;  /* We set the entire EAX (not only AX), just like int21nt.c does it. The PMODE/W DOS extender also sets the entire EAX. */
   } else if (ah == INT21H_FUNC_3DH_OPEN_FILE) {
     fd = r->eax & 3;  /* O_RDONLY == 0, O_WRONLY == 1, O_RDWR == 2. */
     goto do_open;
@@ -332,11 +342,11 @@ static void handle_syscall(struct pushad_regs *r) {
   } else if (ah == INT21H_FUNC_42H_SEEK_IN_FILE) {
     if ((pos = lseek(bx, r->ecx << 16 | (unsigned short)r->edx, (unsigned char)r->eax)) == -1) { r->eax = ERR_SEEK; goto do_error; }
     r->edx = (unsigned)pos >> 16;  /* Zero-extend. */
-    r->eax = (unsigned short)pos;
+    r->eax = pos;  /* Don't clobber to 16 bits, int21nt.c doesn't do it either. */
   } else if (ah == INT21H_FUNC_44H_IOCTL_IN_FILE) {
     if ((r->eax & 0xff) != 0) goto do_invalid;
     /* Get device information. */
-    r->edx = isatty(bx) ? 0x80 : 0;  /* 0x80 indicates character device. */
+    r->edx = isatty(bx) ? 0x80 : 0;  /* 0x80 indicates character device. */  /* We set the entire EDX (not only DX), just like int21nt.c does it. The PMODE/W DOS extender sets only DX. */
   } else if (ah == INT21H_FUNC_41H_DELETE_NAMED_FILE) {
     if (unlink((const char*)r->edx) != 0) goto do_ferr;
   } else if (ah == INT21H_FUNC_56H_RENAME_FILE) {
