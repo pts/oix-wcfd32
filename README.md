@@ -288,8 +288,50 @@ file format, they do the same for DOS .exe, Win32 PE .exe and Linux i386
 ELF-32 file formats. The *oixconv* tool copies this resource data by just
 copying everything after the OIX image.
 
-TODO(pts): Write more, especially about argv, environment,
-start ABI, int 21h ABI.
+Here is the initial register setup of the OIX program entry point (based on
+*bld/clib/startup/a/cstrtosi.asm* in OpenWatcom 1.0 sources):
+
+* ESP is set to the far return address: dword \[esp\] is the return offset
+  and dword \[esp+4\] is the return segment. Upon return, the OIX program
+  should set AL to the program exit code.
+* AH is set to the operating_system identifier. The rest of EAX is uninitialized.
+* ECX is set to the stack low pointer (or NULL if unknown) to indicate the
+  stack size available for the OIX program. The stack is between ECX and ESP.
+* BX is set to the segment of the syscall handler (\_\_Int21) callback
+  provided by the runtime, with which the OIX program can initiate I/O. The
+  rest of EBX is uninitialized.
+* EDX is set to the offset of the syscall handler callback.
+* ESI is uninitialized.
+* EBP is uninitialized.
+* EFLAGS is uninitialized.
+* EDI points to the beginning of the info struct:
+  ```
+  struct pgmparms {
+    char *program_filename;
+    char *command_line;
+    char *env_strings;
+    unsigned *break_flag_ptr;
+    char *copyright;
+    unsigned is_japanese;
+    unsigned max_handle_for_os2;
+  };
+  ```
+* program_filename contains argv[0], and is NUL-terminated. It can be used
+  to open the program file and read e.g. resource data.
+* command_line contains arg[1:], whitespace-separated, NUL-terminated.
+* env_strings contains each envionment string as *KEY=VALUE* and it
+  NUL-terminated. It has an extra NUL indicating the end.
+* break_flag_ptr is a pointer to break flag which the runner can set to
+  nonzero to indicate break (SIGINT, Ctrl-*C*).
+* copyright is a NUL-terminated copyright message of the runner, typically
+  NULL. WCFD32 sets it to NULL.
+* is_japanese indicates non-English locale (isDBCS). WCFD32 sets it to NULL.
+* max_handle_for_os2: maximum number of filehandles for OS/2. WCFDS32 sets
+  it to 0.
+* BSS is not initlizated with 0 bytes. (But the WCFD32 runtime system and
+  *oixrun.c* do it.)
+
+TODO(pts): Write about the syscall (\_\_Int21) ABI.
 
 ## Executable file format debugging
 
