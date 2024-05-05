@@ -28,7 +28,7 @@
 #ifdef _WIN32
 #  include <io.h>  /* chsize(...). */
 #  ifdef __WATCOMC__  /* Maybe h/nt is not on the include path. */
-     void* __stdcall VirtualAlloc(void *, unsigned, unsigned, unsigned);
+     void* __stdcall VirtualAlloc(void *lpAddress, unsigned dwSize, unsigned flAllocationType, unsigned flProtect);
 #  else
 #    include <windows.h>
 #  endif
