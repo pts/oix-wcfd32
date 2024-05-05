@@ -1,7 +1,12 @@
 /*
- * oixrun.c: an OIX program runner reference implementation in C, for POSIX and Win32, for i386 only
+ * oixrun.c: OIX program runner reference implementation in C, for POSIX and Win32, for i386 only
  * by pts@fazekas.hu at Sat May  4 01:51:30 CEST 2024
  *
+ * Compile with GCC for any Unix: gcc -m32 -march=i386 -s -Os -W -Wall -ansi -pedantic -o oixrun oixrun.c
+ * Compile with Clang for any Unix: clang -m32 -march=i386 -s -Os -W -Wall -ansi -pedantic -o oixrun oixrun.c
+ * Compile with TinyCC for Linux: tcc -s -Os -W -Wall -o oixrun oixrun.c
+ * Compile with minicc (https://github.com/pts/minilibc686) for Linux i386: minicc -ansi -pedantic -o oixrun oixrun.c
+ # Compile with OpenWatcom v2 C compiler for Win32: owcc -bwin32 -march=i386 -s -Os -W -Wall -std=c89 -o oixrun.exe oixrun.c
  * Compile with Digital Mars C compiler for Win32: dmc -v0 -3 -w2 -o+space oixrun.c
  *
  * Pass -DUSE_SBRK if your system has sbrk(2), but not mmap(2).
