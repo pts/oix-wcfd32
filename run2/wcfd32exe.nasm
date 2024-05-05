@@ -678,10 +678,16 @@ wcfd32_far_syscall:  ; proc far
 %ifdef DEBUG
 		call debug_syscall
 %endif
+		; We are lucky that the PMODE/W DOS extender ABI is almost
+		; the OIX syscall ABI. Below we just do the exceptions.
 		cmp ah, INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE
 		je strict short .handle_INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE
 		cmp ah, INT21H_FUNC_4FH_FIND_NEXT_MATCHING_FILE
 		je strict short .handle_INT21H_FUNC_4FH_FIND_NEXT_MATCHING_FILE
+		cmp ah, INT21H_FUNC_44H_IOCTL_IN_FILE
+                je strict short .handle_INT21H_FUNC_44H_IOCTL_IN_FILE
+                cmp ah, INT21H_FUNC_42H_SEEK_IN_FILE
+                je strict short .handle_INT21H_FUNC_42H_SEEK_IN_FILE
 		cmp ah, INT21H_FUNC_48H_ALLOCATE_MEMORY
 		jne .not_48h
 		mov eax, ebx
@@ -710,6 +716,22 @@ wcfd32_far_syscall:  ; proc far
 		mov ah, 4fh		; find next
 		int 21h			; ...
 		pop edx			; restore EDX
+		jmp strict short .done
+.handle_INT21H_FUNC_44H_IOCTL_IN_FILE:
+		cmp al, 0
+		jne strict short .not_48h
+		int 21h
+		jc strict short .done
+		movzx edx, dx  ; Clear high word of EDX, for compatibility with int21nt.c and oixrun.c.
+		jmp strict short .done
+.handle_INT21H_FUNC_42H_SEEK_IN_FILE:
+		int 21h
+		jc strict short .done
+		shl eax, 16
+		mov ax, dx
+		rol eax, 16  ; Set high word of EAX to DX, for compatibility with int21nt.c and oixrun.c.
+		movzx edx, dx  ; Set high word of EDX to 0, for compatibility with int21nt.c and oixrun.c.
+		clc
 		jmp strict short .done
 
 %ifdef DEBUG

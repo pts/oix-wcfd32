@@ -460,7 +460,7 @@ handle_INT21H_FUNC_42H_SEEK_IN_FILE:  ; Seek in file. EBX is the file descriptor
 		js strict short handle_common.pop_xret
 		ror eax, 16
 		movzx edx, ax
-		shr eax, 16
+		ror eax, 16  ; Keep all 32 bits of offset in EAX. oixrun.c and int21nt.c both do it.
 		clc
 		pop ecx  ; Just pop it, but don't overwrite EDX.
 		pop ecx
@@ -488,7 +488,7 @@ handle_INT21H_FUNC_44H_IOCTL_IN_FILE:  ; EBX is the file descriptor. AL is the i
 		cmp eax, -ENOTTY
 		jne .not_enotty
 		pop eax
-		mov dl, 0  ; Indicated disk file to DOS.
+		;mov dl, 0  ; Indicate disk file to DOS. DL is already 0.
 		jmp .ret_edx
 .not_enotty:	test eax, eax  ; Also sets CF=0.
 		pop eax
@@ -553,7 +553,6 @@ handlers_3CH:
 		dd handle_unimplemented  ; 4BH
 		dd handle_INT21H_FUNC_4CH_EXIT_PROCESS
 ; !! Implement these, but only if needed by WASM or WLIB.
-; !! WLIB does a segmentation fault on Linux at startup, with a NULL pointer dereference. Why? Does it fail in Wine?
 ; !! WASM by default needs: 3C, 3D, 3E, 3F, 40, 41, 42, 44, 48, 4C, also the help needs 08e
 ; !! Check WASM and WLIB code, all versions. Maybe it's too much.
 ; !! (why doesn't Win32 emulate it?) INT21H_FUNC_45H_DUPLICATE_FILE_HANDLE equ 0x45
