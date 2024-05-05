@@ -371,7 +371,26 @@ static void handle_syscall(struct pushad_regs *r) {
     if (read(0, &c, 1) != 1) c = '\n';
     *(char*)&r->eax = c;  /* Only change AL. */
     return;  /* Don't change CF. */
+  } else if (ah == INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME) {
+    /* This is a deprecated API, please don't call it from new software.
+     * binw/wlib.exe in Watcom C/C++ 10.5 and 10.6 use it for .lib file creation (default OMF LIBHEAD format), and only for getting the time.
+     * We could use our own gmtime(2), but this syscall expects local time, but not all libcs have a working localtime(2).
+     */
+    if (*(const char*)r->eax != 0) goto do_invalid;
+    r->ecx = 0;  /* Fake file time. */
+    r->edx = 1 << 5 | 1;  /* Fake file date. */
   } else { do_invalid:
+    /* binw/wlib.exe in Watcom C/C++ 11.0b and 11.0c call these when creating library:
+     * INT21H_FUNC_19H_GET_CURRENT_DRIVE = 0x19,
+     * INT21H_FUNC_2AH_GET_DATE = 0x2a,
+     * INT21H_FUNC_2CH_GET_TIME = 0x2c,
+     * INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES = 0x43,
+     * INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE = 0x4e,
+     * INT21H_FUNC_4FH_FIND_NEXT_MATCHING_FILE = 0x4f,
+     * INT21H_FUNC_60H_GET_FULL_FILENAME = 0x60,
+     * binw/wasm.exe in Watcom C/C++ 10.6, 11.0b and 11.0c call these when assembling:
+     * INT21H_FUNC_60H_GET_FULL_FILENAME = 0x60,
+     */
 #ifdef DEBUG
     fprintf(stderr, "warning: unknown OIX function: 0x%02x\r\n", ah);
 #endif
