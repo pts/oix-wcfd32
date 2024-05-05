@@ -158,7 +158,10 @@ static char *brk0, *brk1;
 
 #define IS_BRK_ERROR(x) ((unsigned)(x) + 1 <= 1U)  /* 0 and -1 are errors. */
 
-/* Allocate a read-write-execute memory block size. */
+/* Allocate a read-write-execute memory block size. This happens to
+ * zero-initialize the bytes because sbrk(2), mmap and VirtualAlloc
+ * zero-initialize.
+ */
 static void *alloc(unsigned size) {
 #ifndef USE_SBRK
   unsigned psize;
@@ -505,6 +508,10 @@ int main(int argc, char **argv) {
   if (lseek(fd, hdr.load_fofs, SEEK_SET) + 0U != hdr.load_fofs) fatal("fatal: error seeking to program image\r\n");
   if (read(fd, image, hdr.load_size) + 0U != hdr.load_size) fatal("fatal: error reading program image\r\n");
   close(fd);
+#if !defined(__TINYCC__) && !defined(__WATCOMC__)  /* TCC doesn't optimize, __WATCOMC__ complains about unreachable code. */
+  /* This zero-initialization of OIX program BSS is not needed, because alloc(...) already zero-initializes memory. */
+  if (0) memset(image + hdr.load_size, '\0', hdr.mem_size - hdr.load_size);
+#endif
   apply_relocations(image, (const unsigned short*)(image + hdr.reloc_rva));
   ta.c_handler = handle_syscall;
   ta.program_entry = image + hdr.entry_rva;
