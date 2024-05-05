@@ -20,7 +20,7 @@
 #  define _WIN32 1
 #endif
 
-/* Make functions like sbrk(2) available. */
+/* Make functions like sbrk(2) available with GCC. */
 #define _DEFAULT_SOURCE
 #define _XOPEN_SOURCE 500
 #define _SVID_SOURCE
@@ -127,10 +127,26 @@ struct tramp_args {
   unsigned max_handle_for_os2;
 };
 
-static void fatal(char const *msg) {
+#if defined(__GNUC__) || defined(__TINYC__)
+#  define NORETURN __attribute__((noreturn))
+#else
+#  ifdef __WATCOMC__
+#    define NORETURN __declspec(noreturn)
+#  else
+#    define NORETURN
+#  endif
+#endif
+
+/* Use this NORETURN to pacify GCC 4.1 warning about a possibly
+ * uninitialized variable after find_cf_header(...) returns.
+ */
+static NORETURN void fatal(char const *msg) {
   (void)!write(2, msg, strlen(msg));
   exit(125);
 }
+#ifdef __SC__
+#  pragma noreturn (fatal)
+#endif
 
 #ifdef USE_SBRK
 static void bad_sbrk(void) {
