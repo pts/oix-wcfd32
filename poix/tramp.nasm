@@ -29,6 +29,7 @@ tramp:  ; Only works as a near call.
 		jmp strict short tramp2
 
 handle_far_syscall:  ; We assume far call (`retf'), we can't autodetect without active cooperation (stack pushing) from the program.
+		push gs
 		pushfd
 		pushad
 		mov eax, esp  ; EAX := (address of struct pushad_regs).
@@ -37,11 +38,15 @@ handle_far_syscall:  ; We assume far call (`retf'), we can't autodetect without 
 		mov ecx, eax
 		mov edx, eax
 		db 0xbe  ; mov esi, ...
+.c_gs:		dd 0  ; Will be populated by tramp.
+		mov gs, esi  ; Restore host libc GS, will be used by e.g. isatty(2) for stack smashing protection (gcc without -fno-stack-protector): https://www.labcorner.de/the-gs-segment-and-stack-smashing-protection/
+		db 0xbe  ; mov esi, ...
 .c_handler:	dd 0  ; Will be populated by tramp.
 		call esi
 		pop eax  ; Clean up the argument of c_handler from the stack.
 		popad
 		popfd
+		pop gs
 		retf
 
 tramp2:  ; Only works as a near call.
@@ -49,6 +54,7 @@ tramp2:  ; Only works as a near call.
 		lea esi, [esp+0x24]  ; ESI := address of the struct tramp_args pointer, or return CS in a far call.
 		call .me
 .me:		pop ebp  ; For position-independent code with ebp-.me+
+		push gs  ; Save host libc GS.
 		lodsd
 		test eax, eax
 		jz strict short .skip  ; It was a near call, `ret' below will suffice.
@@ -60,6 +66,7 @@ tramp2:  ; Only works as a near call.
 		lodsd  ; EAX := c_handler.
 		lea edx, [ebp-.me+handle_far_syscall]
 		mov [ebp-.me+handle_far_syscall.c_handler], eax  ; This needs read-write-execute memory.
+		mov [ebp-.me+handle_far_syscall.c_gs], gs
 		lodsd  ; EAX := program_entry.
 		xchg edi, eax  ; EDI := EAX (program entry point); EAX := junk.
 		lodsd  ; EAX := stack_low.
@@ -76,6 +83,7 @@ tramp2:  ; Only works as a near call.
 .pop_again:	pop ebx  ; Find sentinel.
 		test ebx, ebx
 		jnz .pop_again
+		pop gs  ; Restore host libc GS.
 		mov [esp+0x1c], eax  ; Overwrite the EAX saved by pushad.
 		popad
 .ret:		ret

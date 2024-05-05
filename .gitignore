@@ -20,6 +20,7 @@
 /poix/oixrun
 /poix/t.bin
 /poix/t0.bin
+/poix/tramp.inline.h
 /poix/tramp.bin
 /poix/tramp.h
 /wasm*.exe
