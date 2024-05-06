@@ -6,11 +6,11 @@
  * Compile with Clang for any Unix: clang -m32 -march=i386 -s -Os -W -Wall -ansi -pedantic -o oixrun oixrun.c
  * Compile with TinyCC for Linux: tcc -s -Os -W -Wall -o oixrun oixrun.c
  * Compile with minicc (https://github.com/pts/minilibc686) for Linux i386: minicc -ansi -pedantic -o oixrun oixrun.c
- * Compile with OpenWatcom v2 C compiler for Linux i386: owcc -blinux -I"$WATCOM/lh" -s -Os -W -Wall -std=c89 -o oixrun oixrun.c
- * Compile with OpenWatcom v2 C compiler for 32-bit DOS (compiles but untested): owcc -bdos4g -Wc,-bt=dos32 -s -Os -W -Wall -std=c89 -o oixrun.exe oixrun.c
- * Compile with OpenWatcom v2 C compiler for OS/2 2.0+: owcc -bos2v2 -march=i386 -s -Os -W -Wall -std=c89 -o oixrun.exe oixrun.c
- * Compile with OpenWatcom v2 C compiler for Win32: owcc -bwin32 -march=i386 -s -Os -W -Wall -std=c89 -o oixrun.exe oixrun.c
- * Compile with Digital Mars C compiler for Win32: dmc -v0 -3 -w2 -o+space oixrun.c
+ * Compile with the OpenWatcom v2 C compiler for Linux i386: owcc -blinux -I"$WATCOM/lh" -s -Os -W -Wall -std=c89 -o oixrun oixrun.c
+ * Compile with the OpenWatcom v2 C compiler for 32-bit DOS (compiles but untested): owcc -bdos4g -Wc,-bt=dos32 -s -Os -W -Wall -std=c89 -o oixrun.exe oixrun.c
+ * Compile with the OpenWatcom v2 C compiler for OS/2 2.0+: owcc -bos2v2 -march=i386 -s -Os -W -Wall -std=c89 -o oixrun.exe oixrun.c
+ * Compile with the OpenWatcom v2 C compiler for Win32: owcc -bwin32 -march=i386 -s -Os -W -Wall -std=c89 -o oixrun.exe oixrun.c
+ * Compile with the Digital Mars C compiler for Win32: dmc -v0 -3 -w2 -o+space oixrun.c
  *
  * This is the reference implementation, meaning that in case of ambiguity
  * this implementation (among the multiple implementations in WCFD32,
