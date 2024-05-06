@@ -48,7 +48,7 @@ Limitations of OIX (as introduced by Watcom in 1994):
 * It suppots only file seek offsets less than 2 GiB.
 * Debugging is not supported. There is no symbol table or other debug info.
 * Networking is not supported.
-* Multihreaded programs are not supported.
+* Multithreaded programs are not supported.
 * Watcom hasn't released any official documentation.
 * Watcom hasn't made available development tools (such as assemblers, C
   compilers) neither as proprietary nor free software, so it wasn't easy for
