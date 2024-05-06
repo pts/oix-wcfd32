@@ -344,6 +344,18 @@ enum oix_syscall_t {
   INT21H_FUNC_60H_GET_FULL_FILENAME = 0x60
 };
 
+#ifdef USE_POSIX_CONSTANTS  /* Just for debugging, dump the values with `gcc -E' */
+/* Linux (GCC, OpenWatcom v2 Linux i386): const int posix_constants[] = {0100, 01000, 2, 20, 13};
+ * Linux in hex: const int posix_constants[] = {0x40, 0x200, 2, 20, 13};
+ * OpenWatcom v2 Win32, 32-bit DOS, OS/2 2.0+: const int posix_constants[] = {0x0020, 0x0040, 1, 23, 6};
+ * Digital Mars C compiler for Win32: const int posix_constants[] = {0x100, 0x200, 2, 20, 13};
+ * FreeBSD 9.3 and 3.0: int posix_constants[] = {0x0200, 0x0400, 2, 20, 13};
+ * IBCS2: int posix_constants[] = {0x100, 0x200, 2, 20, 13};
+ * Turbo C 1.01: int posix_constants[] = {0x100, 0x200, 2, -1, 5};
+ */
+const int posix_constants[] = {O_CREAT, O_TRUNC, ENOENT, ENOTDIR, EACCES};
+#endif
+
 /* The program calls this callback to do I/O and other system functions.
  *
  * For comparison, see the function __Int21C in bld/w32loadr/int21nt.c in
