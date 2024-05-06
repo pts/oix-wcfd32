@@ -649,61 +649,61 @@ static unsigned break_flag;
  * .ret:	ret
  */
   static const char tramp386[] =
-      /*@0x00*/  "\xEB\x21"              /*jmp short 0x23 */
-      /*@0x02*/  "\x0F\xA8"              /*push gs */
-      /*@0x04*/  "\x9C"                  /*pushf */
-      /*@0x05*/  "\x60"                  /*pusha */
-      /*@0x06*/  "\x89\xE0"              /*mov eax, esp */
-      /*@0x08*/  "\x50"                  /*push eax */
-      /*@0x09*/  "\x89\xC3"              /*mov ebx, eax */
-      /*@0x0B*/  "\x89\xC1"              /*mov ecx, eax */
-      /*@0x0D*/  "\x89\xC2"              /*mov edx, eax */
-      /*@0x0F*/  "\xBE\x00\x00\x00\x00"  /*mov esi, 0x0 */
-      /*@0x14*/  "\x8E\xEE"              /*mov gs, si */
-      /*@0x16*/  "\xBE\x00\x00\x00\x00"  /*mov esi, 0x0 */
-      /*@0x1B*/  "\xFF\xD6"              /*call esi */
-      /*@0x1D*/  "\x58"                  /*pop eax */
-      /*@0x1E*/  "\x61"                  /*popa */
-      /*@0x1F*/  "\x9D"                  /*popf */
-      /*@0x20*/  "\x0F\xA9"              /*pop gs */
-      /*@0x22*/  "\xCB"                  /*retf */
-      /*@0x23*/  "\x60"                  /*pusha */
-      /*@0x24*/  "\x8D\x74\x24\x24"      /*lea esi, [esp+0x24] */
-      /*@0x28*/  "\xE8\x00\x00\x00\x00"  /*call 0x2d */
-      /*@0x2D*/  "\x5D"                  /*pop ebp */
-      /*@0x2E*/  "\x0F\xA8"              /*push gs */
-      /*@0x30*/  "\xAD"                  /*lodsd */
-      /*@0x31*/  "\x85\xC0"              /*test eax, eax */
-      /*@0x33*/  "\x74\x04"              /*jz 0x39 */
-      /*@0x35*/  "\xC6\x45\x3E\xCB"      /*mov byte [ebp+0x3e], 0xcb */
-      /*@0x39*/  "\xAD"                  /*lodsd */
-      /*@0x3A*/  "\x85\xC0"              /*test eax, eax */
-      /*@0x3C*/  "\x74\xFB"              /*jz 0x39 */
-      /*@0x3E*/  "\x96"                  /*xchg eax, esi */
-      /*@0x3F*/  "\xAD"                  /*lodsd */
-      /*@0x40*/  "\x8D\x55\xD5"          /*lea edx, [ebp-0x2b] */
-      /*@0x43*/  "\x89\x45\xEA"          /*mov [ebp-0x16], eax */
-      /*@0x46*/  "\x8C\x6D\xE3"          /*mov [ebp-0x1d], gs */
-      /*@0x49*/  "\xAD"                  /*lodsd */
-      /*@0x4A*/  "\x97"                  /*xchg eax, edi */
-      /*@0x4B*/  "\xAD"                  /*lodsd */
-      /*@0x4C*/  "\x91"                  /*xchg eax, ecx */
-      /*@0x4D*/  "\xAD"                  /*lodsd */
-      /*@0x4E*/  "\x0F\xB6\xC0"          /*movzx eax, al */
-      /*@0x51*/  "\xC1\xE0\x08"          /*shl eax, 0x8 */
-      /*@0x54*/  "\x87\xFE"              /*xchg edi, esi */
-      /*@0x56*/  "\x8C\xCB"              /*mov ebx, cs */
-      /*@0x58*/  "\x6A\x00"              /*push byte +0x0 */
-      /*@0x5A*/  "\x53"                  /*push ebx */
-      /*@0x5B*/  "\x29\xED"              /*sub ebp, ebp */
-      /*@0x5D*/  "\xFF\xD6"              /*call esi */
-      /*@0x5F*/  "\x5B"                  /*pop ebx */
-      /*@0x60*/  "\x85\xDB"              /*test ebx, ebx */
-      /*@0x62*/  "\x75\xFB"              /*jnz 0x5f */
-      /*@0x64*/  "\x0F\xA9"              /*pop gs */
-      /*@0x66*/  "\x89\x44\x24\x1C"      /*mov [esp+0x1c], eax */
-      /*@0x6A*/  "\x61"                  /*popa */
-      /*@0x6B*/  "\xC3"                  /*ret */
+      /*@0x00*/  "\xEB\x21"              /* jmp short 0x23 */
+      /*@0x02*/  "\x0F\xA8"              /* push gs */
+      /*@0x04*/  "\x9C"                  /* pushf */
+      /*@0x05*/  "\x60"                  /* pusha */
+      /*@0x06*/  "\x89\xE0"              /* mov eax, esp */
+      /*@0x08*/  "\x50"                  /* push eax */
+      /*@0x09*/  "\x89\xC3"              /* mov ebx, eax */
+      /*@0x0B*/  "\x89\xC1"              /* mov ecx, eax */
+      /*@0x0D*/  "\x89\xC2"              /* mov edx, eax */
+      /*@0x0F*/  "\xBE\x00\x00\x00\x00"  /* mov esi, 0x0 */
+      /*@0x14*/  "\x8E\xEE"              /* mov gs, si */
+      /*@0x16*/  "\xBE\x00\x00\x00\x00"  /* mov esi, 0x0 */
+      /*@0x1B*/  "\xFF\xD6"              /* call esi */
+      /*@0x1D*/  "\x58"                  /* pop eax */
+      /*@0x1E*/  "\x61"                  /* popa */
+      /*@0x1F*/  "\x9D"                  /* popf */
+      /*@0x20*/  "\x0F\xA9"              /* pop gs */
+      /*@0x22*/  "\xCB"                  /* retf */
+      /*@0x23*/  "\x60"                  /* pusha */
+      /*@0x24*/  "\x8D\x74\x24\x24"      /* lea esi, [esp+0x24] */
+      /*@0x28*/  "\xE8\x00\x00\x00\x00"  /* call 0x2d */
+      /*@0x2D*/  "\x5D"                  /* pop ebp */
+      /*@0x2E*/  "\x0F\xA8"              /* push gs */
+      /*@0x30*/  "\xAD"                  /* lodsd */
+      /*@0x31*/  "\x85\xC0"              /* test eax, eax */
+      /*@0x33*/  "\x74\x04"              /* jz 0x39 */
+      /*@0x35*/  "\xC6\x45\x3E\xCB"      /* mov byte [ebp+0x3e], 0xcb */
+      /*@0x39*/  "\xAD"                  /* lodsd */
+      /*@0x3A*/  "\x85\xC0"              /* test eax, eax */
+      /*@0x3C*/  "\x74\xFB"              /* jz 0x39 */
+      /*@0x3E*/  "\x96"                  /* xchg eax, esi */
+      /*@0x3F*/  "\xAD"                  /* lodsd */
+      /*@0x40*/  "\x8D\x55\xD5"          /* lea edx, [ebp-0x2b] */
+      /*@0x43*/  "\x89\x45\xEA"          /* mov [ebp-0x16], eax */
+      /*@0x46*/  "\x8C\x6D\xE3"          /* mov [ebp-0x1d], gs */
+      /*@0x49*/  "\xAD"                  /* lodsd */
+      /*@0x4A*/  "\x97"                  /* xchg eax, edi */
+      /*@0x4B*/  "\xAD"                  /* lodsd */
+      /*@0x4C*/  "\x91"                  /* xchg eax, ecx */
+      /*@0x4D*/  "\xAD"                  /* lodsd */
+      /*@0x4E*/  "\x0F\xB6\xC0"          /* movzx eax, al */
+      /*@0x51*/  "\xC1\xE0\x08"          /* shl eax, 0x8 */
+      /*@0x54*/  "\x87\xFE"              /* xchg edi, esi */
+      /*@0x56*/  "\x8C\xCB"              /* mov ebx, cs */
+      /*@0x58*/  "\x6A\x00"              /* push byte +0x0 */
+      /*@0x5A*/  "\x53"                  /* push ebx */
+      /*@0x5B*/  "\x29\xED"              /* sub ebp, ebp */
+      /*@0x5D*/  "\xFF\xD6"              /* call esi */
+      /*@0x5F*/  "\x5B"                  /* pop ebx */
+      /*@0x60*/  "\x85\xDB"              /* test ebx, ebx */
+      /*@0x62*/  "\x75\xFB"              /* jnz 0x5f */
+      /*@0x64*/  "\x0F\xA9"              /* pop gs */
+      /*@0x66*/  "\x89\x44\x24\x1C"      /* mov [esp+0x1c], eax */
+      /*@0x6A*/  "\x61"                  /* popa */
+      /*@0x6B*/  "\xC3"                  /* ret */
       /*@0x6C*/;
 #endif
 
