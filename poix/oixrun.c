@@ -767,7 +767,9 @@ int main(int argc, char **argv) {
   ta.operating_system = OS_WIN32;  /* A plausible lie. */
   ta.stack_low = NULL;
   ta.program_filename = argv[1];
-  ta.break_flag_ptr = &break_flag;  /* break_flag is always zero. WLIB relies on non-NULL pointer. */  /* TODO(pts): Catch SIGINT, set break_flag = 1. */
+  /* TODO(pts): On POSIX, catch SIGINT, set break_flag = 1. */
+  /* TODO(pts): Add interrupt and exception handling for Win32 and OS/2 2.0+ as well. */
+  ta.break_flag_ptr = &break_flag;  /* break_flag is always zero. WLIB relies on non-NULL pointer. */
   ta.copyright = NULL;
 #ifdef __OS2__
   ta.is_japanese = 0;
