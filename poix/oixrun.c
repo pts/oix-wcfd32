@@ -8,6 +8,7 @@
  * Compile with minicc (https://github.com/pts/minilibc686) for Linux i386: minicc -ansi -pedantic -o oixrun oixrun.c
  * Compile with Clang for macOS 10.14 Mojave or earlier on macOS: gcc -m32 -march=i386 -O2 -W -Wall -ansi -pedantic -o oixrun oixrun.c && strip oixrun
  * Compile with Clang for macOS 10.14 Mojave or earlier on Linux amd64 with pts-osxcross (https://github.com/pts/pts-osxcross): ~/Downloads/pts_osxcross_10.10/i386-apple-darwin14/bin/gcc -m32 -march=i386 -mmacosx-version-min=10.5 -nodefaultlibs -lSystem -O2 -W -Wall -ansi -pedantic -o oixrun.darwinc32 oixrun.c && ~/Downloads/pts_osxcross_10.10/i386-apple-darwin14/bin/strip oixrun.darwinc32
+ * Compile with mingw-w64 GCC for Win32: i686-w64-mingw32-gcc -s -Os -W -Wall -o oixrun.exe oixrun.c
  * Compile with TinyCC for Win32: i386-win-tcc -s -Os -W -Wall -o oixrun.exe oixrun.c
  * Compile with the OpenWatcom v2 C compiler for Linux i386: owcc -blinux -I"$WATCOM/lh" -s -Os -W -Wall -std=c89 -o oixrun oixrun.c
  * Compile with the OpenWatcom v2 C compiler for 32-bit DOS (compiles but untested): owcc -bdos4g -Wc,-bt=dos32 -s -Os -W -Wall -std=c89 -o oixrun.exe oixrun.c
@@ -53,7 +54,7 @@
 #include <string.h>
 #ifdef _WIN32
 #  include <io.h>  /* chsize(...). */
-#  if defined(__WATCOMC__) || defined(__SC__) || defined(__TINYC__)  /* Maybe h/nt (for __WATCOMC__) is not on the include path. */
+#  if defined(__WATCOMC__) || defined(__SC__) || defined(__TINYC__) || defined(__GNUC__)  /* Maybe h/nt (for __WATCOMC__) is not on the include path. */
     void* __stdcall VirtualAlloc(void *lpAddress, unsigned dwSize, unsigned flAllocationType, unsigned flProtect);
 #  else
 #    include <windows.h>
