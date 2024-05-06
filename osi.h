@@ -54,4 +54,4 @@ int isatty(int fd);
 /* Non-POSIX functions. */
 int open2(const char *pathname, int flags);  /* Same functionality as the 2-argument open(2). */
 int open3(const char *pathname, int flags, mode_t mode);  /* Same functionality as the 2-argument open(2). */
-int ftruncate_here(int fd, off_t length);  /* Same as (but with error handling): ftruncate(fd, lseek(fd, 0, SEEK_CUR)). */
+int ftruncate_here(int fd);  /* Same as (but with error handling): ftruncate(fd, lseek(fd, 0, SEEK_CUR)). */
