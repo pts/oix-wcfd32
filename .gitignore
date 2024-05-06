@@ -25,6 +25,8 @@
 /poix/tramp.inline.h
 /poix/tramp.bin
 /poix/tramp.h
+/poix/test_poix1.o
+/poix/test_poix1.exe
 /wasm*.exe
 /wlib*.exe
 /wcfd32dos.exe
