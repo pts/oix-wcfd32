@@ -549,6 +549,13 @@ function implemented in NASM assembly. The trampoline function is neede to
 translate between real and far calls, and to work with any C calling
 convention.
 
+Please note that there is no C implementation of the *oixconv* tool.
+
+Please note that converting OIX programs to native executable programs is
+not supported with *poix/oixrun.c*, but it is supported only by the
+*oixconv* tool, only for targets supported by the *oixconv* tool. macOS and
+OS/2 2.0+ are not such targets.
+
 ## Watcom resource data
 
 Some Watcom program files (such as WASM, WLIB and WLINK, but not *wcc* or
