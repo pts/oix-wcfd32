@@ -7,6 +7,7 @@
  * Compile with TinyCC for Linux: tcc -s -Os -W -Wall -o oixrun oixrun.c
  * Compile with minicc (https://github.com/pts/minilibc686) for Linux i386: minicc -ansi -pedantic -o oixrun oixrun.c
  * Compile with OpenWatcom v2 C compiler for Linux i386: owcc -blinux -I"$WATCOM/lh" -s -Os -W -Wall -std=c89 -o oixrun oixrun.c
+ * Compile with OpenWatcom v2 C compiler for 32-bit DOS (compiles but untested): owcc -bdos4g -Wc,-bt=dos32 -s -Os -W -Wall -std=c89 -o oixrun.exe oixrun.c
  * Compile with OpenWatcom v2 C compiler for OS/2 2.0+: owcc -bos2v2 -march=i386 -s -Os -W -Wall -std=c89 -o oixrun.exe oixrun.c
  * Compile with OpenWatcom v2 C compiler for Win32: owcc -bwin32 -march=i386 -s -Os -W -Wall -std=c89 -o oixrun.exe oixrun.c
  * Compile with Digital Mars C compiler for Win32: dmc -v0 -3 -w2 -o+space oixrun.c
@@ -29,6 +30,10 @@
 
 #if !defined(_WIN32) && defined(__NT__)  /* __NT__ is Watcom C, but it also defines _WIN32 with `owcc -bwin32'. */
 #  define _WIN32 1
+#endif
+
+#if !defined(MSDOS) && defined(__DOS32__)  /* OpenWatcom v2 C compiler with `owcc -bdos32'. */
+#  define MSDOS 1
 #endif
 
 /* Make functions like sbrk(2) available with GCC. */
@@ -63,11 +68,17 @@
     unsigned long _System DosAllocMem(void **pBaseAdress, unsigned long ulObjectSize, unsigned long ulAllocationFlags);  /* http://www.edm2.com/index.php/DosAllocMem */
     unsigned long _System DosSetRelMaxFH(long *pcbReqCount, unsigned long *pcbCurMaxFH);  /* http://www.edm2.com/index.php/DosSetRelMaxFH */
 #  else
-#    include <unistd.h>  /* sbrk(...), ftruncate(...). */
+#    ifdef MSDOS
+#      include <io.h>
+#      include <stdlib.h>  /* malloc(...). */
+#      define ftruncate(fd, size) chsize(fd, size)
+#    else
+#      include <unistd.h>  /* sbrk(...), ftruncate(...). */
+#      if !defined(USE_SBRK)
+#        include <sys/mman.h>  /* mmap(...). */
+#      endif
+#    endif
 #  endif
-#endif
-#if !defined(USE_SBRK) && !defined(_WIN32) && !defined(__OS2__)  /* __OS2__ is defined by __WATCOMC__. */
-#  include <sys/mman.h>  /* mmap(...). */
 #endif
 
 #ifndef   O_BINARY  /* Mostly on _WIN32. */
@@ -179,14 +190,25 @@ static void bad_sbrk(void) {
 }
 #endif
 
-static char *brk0, *brk1;
-
-#define IS_BRK_ERROR(x) ((unsigned)(x) + 1 <= 1U)  /* 0 and -1 are errors. */
+#ifndef MSDOS
+  static char *brk0, *brk1;
+#  define IS_BRK_ERROR(x) ((unsigned)(x) + 1 <= 1U)  /* 0 and -1 are errors. */
+#endif
 
 /* Allocate a read-write-execute memory block size. This happens to
  * zero-initialize the bytes because sbrk(2), mmap and VirtualAlloc
  * zero-initialize.
  */
+#ifdef MSDOS
+static void *alloc(unsigned size) {
+  char *p;
+  size = (size + 3) & ~3;  /* 4-byte alignment. */
+  if (size == 0) return NULL;
+  if (!(p = malloc(size))) return NULL;  /* Not enough memory. */
+  memset(p, '\0', size);  /* TODO(pts): Add a short and fast memset, with rep stosb. */
+  return p;
+}
+#else
 static void *alloc(unsigned size) {
 #ifndef USE_SBRK
   unsigned psize;
@@ -238,6 +260,7 @@ static void *alloc(unsigned size) {
   brk0 += size;
   return result;
 }
+#endif  /* else ifdef MSDOS. */
 
 enum os_t {
   OS_DOS = 0,
@@ -336,11 +359,7 @@ static void handle_syscall(struct pushad_regs *r) {
       if ((int)r->eax < 0) { r->eax = ERR_WRITE_FAULT; goto do_error; }  /* TODO(pts): Better. */
     } else {  /* Truncate. */
       if ((pos = lseek(bx, 0, SEEK_CUR)) == -1) { r->eax = ERR_SEEK; goto do_error; }
-#ifdef _WIN32
-      if (chsize(bx, pos) != 0) { r->eax = ERR_GEN_FAILURE; goto do_error; }
-#else
       if (ftruncate(bx, pos) != 0) { r->eax = ERR_GEN_FAILURE; goto do_error; }
-#endif
       r->eax = 0;
     }
   } else if (ah == INT21H_FUNC_3FH_READ_FROM_FILE) {
