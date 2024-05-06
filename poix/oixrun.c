@@ -1,12 +1,14 @@
 /*
- * oixrun.c: OIX program runner reference implementation in C, for POSIX and Win32, for i386 only
+ * oixrun.c: OIX program runner reference implementation in C, for POSIX and Win32 and OS/2 2.0+, for i386 only
  * by pts@fazekas.hu at Sat May  4 01:51:30 CEST 2024
  *
  * Compile with GCC for any Unix: gcc -m32 -march=i386 -s -Os -W -Wall -ansi -pedantic -o oixrun oixrun.c
  * Compile with Clang for any Unix: clang -m32 -march=i386 -s -Os -W -Wall -ansi -pedantic -o oixrun oixrun.c
  * Compile with TinyCC for Linux: tcc -s -Os -W -Wall -o oixrun oixrun.c
  * Compile with minicc (https://github.com/pts/minilibc686) for Linux i386: minicc -ansi -pedantic -o oixrun oixrun.c
- * Compile with OpenWatcom v2 C compiler for Win32: owcc -bwin32 -march=i386 -s -Os -W -Wall -Wno-n201 -std=c89 -o oixrun.exe oixrun.c
+ * Compile with OpenWatcom v2 C compiler for Linux i386: owcc -blinux -I"$WATCOM/lh" -s -Os -W -Wall -std=c89 -o oixrun oixrun.c
+ * Compile with OpenWatcom v2 C compiler for OS/2 2.0+: owcc -bos2v2 -march=i386 -s -Os -W -Wall -std=c89 -o oixrun.exe oixrun.c
+ * Compile with OpenWatcom v2 C compiler for Win32: owcc -bwin32 -march=i386 -s -Os -W -Wall -std=c89 -o oixrun.exe oixrun.c
  * Compile with Digital Mars C compiler for Win32: dmc -v0 -3 -w2 -o+space oixrun.c
  *
  * This is the reference implementation, meaning that in case of ambiguity
@@ -47,10 +49,24 @@
 #  else
 #    include <windows.h>
 #  endif
+#  define ftruncate(fd, size) chsize(fd, size)
 #else
-#  include <unistd.h>  /* sbrk(...), ftruncate(...). */
+#  ifdef __OS2__  /* Maybe h/os2 (for __WATCOMC__) is not on the include path. */
+#    include <io.h>  /* chsize(...). */
+#    define ftruncate(fd, size) chsize(fd, size)
+    /* __WATCOMC__ os2/bsememf.h */
+#    define PAG_READ      0x00000001
+#    define PAG_WRITE     0x00000002
+#    define PAG_EXECUTE   0x00000004
+#    define PAG_COMMIT    0x00000010
+    /* os2/bsedos.h */
+    unsigned long _System DosAllocMem(void **pBaseAdress, unsigned long ulObjectSize, unsigned long ulAllocationFlags);  /* http://www.edm2.com/index.php/DosAllocMem */
+    unsigned long _System DosSetRelMaxFH(long *pcbReqCount, unsigned long *pcbCurMaxFH);  /* http://www.edm2.com/index.php/DosSetRelMaxFH */
+#  else
+#    include <unistd.h>  /* sbrk(...), ftruncate(...). */
+#  endif
 #endif
-#if !defined(USE_SBRK) && !defined(_WIN32)
+#if !defined(USE_SBRK) && !defined(_WIN32) && !defined(__OS2__)  /* __OS2__ is defined by __WATCOMC__. */
 #  include <sys/mman.h>  /* mmap(...). */
 #endif
 
@@ -132,8 +148,8 @@ struct tramp_args {
   char *env_strings;
   unsigned *break_flag_ptr;
   char *copyright;
-  unsigned is_japanese;
-  unsigned max_handle_for_os2;
+  long is_japanese;  /* Using the type `long' because for __OS2__ we reuse this for the req_count. */
+  unsigned long max_handle_for_os2;
 };
 
 #if defined(__GNUC__) || defined(__TINYC__)
@@ -206,8 +222,12 @@ static void *alloc(unsigned size) {
 #  define MEM_RESERVE 0x2000
 #endif
     if (!(brk0 = VirtualAlloc(NULL, psize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE))) return NULL;  /* Not enough memory. */
+#else
+#ifdef __OS2__  /* Use DosAllocMem(...) */
+    if (DosAllocMem((void**)&brk0, psize, PAG_COMMIT | PAG_READ | PAG_WRITE | PAG_EXECUTE)) return  NULL;  /* Not enough memory. */
 #else  /* Use mmap(2). */
     if (!(brk0 = mmap(NULL, psize, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0))) return NULL;  /* Not enough memory. */
+#endif
 #endif
     /* TODO(pts): Use the rest of the previous brk0...brk1 for smaller amounts. */
     brk1 = brk0 + psize;
@@ -724,8 +744,14 @@ int main(int argc, char **argv) {
   ta.program_filename = argv[1];
   ta.break_flag_ptr = &break_flag;  /* break_flag is always zero. WLIB relies on non-NULL pointer. */  /* TODO(pts): Catch SIGINT, set break_flag = 1. */
   ta.copyright = NULL;
+#ifdef __OS2__
   ta.is_japanese = 0;
+  DosSetRelMaxFH(&ta.is_japanese, &ta.max_handle_for_os2);  /* ta_is_japanese is the req_count argument. */
+#else
   ta.max_handle_for_os2 = 0;
+#endif
+  ta.is_japanese = 0;
+  /* bld/w32loadr/loader.c a */
   /* We use varargs (`...') to force caller-pops calling convention (Watcom
    * default __watcall isn't one if not all arguments fit in registers. We push
    * two NULL pointers so that at least one ends up on the stack, and tramp can
