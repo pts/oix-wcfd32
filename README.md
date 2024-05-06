@@ -19,10 +19,14 @@ To see source code of simple programs written for OIX, look at
 repository. The compilation scripts (running on Linux i386) are also
 provided.
 
-Original OIX does, but WFCD32 doesn't support 32-bit OS/2 2.x and 32-bit
-Windows 3.x as operating systems on which OIX programs can be run. WFCD32
-adds new operating systems: Linux i386 (partial but works) and FreeBSD i386
-(not started yet).
+In addition to the targets 32-bit DOS, Win32 and OS/2 2.0+ supported by W32,
+the original Watcom implementation of OIX, WCFD32 also supports Linux i386
+and FreeBSD i386 (coming soon). For OS/2 2.0+ support, the *poix/oixrun.c*
+source file has to be compiled by the OpenWatcom v2 compiler. For 32-bit
+DOS, Win32, Linux i386 and FreeBSD i386, a pure assembly implementation is
+provided in NASM syntax (it's called the WCFD32 runtime system), and the
+conversion tool *oixconv* is also provided to convert OIX programs to native
+programs (for operating systems supported by the WCFD32 runtime system).
 
 The license of WCFD32 is GNU GPL v2. All the source code is provided as part
 of the Git repository, and it is derived from free software (mostly
@@ -85,7 +89,7 @@ C/C++ 10.0 (in 1994). By writing a C or assembly program once and compiling
 it for this target, it is possible to run the same binary program on 32-bit
 DOS, 32-bit Windows 3.x
 ([Win386](https://www.os2museum.com/wp/watcom-win386/), also invented by
-Watcom), 32-bit OS/2 2.x, and Win32 (Windows NT and later, Windows 95 and
+Watcom), 32-bit OS/2 2.0+, and Win32 (Windows NT and later, Windows 95 and
 later). Some of these are supported natively, some are supported with helper
 .exe programs (such as *w32run.exe*) put next to the
 .exe program file.
@@ -156,8 +160,9 @@ software targeting OIX:
 
   We can work this around by using PMODE/W 1.33 and *wcfd32dos.exe* instead.
 
-* The OIX implementation for OS/2 and DOS runner (which loads *w32run.exe*):
-  It can be grabbed from the first 0x2800 bytes of *binw/wasm.exe* and
+* The OIX implementation for OS/2 2.0+ and DOS runner (which loads
+  *w32run.exe*): It can be grabbed from the first 0x2800 bytes of
+  *binw/wasm.exe* and
   *binw/wlib.exe* (in Watcom C/C++ 10.x and 11.x). It looks like it's
   possible to build this from sources: *loader16.asm*, *dpmildr.asm*,
   *int21win.asm* in OpeNWatcom *bld/w32loadr*. But unfortunately the built
@@ -326,8 +331,8 @@ Here is the initial register setup of the OIX program entry point (based on
 * copyright is a NUL-terminated copyright message of the runner, typically
   NULL. WCFD32 sets it to NULL.
 * is_japanese indicates non-English locale (isDBCS). WCFD32 sets it to NULL.
-* max_handle_for_os2: maximum number of filehandles for OS/2. WCFDS32 sets
-  it to 0.
+* max_handle_for_os2: maximum number of filehandles for OS/2 2.0+. WCFDS32
+  sets it to 0 except on OS/2 2.0+.
 * BSS is not initlizated with 0 bytes. (But the WCFD32 runtime system and
   *oixrun.c* do it.)
 
@@ -336,10 +341,10 @@ TODO(pts): Write about the syscall (\_\_Int21) ABI.
 ## Executable file format debugging
 
 The OpenWatcom *wdump* tool can be used to display headers, relocation data,
-debug info etc. about DOS MZ .exe programs , Win32 PE .exe programs, OS/2 or
-DOS extender LX/LE .exe programs, Pharlap relocatable executable .rex files,
-but unfortunately it doesn't support OIX programs, not even those which were
-shipped by Watcom.
+debug info etc. about DOS MZ .exe programs , Win32 PE .exe programs, OS/2
+2.0+ or DOS extender LX/LE .exe programs, Pharlap relocatable executable
+.rex files, but unfortunately it doesn't support OIX programs, not even
+those which were shipped by Watcom.
 
 ## The WCFD32 runtime system
 
@@ -376,9 +381,10 @@ The runtime consists of the following programs:
   are built from source as port of the WCFD32 runtime build process (see
   below). The build process generates *oixrun.exe* which works on Win32 and
   32-bit DOS, and and the *oixrun* executable program, which works on Linux
-  i386 (and it will also work on FreeBSD i386). Other operating systems are
-  not supported, such as OS/2 2.x (or later) or macOS 10.14 Mojave (or
-  earlier).
+  i386 (and it will also work on FreeBSD i386). Other operating systems
+  (such as OS/2 2.0+ or macOS 10.14 Mojave or earlier) are supported by the
+  C reference implemention *poix/oixrun.c* instead, and such such support is
+  not compiled into this implementation of the WCFD32 runtime system.
 
 * *oixconv*: A command-line tool which can convert OIX program files. One
   possible conversion is converting an OIX program (.oix, .exe etc.) to a
@@ -504,19 +510,36 @@ will be possible, but it is especially tricky for LE (32-bit DOS) and PE
 (Win32) executables with relocation. After that point building the runtime
 will depend on NASM only.
 
-## The POSIX C reference implementation
+## The C reference implementation
 
 The file *poix/oixrun.c* is a reference implementation of the *oixrun*
-runner tool, written in C, using the POSIX library functions (e.g. open(2),
-lseek(2), mmap(2), sbrk(2)). It should compile on any Unix system with a C
-compiler. It also supports (and autodetects) Win32 as a target, on Win32 it
-uses VirtualAlloc(...) instead of mmap(2). It doesn't do any CPU emulation,
-so it works only if the target is the i386 CPU in 32-bit protected mode.
+runner tool, written in C. It supports the following targets:
 
-The reference implementation uses a short trampoline function implemented in
-NASM assembly, otherwise it's written in C89. The trampoline function is
-neede to translate between real and far calls, and to work with any C
-calling convention.
+* Any Unix system with a C compiler (tested on Linux with GCC and Clang)
+  targeting i386. It uses the POSIX library functions (open(2), lseek(2),
+  ftruncate(2), read(2), write(2), isatty(2), close(2), mmap(2), sbrk(2),
+  exit(2), rename(2), unlink(2)) and global variables (errno and environ)
+  and libc string funcions (memcpy(3) and strlen(2)). By default it uses
+  mmap(2) for memory allocation (specify `-DUSE_SBRK` to use sbrk(2)
+  instead), because that's the reliable way to get read-write-execute pages
+  needed by OIX programs.
+
+* Win32 (tested with the OpenWatcom v2 C compiler and the [Digital Mars C
+  compiler](https://www.digitalmars.com/download/freecompiler.html)). It
+  uses VirtualAlloc(...) for memory allocation. It uses chsize(...), because
+  ftruncate(...) is not available.
+
+* OS/2 2.0+ (tested with the OpenWatcom v2 C compiler). It uses
+  DosAllocMem(...) for memory allocation. It uses chsize(...), because
+  ftruncate(...) is not available.
+
+It doesn't do any CPU emulation, so it works only if the target uses the
+i386 CPU in 32-bit protected mode.
+
+It is written in C89 (ANSI C), except that ot uses a short trampoline
+function implemented in NASM assembly. The trampoline function is neede to
+translate between real and far calls, and to work with any C calling
+convention.
 
 ## Watcom resource data
 
