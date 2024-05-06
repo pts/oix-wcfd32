@@ -29,76 +29,17 @@
  *
  * TODO(pts): Check for i386, little-endian, 32-bit mode etc. system. Start with C #ifdef()s.
  * !! TODO(pts): Do some extra sanity checks that we are compiling for i386. Even at runtime: try to disassemble a simple function: void tryf(void) { return 0x12345678; }
- * !! TODO(pts): How to pass the pointer to the bottom of the stack? Document it.
  */
 
-#if !defined(_WIN32) && defined(__NT__)  /* __NT__ is Watcom C, but it also defines _WIN32 with `owcc -bwin32'. */
-#  define _WIN32 1
+#define _FILE_OFFSET_BITS 32  /* The OIX ABI doesn't support more. */
+#include "poix1.h"
+
+#ifdef __OS2__  /* Maybe h/os2 (for __WATCOMC__) is not on the include path. */
+  /* os2/bsedos.h */
+  unsigned long _System DosSetRelMaxFH(long *pcbReqCount, unsigned long *pcbCurMaxFH);  /* http://www.edm2.com/index.php/DosSetRelMaxFH */
 #endif
 
-#if !defined(MSDOS) && defined(__DOS32__)  /* OpenWatcom v2 C compiler with `owcc -bdos32'. */
-#  define MSDOS 1
-#endif
-
-/* Make functions like sbrk(2) available with GCC. */
-#define _DEFAULT_SOURCE
-#define _XOPEN_SOURCE 500
-#define _SVID_SOURCE
-#define _DARWIN_C_SOURCE  /* For MAP_ANON in MacOSX10.10.sdk/usr/include/sys/mman.h . */
-
-#include <errno.h>
-#include <fcntl.h>
-#include <stddef.h>
-#include <stdio.h>  /* rename(...). */
-#include <stdlib.h>
-#include <string.h>
-#ifdef _WIN32
-#  include <io.h>  /* chsize(...). */
-#  if defined(__WATCOMC__) || defined(__SC__) || defined(__TINYC__) || defined(__GNUC__)  /* Maybe h/nt (for __WATCOMC__) is not on the include path. */
-    void* __stdcall VirtualAlloc(void *lpAddress, unsigned dwSize, unsigned flAllocationType, unsigned flProtect);
-#  else
-#    include <windows.h>
-#  endif
-#  define ftruncate(fd, size) chsize(fd, size)
-#else
-#  ifdef __OS2__  /* Maybe h/os2 (for __WATCOMC__) is not on the include path. */
-#    include <io.h>  /* chsize(...). */
-#    define ftruncate(fd, size) chsize(fd, size)
-    /* __WATCOMC__ os2/bsememf.h */
-#    define PAG_READ      0x00000001
-#    define PAG_WRITE     0x00000002
-#    define PAG_EXECUTE   0x00000004
-#    define PAG_COMMIT    0x00000010
-    /* os2/bsedos.h */
-    unsigned long _System DosAllocMem(void **pBaseAdress, unsigned long ulObjectSize, unsigned long ulAllocationFlags);  /* http://www.edm2.com/index.php/DosAllocMem */
-    unsigned long _System DosSetRelMaxFH(long *pcbReqCount, unsigned long *pcbCurMaxFH);  /* http://www.edm2.com/index.php/DosSetRelMaxFH */
-#  else
-#    ifdef MSDOS
-#      include <io.h>
-#      include <stdlib.h>  /* malloc(...). */
-#      define ftruncate(fd, size) chsize(fd, size)
-#    else
-#      include <unistd.h>  /* sbrk(...), ftruncate(...). */
-#      if !defined(USE_SBRK)
-#        include <sys/mman.h>  /* mmap(...). */
-#        if defined(MAP_ANON) && !defined(MAP_ANONYMOUS)  /* macOS: MacOSX10.10.sdk/usr/include/sys/mman.h */
-#          define MAP_ANONYMOUS MAP_ANON
-#        endif
-#      endif
-#    endif
-#  endif
-#endif
-
-#ifndef   O_BINARY  /* Mostly on _WIN32. */
-#  define O_BINARY 0
-#endif
-
-#if !defined(__GNUC__) && !defined(__extension__)
-#  define __extension__
-#endif
-
-#if defined(__i386) || defined(__i386__) || defined(i386) || defined(__386) || defined(_M_I386) || defined(_M_I86) || defined(_M_IX86) || defined(__386__) || defined(__X86__)
-#else
+#ifndef __i386__
 #  if defined(__amd64__) || defined(__x86_64__) || defined(_M_X64) || defined(_M_AMD64) || defined(__X86_64__) || defined(_M_X64) || defined(_M_AMD64) || \
     defined(__X86__) || defined(__I86__) || defined(_M_I86) || defined(_M_I8086) || defined(_M_I286) || \
     defined(__BIG_ENDIAN__) || (defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__) || \
@@ -108,40 +49,10 @@
     defined(_BIG_ENDIAN) || \
     defined(__ARMEL__) || defined(__THUMBEL__) || defined(__AARCH64EL__) || defined(_MIPSEL) || defined (__MIPSEL) || defined(__MIPSEL__) || \
     defined(__ia64__) || defined(__LITTLE_ENDIAN) || defined(_LITTLE_ENDIAN)
-#    error Unsupported CPU architecture detected. If you are sure, then recompile with -D__386
+#    error Unsupported CPU architecture detected. This program requires i386. If you are sure, then recompile with -D__386
 #  else  /* TODO(pts): Add some runtime (disassembly) checks. */
 #    error CPU architecture not detected. If you are sure you have i386, then recompile with -D__386
 #  endif
-#endif
-
-#if defined(_WIN32) && defined(__WATCOMC__)
-  /* Overrides lib386/nt/clib3r.lib / mbcupper.o
-   * Source: https://github.com/open-watcom/open-watcom-v2/blob/master/bld/clib/mbyte/c/mbcupper.c
-   * Overridden implementation calls CharUpperA in USER32.DLL:
-   * https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-charuppera
-   *
-   * This function is a transitive dependency of _cstart() with main() in
-   * OpenWatcom. By overridding it, we remove the transitive dependency of all
-   * .exe files compiled with `owcc -bwin32' on USER32.DLL.
-   *
-   * This is a simplified implementation, it keeps non-ASCII characters intact.
-   */
-  unsigned int _mbctoupper(unsigned int c) {
-    return (c - 'a' + 0U <= 'z' - 'a' + 0U)  ? c + 'A' - 'a' : c;
-  }
-#endif
-
-#if defined(_WIN32) && defined(__SC__)  /* Digital Mars C compiler. */
-  /* Overrides win32/w32fater.o. The _win32_faterr(...) function is a
-   * transitive dependency of the DMC libc (dm/lib/snn.lib). It calls
-   * MessageBoxA, which we don't want to call, to avoid the dependency on
-   * USER32.DLL. So we just call write(2) from here.
-   * TODO(pts): Call GetStdHandle and WriteConsole instead. Is it needed?
-   */
-  void _win32_faterr(const char *msg) {
-    (void)!write(2, msg, strlen(msg));
-    exit(1);
-  }
 #endif
 
 typedef char assert_sizeof_short[sizeof(short) == 2 ? 1 : -1];
@@ -171,16 +82,6 @@ struct tramp_args {
   unsigned long max_handle_for_os2;
 };
 
-#if defined(__GNUC__) || defined(__TINYC__)
-#  define NORETURN __attribute__((noreturn))
-#else
-#  ifdef __WATCOMC__
-#    define NORETURN __declspec(noreturn)
-#  else
-#    define NORETURN
-#  endif
-#endif
-
 /* Use this NORETURN to pacify GCC 4.1 warning about a possibly
  * uninitialized variable after find_cf_header(...) returns.
  */
@@ -197,78 +98,6 @@ static void bad_sbrk(void) {
   fatal("fatal: sbrk failure\r\n");  /* Not an out-of-memory error. */
 }
 #endif
-
-#ifndef MSDOS
-  static char *brk0, *brk1;
-#  define IS_BRK_ERROR(x) ((unsigned)(x) + 1 <= 1U)  /* 0 and -1 are errors. */
-#endif
-
-/* Allocate a read-write-execute memory block size. This happens to
- * zero-initialize the bytes because sbrk(2), mmap and VirtualAlloc
- * zero-initialize.
- */
-#ifdef MSDOS
-static void *alloc(unsigned size) {
-  char *p;
-  size = (size + 3) & ~3;  /* 4-byte alignment. */
-  if (size == 0) return NULL;
-  if (!(p = malloc(size))) return NULL;  /* Not enough memory. */
-  memset(p, '\0', size);  /* TODO(pts): Add a short and fast memset, with rep stosb. */
-  return p;
-}
-#else
-static void *alloc(unsigned size) {
-#ifndef USE_SBRK
-  unsigned psize;
-#endif
-  void *result;
-  size = (size + 3) & ~3;  /* 4-byte alignment. */
-  if (size == 0) return NULL;
-  while ((unsigned)(brk1 - brk0) < size) {
-#ifdef USE_SBRK  /* Typically sbrk(2) doesn't allocate read-write-execute memory (which we need), not even with `gcc -static -Wl,-N. But it succeds with `minicc --diet'. */
-    if (IS_BRK_ERROR(brk1 = sbrk(0))) bad_sbrk();  /* This is fatal, it shouldn't be NULL. */
-    if (!brk0) brk0 = brk1;  /* Initialization at first call. */
-    if ((unsigned)(brk1 - brk0) >= size) break;
-    /* TODO(pts): Allocate more than necessary, to save on system call round-trip time. */
-    if (IS_BRK_ERROR(sbrk(size - (brk1 - brk0)))) bad_sbrk();  /* This is fatal, it shouldn't be NULL. */
-    if (IS_BRK_ERROR(brk1 = sbrk(0))) bad_sbrk();  /* This is fatal, it shouldn't be NULL. */
-    if ((unsigned)(brk1 - brk0) < size) return NULL;  /* Not enough memory. */
-    break;
-#else  /* Use mmap(2) or VirtualAlloc(2). */
-    /* TODO(pts): Write a more efficient memory allocator, and write one
-     * which tries to allocate less if more is not available.
-     */
-    psize = (size + 0xfff) & ~0xfff;  /* Round up to page boundary. */
-    if (!psize) return NULL;  /* Not enough memory. */
-    if (!(psize >> 18)) psize = 1 << 18;  /* Round up less than 256 KiB to 256 KiB. */
-#ifdef _WIN32  /* Use VirtualAlloc(...). */
-#ifndef   PAGE_EXECUTE_READWRITE
-#  define PAGE_EXECUTE_READWRITE 0x40
-#endif
-#ifndef   MEM_COMMIT
-#  define MEM_COMMIT 0x1000
-#endif
-#ifndef   MEM_RESERVE
-#  define MEM_RESERVE 0x2000
-#endif
-    if (!(brk0 = VirtualAlloc(NULL, psize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE))) return NULL;  /* Not enough memory. */
-#else
-#ifdef __OS2__  /* Use DosAllocMem(...) */
-    if (DosAllocMem((void**)&brk0, psize, PAG_COMMIT | PAG_READ | PAG_WRITE | PAG_EXECUTE)) return  NULL;  /* Not enough memory. */
-#else  /* Use mmap(2). */
-    if (!(brk0 = mmap(NULL, psize, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0))) return NULL;  /* Not enough memory. */
-#endif
-#endif
-    /* TODO(pts): Use the rest of the previous brk0...brk1 for smaller amounts. */
-    brk1 = brk0 + psize;
-    break;
-#endif
-  }
-  result = brk0;
-  brk0 += size;
-  return result;
-}
-#endif  /* else ifdef MSDOS. */
 
 enum os_t {
   OS_DOS = 0,
@@ -346,18 +175,6 @@ enum oix_syscall_t {
   INT21H_FUNC_60H_GET_FULL_FILENAME = 0x60
 };
 
-#ifdef USE_POSIX_CONSTANTS  /* Just for debugging, dump the values with `gcc -E' */
-/* Linux (GCC, OpenWatcom v2 Linux i386): const int posix_constants[] = {0100, 01000, 2, 20, 13};
- * Linux in hex: const int posix_constants[] = {0x40, 0x200, 2, 20, 13};
- * OpenWatcom v2 Win32, 32-bit DOS, OS/2 2.0+: const int posix_constants[] = {0x0020, 0x0040, 1, 23, 6};
- * Digital Mars C compiler for Win32: const int posix_constants[] = {0x100, 0x200, 2, 20, 13};
- * FreeBSD 9.3 and 3.0: int posix_constants[] = {0x0200, 0x0400, 2, 20, 13};
- * IBCS2: int posix_constants[] = {0x100, 0x200, 2, 20, 13};
- * Turbo C 1.01: int posix_constants[] = {0x100, 0x200, 2, -1, 5};
- */
-const int posix_constants[] = {O_CREAT, O_TRUNC, ENOENT, ENOTDIR, EACCES};
-#endif
-
 /* The program calls this callback to do I/O and other system functions.
  *
  * For comparison, see the function __Int21C in bld/w32loadr/int21nt.c in
@@ -386,7 +203,7 @@ static void handle_syscall(struct pushad_regs *r) {
     r->eax = read(bx, (void*)r->edx, r->ecx);
     if ((int)r->eax < 0) { r->eax = ERR_READ_FAULT; goto do_error; }  /* TODO(pts): Better. */
   } else if (ah == INT21H_FUNC_48H_ALLOCATE_MEMORY) {  /* This OIX-specific API function differs from the typical DOS extender API. */
-    r->eax = (unsigned)alloc(r->ebx);
+    r->eax = (unsigned)cealloc(r->ebx);
     if (!r->eax) { r->eax = ERR_NOT_ENOUGH_MEMORY; goto do_error; }
   } else if (ah == INT21H_FUNC_4CH_EXIT_PROCESS) {
     exit((unsigned char)r->eax);
@@ -533,7 +350,7 @@ static char *concatenate_args(char **args) {
   size_t size = 1;  /* Trailing '\0'. */
   for (argp = args; *argp; size += get_arg_quoted_size(*argp++)) {}
   ++size;
-  result = alloc(size);  /* Will never be freed. */
+  result = cealloc(size);  /* Will never be freed. */
   if (result) {
     pout = result;
     for (pout = result, argp = args; *argp; pout = append_arg_quoted(*argp++, pout)) {}
@@ -551,7 +368,7 @@ static char *concatenate_env(char **env) {
     while (*p++ != '\0') {}
     size += p - *envp;
   }
-  result = alloc(size);  /* Will never be freed. */
+  result = cealloc(size);  /* Will never be freed. */
   if (result) {
     pout = result;
     for (envp = env; (p = *envp); ++envp) {
@@ -607,8 +424,6 @@ static void find_cf_header(int fd, struct cf_header *hdr) {
   if ((unsigned)got >= 0xa && (u = *(const unsigned short*)(buf + 8) << 4) <= (unsigned)got && *(const unsigned*)(p = buf + u) == CF_SIGNATURE) goto found;
   fatal("fatal: CF signature not found\r\n");
 }
-
-extern char **environ;
 
 static unsigned break_flag;
 
@@ -760,19 +575,19 @@ int main(int argc, char **argv) {
 #endif
   if (!argv[0] || !argv[1]) fatal("Usage: oixrun <prog.oix> [<arg> ...]\r\n");
   /* TODO(pts): binmode(...) etc. On POSIX it's not needed. */
-  if (!(tramp386_copy = alloc(sizeof(tramp386)))) fatal("fatal: initial alloc failed\r\n");
+  if (!(tramp386_copy = cealloc(sizeof(tramp386)))) fatal("fatal: initial alloc failed\r\n");
   memcpy(tramp386_copy, tramp386, sizeof(tramp386));
   if ((fd = open(argv[1], O_RDONLY | O_BINARY)) < 0) fatal("fatal: error opening OIX program\r\n");
   find_cf_header(fd, &hdr);
   /* TODO(pts): Do some bounds-checking on the cf_header fields. */
-  if (!(image = alloc(hdr.mem_size))) fatal("fatal: not enough memory for program image\r\n");
+  if (!(image = cealloc(hdr.mem_size))) fatal("fatal: not enough memory for program image\r\n");
   if (!(ta.command_line = concatenate_args(argv + 2))) fatal("fatal: not enough memory for argv\r\n");
   if (!(ta.env_strings = concatenate_env(environ))) fatal("fatal: not enough memory for environ\r\n");
   if (lseek(fd, hdr.load_fofs, SEEK_SET) + 0U != hdr.load_fofs) fatal("fatal: error seeking to program image\r\n");
   if (read(fd, image, hdr.load_size) + 0U != hdr.load_size) fatal("fatal: error reading program image\r\n");
   close(fd);
 #if !defined(__TINYCC__) && !defined(__WATCOMC__)  /* TCC doesn't optimize, __WATCOMC__ complains about unreachable code. */
-  /* This zero-initialization of OIX program BSS is not needed, because alloc(...) already zero-initializes memory. */
+  /* This zero-initialization of OIX program BSS is not needed, because cealloc(...) already zero-initializes memory. */
   if (0) memset(image + hdr.load_size, '\0', hdr.mem_size - hdr.load_size);
 #endif
   apply_relocations(image, (const unsigned short*)(image + hdr.reloc_rva));
