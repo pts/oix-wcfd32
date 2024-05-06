@@ -276,7 +276,7 @@ enum os_t {
   OS_UNKNOWN = 4  /* Anything above 3 is unknown. */
 };
 
-enum oix_error_t {  /* Same as DOS and OS/2 error codes. */
+enum oix_error_t {  /* Same as DOS, OS/2 and Win32 (ERROR_SUCCESS etc.) error codes (!), not the same as POSIX errno E* numbers. */
   ERR_OK = 0,
   ERR_INVALID_FUNCTION,
   ERR_FILE_NOT_FOUND,
