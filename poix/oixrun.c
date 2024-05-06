@@ -6,6 +6,8 @@
  * Compile with Clang for any Unix: clang -m32 -march=i386 -s -Os -W -Wall -ansi -pedantic -o oixrun oixrun.c
  * Compile with TinyCC for Linux: tcc -s -Os -W -Wall -o oixrun oixrun.c
  * Compile with minicc (https://github.com/pts/minilibc686) for Linux i386: minicc -ansi -pedantic -o oixrun oixrun.c
+ * Compile with Clang for macOS 10.14 Mojave or earlier on macOS: gcc -m32 -march=i386 -O2 -W -Wall -ansi -pedantic -o oixrun oixrun.c && strip oixrun
+ * Compile with Clang for macOS 10.14 Mojave or earlier on Linux amd64 with pts-osxcross (https://github.com/pts/pts-osxcross): ~/Downloads/pts_osxcross_10.10/i386-apple-darwin14/bin/gcc -m32 -march=i386 -mmacosx-version-min=10.5 -nodefaultlibs -lSystem -O2 -W -Wall -ansi -pedantic -o oixrun.darwinc32 oixrun.c && ~/Downloads/pts_osxcross_10.10/i386-apple-darwin14/bin/strip oixrun.darwinc32
  * Compile with the OpenWatcom v2 C compiler for Linux i386: owcc -blinux -I"$WATCOM/lh" -s -Os -W -Wall -std=c89 -o oixrun oixrun.c
  * Compile with the OpenWatcom v2 C compiler for 32-bit DOS (compiles but untested): owcc -bdos4g -Wc,-bt=dos32 -s -Os -W -Wall -std=c89 -o oixrun.exe oixrun.c
  * Compile with the OpenWatcom v2 C compiler for OS/2 2.0+: owcc -bos2v2 -march=i386 -s -Os -W -Wall -std=c89 -o oixrun.exe oixrun.c
@@ -40,6 +42,7 @@
 #define _DEFAULT_SOURCE
 #define _XOPEN_SOURCE 500
 #define _SVID_SOURCE
+#define _DARWIN_C_SOURCE  /* For MAP_ANON in MacOSX10.10.sdk/usr/include/sys/mman.h . */
 
 #include <errno.h>
 #include <fcntl.h>
@@ -76,6 +79,9 @@
 #      include <unistd.h>  /* sbrk(...), ftruncate(...). */
 #      if !defined(USE_SBRK)
 #        include <sys/mman.h>  /* mmap(...). */
+#        if defined(MAP_ANON) && !defined(MAP_ANONYMOUS)  /* macOS: MacOSX10.10.sdk/usr/include/sys/mman.h */
+#          define MAP_ANONYMOUS MAP_ANON
+#        endif
 #      endif
 #    endif
 #  endif

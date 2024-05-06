@@ -21,12 +21,13 @@ provided.
 
 In addition to the targets 32-bit DOS, Win32 and OS/2 2.0+ supported by W32,
 the original Watcom implementation of OIX, WCFD32 also supports Linux i386
-and FreeBSD i386 (coming soon). For OS/2 2.0+ support, the *poix/oixrun.c*
-source file has to be compiled by the OpenWatcom v2 compiler. For 32-bit
-DOS, Win32, Linux i386 and FreeBSD i386, a pure assembly implementation is
-provided in NASM syntax (it's called the WCFD32 runtime system), and the
-conversion tool *oixconv* is also provided to convert OIX programs to native
-programs (for operating systems supported by the WCFD32 runtime system).
+and FreeBSD i386 (coming soon). For OS/2 2.0+ support and for macOS 10.14
+Mojave or earlier support, the *poix/oixrun.c* source file has to be
+compiled by the OpenWatcom v2 compiler. For 32-bit DOS, Win32, Linux i386
+and FreeBSD i386, a pure assembly implementation is provided in NASM syntax
+(it's called the WCFD32 runtime system), and the conversion tool *oixconv*
+is also provided to convert OIX programs to native programs (for operating
+systems supported by the WCFD32 runtime system).
 
 The license of WCFD32 is GNU GPL v2. All the source code is provided as part
 of the Git repository, and it is derived from free software (mostly
@@ -528,6 +529,13 @@ runner tool, written in C. It supports the following targets:
   compiler](https://www.digitalmars.com/download/freecompiler.html)). It
   uses VirtualAlloc(...) for memory allocation. It uses chsize(...), because
   ftruncate(...) is not available.
+
+* macOS 10.14 Mojave or earlier with the Clang compiler (compiled either on
+  a Mac or on Linux amd64 using
+  [pts-osxcross](https://github.com/pts/pts-osxcross)). Please note that
+  macOS 10.15 Catalina or later is not supported, becase Cataline dropped
+  support for running macOS i386 programs ([32-bit
+  app](https://support.apple.com/en-us/103076) as Apple calls it).
 
 * OS/2 2.0+ (tested with the OpenWatcom v2 C compiler). It uses
   DosAllocMem(...) for memory allocation. It uses chsize(...), because
