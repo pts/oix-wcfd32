@@ -107,7 +107,12 @@ enum os_t {
   OS_UNKNOWN = 4  /* Anything above 3 is unknown. */
 };
 
-enum oix_error_t {  /* Same as DOS, OS/2 and Win32 (ERROR_SUCCESS etc.) error codes (!), not the same as POSIX errno E* numbers. */
+/* Same as DOS, OS/2 and Win32 (ERROR_SUCCESS etc.) error codes (!), not the
+ * same as POSIX errno E* numbers. The ERRH_* (above 0x12) error codes are
+ * never returned by DOS except as extended error info with int 21h, AH ==
+ * 0x59.
+ */
+enum oix_error_t {
   ERR_OK = 0,
   ERR_INVALID_FUNCTION,
   ERR_FILE_NOT_FOUND,
@@ -127,24 +132,24 @@ enum oix_error_t {  /* Same as DOS, OS/2 and Win32 (ERROR_SUCCESS etc.) error co
   ERR_CURRENT_DIRECTORY,
   ERR_NOT_SAME_DEVICE,
   ERR_NO_MORE_FILES,
-  ERR_WRITE_PROTECT,
-  ERR_BAD_UNIT,
-  ERR_NOT_READY,
-  ERR_BAD_COMMAND,
-  ERR_CRC,
-  ERR_BAD_LENGTH,
-  ERR_SEEK,
-  ERR_NOT_DOS_DISK,
-  ERR_SECTOR_NOT_FOUND,
-  ERR_OUT_OF_PAPER,
-  ERR_WRITE_FAULT,
-  ERR_READ_FAULT,
-  ERR_GEN_FAILURE,
-  ERR_SHARING_VIOLATION,
-  ERR_LOCK_VIOLATION,
-  ERR_WRONG_DISK,
-  ERR_FCB_UNAVAILABLE,
-  ERR_SHARING_BUFFER_EXCEEDED
+  ERRH_WRITE_PROTECT,
+  ERRH_BAD_UNIT,
+  ERRH_NOT_READY,
+  ERRH_BAD_COMMAND,
+  ERRH_CRC,
+  ERRH_BAD_LENGTH,
+  ERRH_SEEK,
+  ERRH_NOT_DOS_DISK,
+  ERRH_SECTOR_NOT_FOUND,
+  ERRH_OUT_OF_PAPER,
+  ERRH_WRITE_FAULT,
+  ERRH_READ_FAULT,
+  ERRH_GEN_FAILURE,
+  ERRH_SHARING_VIOLATION,
+  ERRH_LOCK_VIOLATION,
+  ERRH_WRONG_DISK,
+  ERRH_FCB_UNAVAILABLE,
+  ERRH_SHARING_BUFFER_EXCEEDED
   /* https://stanislavs.org/helppc/dos_error_codes.html has more, but OS/2 has different ones. */
 };
 
@@ -193,15 +198,15 @@ static void handle_syscall(struct pushad_regs *r) {
   if (ah == INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE) {
     if (r->ecx != 0) {
       r->eax = write(bx, (const void*)r->edx, r->ecx);
-      if ((int)r->eax < 0) { r->eax = ERR_WRITE_FAULT; goto do_error; }  /* TODO(pts): Better. */
+      if ((int)r->eax < 0) { r->eax = ERR_INVALID_DATA /* ERRH_WRITE_FAULT */; goto do_error; }  /* TODO(pts): Better. */
     } else {  /* Truncate. */
-      if ((pos = lseek(bx, 0, SEEK_CUR)) == -1) { r->eax = ERR_SEEK; goto do_error; }
-      if (ftruncate(bx, pos) != 0) { r->eax = ERR_GEN_FAILURE; goto do_error; }
+      if ((pos = lseek(bx, 0, SEEK_CUR)) == -1) { r->eax = ERR_INVALID_DATA /* ERRH_SEEK */; goto do_error; }
+      if (ftruncate(bx, pos) != 0) { r->eax = ERR_INVALID_DATA  /* ERR_GEN_FAILURE */; goto do_error; }
       r->eax = 0;
     }
   } else if (ah == INT21H_FUNC_3FH_READ_FROM_FILE) {
     r->eax = read(bx, (void*)r->edx, r->ecx);
-    if ((int)r->eax < 0) { r->eax = ERR_READ_FAULT; goto do_error; }  /* TODO(pts): Better. */
+    if ((int)r->eax < 0) { r->eax = ERR_INVALID_DATA  /* ERRH_READ_FAULT */; goto do_error; }  /* TODO(pts): Better. */
   } else if (ah == INT21H_FUNC_48H_ALLOCATE_MEMORY) {  /* This OIX-specific API function differs from the typical DOS extender API. */
     r->eax = (unsigned)cealloc(r->ebx);
     if (!r->eax) { r->eax = ERR_NOT_ENOUGH_MEMORY; goto do_error; }
@@ -228,7 +233,7 @@ static void handle_syscall(struct pushad_regs *r) {
   } else if (ah == INT21H_FUNC_3EH_CLOSE_FILE) {
     if (close(bx) != 0) { r->eax = ERR_INVALID_HANDLE; goto do_error; }
   } else if (ah == INT21H_FUNC_42H_SEEK_IN_FILE) {
-    if ((pos = lseek(bx, r->ecx << 16 | (unsigned short)r->edx, (unsigned char)r->eax)) == -1) { r->eax = ERR_SEEK; goto do_error; }
+    if ((pos = lseek(bx, r->ecx << 16 | (unsigned short)r->edx, (unsigned char)r->eax)) == -1) { r->eax = ERR_INVALID_DATA /* ERRH_SEEK */; goto do_error; }
     r->edx = (unsigned)pos >> 16;  /* Zero-extend. The PMODE/W DOS extender doesn't zero-extend it, but WCFD32 fixes it. */
     r->eax = pos;  /* Don't clobber to 16 bits, int21nt.c doesn't do it either. The PMODE/W DOS extender clobbers it, but WCFD32 fixes it. */
   } else if (ah == INT21H_FUNC_44H_IOCTL_IN_FILE) {
@@ -269,7 +274,7 @@ static void handle_syscall(struct pushad_regs *r) {
 #ifdef DEBUG_MORE
     fprintf(stderr, "warning: trying to get full filename of: (%s)\r\n", (const char*)r->edx);
 #endif
-    if (r->ecx <= size) { r->eax = ERR_BAD_LENGTH; goto do_error; }  /* No way to query the required size. */
+    if (r->ecx <= size) { r->eax = ERR_INVALID_ACCESS /* ERR_BAD_LENGTH */; goto do_error; }  /* No way to query the required size. */
     memcpy((char*)r->ebx, (char*)r->edx, size + 1);
   } else { do_invalid:
     /* binw/wlib.exe in Watcom C/C++ 11.0b and 11.0c call these when creating library:
