@@ -2668,10 +2668,11 @@ handle_INT21H_FUNC_4CH_EXIT_PROCESS:
 		push dword [esi]	    ; jumptable 00410ED7 case 19
 		jmp exit_pushed
 		; Not reached.
-handle_INT21H_FUNC_44H_IOCTL_IN_FILE:
-		cmp byte [esi], 0  ; jumptable 00410ED7 case 16
-		jnz handle_unsupported_int21h_function  ; jumptable 00410ED7 case 0
+handle_INT21H_FUNC_44H_IOCTL_IN_FILE:  ; jumptable 00410ED7 case 16
 		xor eax, eax
+		inc eax  ; EAX := 1 (ERR_INVALID_FUNCTION).
+		cmp byte [esi], 0
+		jne dos_error_with_code
 		mov ax, [esi+4]
 		mov dword [esi+0Ch], 0
 		pe.reloc 4, PE_BSSREF(stdin_handle), mov eax, [relval+eax*4]
@@ -2682,16 +2683,14 @@ handle_INT21H_FUNC_44H_IOCTL_IN_FILE:
 		mov dword [esi+0Ch], 80h
 .skip:		xor eax, eax  ; Set CF=0 (success) in returned flags.
 		jmp loc_410BE9
-handle_unsupported_int21h_function:
-		xor eax, eax	    ; jumptable 00410ED7 case 0
-		mov al, [esi+1]
+handle_unsupported_int21h_function:  ; jumptable 00410ED7 case 0
+		movzx eax, byte [esi+1]  ; Report AH (%h).
+		mov byte [esi], ah  ; Indicate function not supported by setting AL := 0. MS-DOS 2.0, MS-DOS 6.22, DOSBox 0.74 DOS_21Handler and kvikdos also set AL := 0, some of them also set CF := 1.
 		push eax
 		pe.reloc 4, PE_DATAREF(aUnsupportedInt), push relval  ; "Unsupported int 21h function AH=%h\r\n"
 		call PrintMsg
-		add esp, 8
-		push 2  ; TODO(pts): Why not 1 (invalid function)? What does DOS do? */
-		pop eax
-		jmp dos_error_with_code
+		add esp, 8  ; Clean up stack from PrintMsg.
+		jmp dos_error
 
 populate_stdio_handles:
 		push ecx
