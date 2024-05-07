@@ -341,8 +341,11 @@ handle_far_INT21H_FUNC_56H_RENAME_FILE:  ; EDX: old filename, EDI: new filename.
 
 handle_far_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME:
 		cmp al, 0
-		jne handle_unimplemented
-		; Not reached.
+		je .get
+.bad:		xor eax, eax
+		inc eax  ; EAX := 1 (ERR_INVALID_FUNCTION).
+		stc
+		retf
 .get:		; !! Use the real stat(...).
 		; !! Don't lose the last bit of seconds precision.
 		; It looks like that for .lib file creation with WLIB
@@ -509,11 +512,11 @@ handle_INT21H_FUNC_42H_SEEK_IN_FILE:  ; Seek in file. EBX is the file descriptor
 
 handle_INT21H_FUNC_44H_IOCTL_IN_FILE:  ; EBX is the file descriptor. AL is the ioctl number (we support only 0). Returns: CF indicating failure; EDX (if CF=0) contains the device information bits (high word is 0). EAX (if CF=1) is DOS error code (high word is 0).
 		cmp al, 0  ; Get device information.
-		jne strict short handle_unimplemented
+		jne strict short .bad
 		; In EDX, we return 0x80 for TTY, 0 for anything else.
 		; !! TODO(pts): Should we return 0x80 for character devices other than a TTY?
 		; https://stanislavs.org/helppc/int_21-44-0.html
-		push ebx
+.get:		push ebx
 		push ecx
 		push edx
 		push eax  ; Save.
@@ -532,14 +535,20 @@ handle_INT21H_FUNC_44H_IOCTL_IN_FILE:  ; EBX is the file descriptor. AL is the i
 		jmp .ret_edx
 .not_enotty:	test eax, eax  ; Also sets CF=0.
 		pop eax
-		js strict short handle_common.pop_xret
+.pop_xret:	js strict short handle_common.pop_xret
 		mov dl, 0x80  ; Indicate character device to DOS.
 .ret_edx:	pop ecx  ; Ignore saved EDX.
 		pop ecx
 		pop ebx
 		ret
+.bad:		xor eax, eax
+		inc eax  ; EAX := 1 (ERR_INVALID_FUNCTION).
+		stc
+		ret
 
 handle_unimplemented:
+		push eax  ; Save.
+		push ebp  ; Save.
 		mov al, ah
 		aam 0x10  ; AH := high nibble; AL := low nibble
 		cmp ah, 10
@@ -554,9 +563,13 @@ handle_unimplemented:
 		mov word [ebp+msg_unimplemented.hexdigits-msg_unimplemented], ax
 		xchg eax, ebp  ; EAX := EBP; EBP := junk.
 		call print_str  ; !! Print to stderr.
-		mov al, 120  ; Exit code.
-		jmp strict short handle_INT21H_FUNC_4CH_EXIT_PROCESS
-		; Not reached.
+		pop ebp  ; Restore.
+		pop eax  ; Restore.
+		;mov al, 120  ; Exit code.
+		;jmp strict short handle_INT21H_FUNC_4CH_EXIT_PROCESS
+		mov al, 0  ; Indicate function not supported. MS-DOS 2.0, MS-DOS 6.22, DOSBox 0.74 DOS_21Handler and kvikdos also set AL := 0, some of them also set CF := 1.
+		stc
+		ret
 
 handle_INT21H_FUNC_48H_ALLOCATE_MEMORY:
 		mov eax, ebx
