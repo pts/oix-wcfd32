@@ -243,6 +243,18 @@ static void handle_syscall(struct pushad_regs *r) {
     }
     /* Get device information. */
     r->edx = isatty(bx) ? 0x80 : 0;  /* 0x80 indicates character device. */  /* We set the entire EDX (not only DX), just like int21nt.c does it. The PMODE/W DOS extender sets only DX, but WCFD32 fixes it. */
+  } else if (ah == INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES) {  /* TODO(pts): Do the real thing on DOS, OS/2 and Windows. */
+    if (*(unsigned char*)&r->eax == 0) {  /* Get attributes. */
+      /* TODO(pts): Call stat(2) if available. That will work for unreadable files. */
+      if ((fd = open((void*)r->edx, O_RDONLY | O_BINARY, 0666)) < 0) goto do_ferr;
+      r->ecx &= ~0xffffU;  /* CX := 0. Simulate that there are no DOS attributes (read-only, hidden, system, archive) set. */
+    } else if (*(unsigned char*)&r->eax == 1) {  /* Set attributes. */
+      if ((fd = open((void*)r->edx, O_WRONLY | O_BINARY, 0666)) < 0) goto do_ferr;
+      /* Simulate the attribute change by doing nothing. */
+    } else {
+      goto do_invalid;
+    }
+    close(fd);
   } else if (ah == INT21H_FUNC_41H_DELETE_NAMED_FILE) {
     if (unlink((const char*)r->edx) != 0) goto do_ferr;
   } else if (ah == INT21H_FUNC_56H_RENAME_FILE) {
@@ -288,14 +300,10 @@ static void handle_syscall(struct pushad_regs *r) {
      * INT21H_FUNC_19H_GET_CURRENT_DRIVE = 0x19,
      * INT21H_FUNC_2AH_GET_DATE = 0x2a,
      * INT21H_FUNC_2CH_GET_TIME = 0x2c,
-     * INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES = 0x43,  !! Implement this, otherwise binw/wlib.exe recreates the file.
      * INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE = 0x4e,
      * INT21H_FUNC_4FH_FIND_NEXT_MATCHING_FILE = 0x4f,
-     * INT21H_FUNC_60H_GET_FULL_FILENAME = 0x60,
-     * binw/wasm.exe in Watcom C/C++ 10.6, 11.0b and 11.0c call these when assembling:
-     * INT21H_FUNC_60H_GET_FULL_FILENAME = 0x60,
      */
-#ifdef DEBUG  /* !! Make this non-debugging. */
+#ifdef DEBUG  /* TODO(pts): Make this non-debugging? */
     fprintf(stderr, "warning: unknown OIX function: 0x%02x\r\n", ah);
 #endif
     /* TODO(pts): Implement more of the API. */
