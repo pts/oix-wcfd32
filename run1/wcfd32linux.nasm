@@ -535,7 +535,7 @@ handle_INT21H_FUNC_44H_IOCTL_IN_FILE:  ; EBX is the file descriptor. AL is the i
 		jmp .ret_edx
 .not_enotty:	test eax, eax  ; Also sets CF=0.
 		pop eax
-		js strict short handle_common.pop_xret
+.pop_xret:	js strict short handle_common.pop_xret
 		mov dl, 0x80  ; Indicate character device to DOS.
 .ret_edx:	pop ecx  ; Ignore saved EDX.
 		pop ecx
@@ -545,6 +545,42 @@ handle_INT21H_FUNC_44H_IOCTL_IN_FILE:  ; EBX is the file descriptor. AL is the i
 		inc eax  ; EAX := 1 (ERR_INVALID_FUNCTION).
 		stc
 		ret
+
+handle_INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES:  ; EDX points to the filename. AL is function number (0: get, 1: set). Returns: CF indicating failure; CX (if CF=0) is the attribute bits for the get function. EAX (if CF=1) is DOS error code (high word is 0).
+		push ebx  ; Save.
+		push ecx  ; Save.
+		mov ebx, edx
+		xor ecx, ecx  ; ECX := 0 (O_RDONLY).
+		cmp al, 1  ; Get or set attributes.
+		jbe .get_set
+.bad:		pop ecx
+		pop ebx
+		xor eax, eax
+		inc eax  ; EAX := 1 (ERR_INVALID_FUNCTION).
+		stc
+		ret
+.get_set:	add cl, al  ; ECX := 0 (O_RDONLY) for get, 1 O_WRONLY (O_WRONLY) for set.
+		push edx  ; Save for handle_common.pop_xret.
+		push eax  ; Save.
+		push SYS_open  ; TODO(pts): Use stat(2) instead, in case the file is not readable or writable.
+		pop eax
+		int 0x80  ; Linux i386 syscall.
+		xchg eax, ebx  ; EBX := file descriptor or error code.
+		test ebx, ebx
+		pop eax  ; Restore.
+		js strict short handle_INT21H_FUNC_44H_IOCTL_IN_FILE.pop_xret  ; handle_common.pop_xret
+		push eax  ; Save.
+		push SYS_close
+		pop eax
+		int 0x80  ; Linux i386 syscall.
+		pop eax  ; Restore.
+		pop edx  ; Restore.
+		pop ecx  ; Restore.
+		pop ebx  ; Restore.
+		test al, al  ; As a side effect, sets CF := 0 (success).
+		jnz .ret
+		xor cx, cx  ; CX := 0. Simulate that there are no DOS attributes (read-only, hidden, system, archive) set.
+.ret:		ret
 
 handle_unimplemented:
 		push eax  ; Save.
@@ -595,7 +631,7 @@ handlers_3CH:
 		dd handle_INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE
 		dd handle_INT21H_FUNC_41H_DELETE_NAMED_FILE
 		dd handle_INT21H_FUNC_42H_SEEK_IN_FILE
-		dd handle_unimplemented  ; dd handle_INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES  ; WASM doesn't need it.
+		dd handle_INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES
 		dd handle_INT21H_FUNC_44H_IOCTL_IN_FILE
 		dd handle_unimplemented  ; 45H
 		dd handle_unimplemented  ; 46H
