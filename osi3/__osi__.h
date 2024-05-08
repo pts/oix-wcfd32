@@ -545,7 +545,7 @@ static __declspec(naked) int __watcall __osi_start_helper(void) { __asm {
 		inc edx
 		jmp short LP5
   LP6:		je short LP10
-  LP7:		xor bh, 0x1
+  LP7:		not bh
   LP8:		mov bl, [edx]
 		test bl, bl
 		je short LP16

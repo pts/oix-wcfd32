@@ -210,7 +210,7 @@ parse_first_arg:
 		inc edx
 		jmp .5
 .6:		je .10
-.7:		xor bh, 0x1
+.7:		not bh
 .8:		mov bl, [edx]
 		test bl, bl
 		je .16

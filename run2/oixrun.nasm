@@ -215,7 +215,7 @@ parse_first_arg:
 		inc edx
 		jmp .5
 .6:		je .10
-.not_isq:	xor bh,  1  ; TODO(pts): not bh  ; is_quote ^= -1;
+.not_isq:	not bh
 .next_char:	mov bl, [edx]
 		test bl, bl
 		je .after_arg  ; Reached end of input.
