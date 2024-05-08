@@ -64,6 +64,7 @@
 # TODO(pts): Preload oixrun.oix to wcfd32win32.exe, don't let oixrun.exe contain `Memory allocation failed' 2 times, just once. This is possible by overlapping the end of the LE image with the beginning of the PE image. the winning is 211 file bytes, and the loss is more virtual memory usage.
 # TODO(pts): Make the size of the command-line unlimited on Windows, currently it's 0x100 bytes.
 # TODO(pts): Use only BX as filehandle in wcfd32linux.nasm.
+# TODO(pts): INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE makes mwperun.exe crash DOSBox (even if there are no wildcards in the filename) in: dosbox.nox.static --cmd --mem-mb=3 ~/prg/mwpestub/mwperun.exe run1/oixrun.exe wl.exe t.lib rex2oix.o
 #
 
 set -ex

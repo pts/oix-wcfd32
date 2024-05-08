@@ -228,17 +228,20 @@
 #    define ENOTDIR 23
 #    define EACCES 6
 #    define ENXIO 27
+#    define ERANGE 14
 #  else  /* Typical values, including Linux and FreeBSD. */
 #    ifdef __TURBOC__
 #      define ENOENT 2
 #      define ENOTDIR 120  /* Fake. */
 #      define EACCES 5
 #      define ENXIO 121  /* Fake. */
-#    else
+#      define ERANGE 34
+#    else  /* Linux, FreeBSD, macOS, iBCS2, Win32 MSVCRT.DLL. */
 #      define ENOENT 2
 #      define ENOTDIR 20
 #      define EACCES 13
 #      define ENXIO 6
+#      define ERANGE 34
 #    endif
 #  endif
 #  if defined(__WATCOMC_LIBC__) && !defined(errno)
@@ -249,7 +252,7 @@
 #  endif
 #else
 #  include <errno.h>  /* The errno variable and the E... constants. `extern int errno;' doesn't work everywhere, because errno may be thread-local. */
-#  if (defined(__linux__) || defined(__FreeBSD__)) && (ENOENT != 2 || ENOTDIR != 20 || EACCES != 13 || ENXIO != 6)
+#  if !defined(POIX_ANY_E) && (defined(__linux__) || defined(__FreeBSD__) || (defined(_WIN32) && !defined(__WATCOMC__))) && (ENOENT != 2 || ENOTDIR != 20 || EACCES != 13 || ENXIO != 6 || ERANGE != 34)
 #    error Bad E* constants.  /* Typically with __WATCOMC_LIBC__ and bad -I"$WATCOM/lh" not specified, so the incorrect -I"$WATCOM/h" is used. */
 #  endif
 #  if defined(__TURBOC__) && ENOTDIR<0

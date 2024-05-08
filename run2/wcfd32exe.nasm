@@ -690,6 +690,8 @@ wcfd32_far_syscall:  ; proc far
                 je strict short .handle_INT21H_FUNC_42H_SEEK_IN_FILE
                 cmp ah, INT21H_FUNC_60H_GET_FULL_FILENAME
 		je strict short .handle_far_INT21H_FUNC_60H_GET_FULL_FILENAME
+		cmp ah, INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME
+		je strict short .handle_far_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME
 		cmp ah, INT21H_FUNC_48H_ALLOCATE_MEMORY
 		jne .not_48h
 		mov eax, ebx
@@ -735,6 +737,13 @@ wcfd32_far_syscall:  ; proc far
 		movzx edx, dx  ; Set high word of EDX to 0, for compatibility with int21nt.c and oixrun.c.
 		clc
 		jmp strict short .done
+.handle_far_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME:
+		cmp al, 1  ; We check it because DOSBox 0.74 doesn't report the error properly.
+		jbe strict short .not_48h
+		xor eax, eax
+		inc eax  ; EAX := 1 (ERR_INVALID_FUNCTION).
+		stc
+		retf
 .handle_far_INT21H_FUNC_60H_GET_FULL_FILENAME:
 		; This is different from https://stanislavs.org/helppc/int_21-60.html ,
 		; see int21nt.c. This gives the input pathname in EDX.
@@ -1157,7 +1166,17 @@ EXCEPTION_ACCESS_VIOLATION      equ -1073741819
 EXCEPTION_ILLEGAL_INSTRUCTION   equ -1073741795
 CONTROL_C_EXIT equ -1073741510
 
-ERROR_TOO_MANY_OPEN_FILES        equ 0x4
+; DOS error codes between 1 and 18 == 0x12.
+; https://stanislavs.org/helppc/dos_error_codes.html
+ERR_INVALID_FUNCTION equ 1
+ERR_FILE_NOT_FOUND equ 2
+ERR_PATH_NOT_FOUND equ 3
+ERR_TOO_MANY_OPEN_FILES equ 4
+ERR_ACCESS_DENIED equ 5
+ERR_NOT_ENOUGH_MEMORY equ 8
+ERR_BAD_FORMAT equ 11
+ERR_INVALID_ACCESS equ 12
+ERR_INVALID_DATA equ 13
 
 FALSE equ 0
 TRUE  equ 1
@@ -1301,7 +1320,7 @@ loc_4101CF:
 		add al, '0'
 		jmp loc_4101E5
 loc_4101E3:
-		add al, 37h
+		add al, 37h  ; Starts with 'A'.
 loc_4101E5:
 		inc ecx
 		mov byte [esp+ecx+98h-99h], al
@@ -1340,7 +1359,7 @@ pop_esi_edx_ecx_ebx_ret:
 DumpEnvironment:
 		push ebx
 		push edx
-		pe.reloc 4, PE_DATAREF(fmt), push relval	     ; "Environment Variables:\r\n"
+		pe.reloc 4, PE_DATAREF(aEnv), push relval	     ; "Environment Variables:\r\n"
 		call PrintMsg
 		pe.reloc 4, PE_DATAREF(wcfd32win32_env_strings), mov edx, [relval]
 		add esp, 4
@@ -1764,7 +1783,25 @@ loc_4108FB:
 		; Not reached.
 
 wcfd32win32_far_syscall:  ; proc far
+%ifdef DEBUG  ; Dump incoming syscall number.
+		push eax  ; Save.
+		movzx eax, ah  ; Report AH (%h in aUnsupportedInt).
+		push eax
+		pe.reloc 4, PE_DATAREF(aUnsupportedInt+3), push relval
+		call PrintMsg
+		add esp, 8  ; Clean up stack from PrintMsg.
+		pop eax  ; Restore.
+%endif
 		call wcfd32win32_near_syscall
+%ifdef DEBUG  ; Indicate return from syscall.
+		pushfd
+		push eax
+		pe.reloc 4, PE_DATAREF(aEnv), push relval
+		call PrintMsg
+		add esp, 4  ; Clean up stack from PrintMsg.
+		pop eax
+		popfd
+%endif
 		retf
 
 ; unsigned __int8 __usercall wcfd32win32_near_syscall@<cf>(unsigned int r_eax@<eax>, unsigned int r_ebx@<ebx>, unsigned int r_ecx@<ecx>, unsigned int r_edx@<edx>, unsigned int r_esi@<esi>, unsigned int  dword  8 @<edi>)
@@ -1805,7 +1842,7 @@ loc_4109E0:
 		inc esi
 		cmp ebx, other_stdio_handles.end-other_stdio_handles
 		jne loc_4109E0
-		pe.reloc 8, PE_BSSREF(force_last_error), mov dword [relval], ERROR_TOO_MANY_OPEN_FILES
+		pe.reloc 8, PE_BSSREF(force_last_error), mov dword [relval], ERR_TOO_MANY_OPEN_FILES
 loc_4109FC:
 		xor eax, eax
 		jmp loc_410A2A
@@ -2182,6 +2219,14 @@ func_INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE:
 		push eax	     ; lpFindFileData
 		mov edx, [esi+0Ch]
 		push edx	     ; lpFileName
+%ifdef DEBUG  ; Dump filename to be matched.
+		push eax  ; Save.
+		push aS
+		push edx
+		call PrintMsg
+		add esp, 8  ; Clean up stack from PrintMsg.
+		pop eax ; Restore.
+%endif
 		xor ebx, ebx
 		pe.call.imp FindFirstFileA
 		mov ecx, eax
@@ -2269,30 +2314,20 @@ loc_410DC8:
 func_INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES:
 		push ebx
 		push ecx
-		push edx
 		push esi
 		mov ebx, eax
-		mov ah, [eax]
 		xor esi, esi
-		test ah, ah
-		jnz loc_410DFD
-		mov edx, [ebx+0Ch]
-		push edx	     ; lpFileName
-		pe.call.imp GetFileAttributesA
-		mov edx, eax
-		cmp eax, 0FFFFFFFFh
-		jz loc_410E04
-		mov esi, 1
-		mov [ebx+8], al
-		jmp loc_410E04
-loc_410DFD:
-		xor eax, eax
-		mov al, [ebx]
-		cmp eax, 1
-loc_410E04:
-		mov eax, esi
+		cmp byte [eax], 0  ; Get.
+		jne .done
+		push dword [ebx+0Ch]     ; lpFileName
+                pe.call.imp GetCurrentDirectoryA
+		cmp eax, -1
+		je .done
+		inc esi  ; ESI := 1 (TRUE).
+		mov ah, 0
+		mov [ebx+8], ax  ; Set CX in the result.
+.done:		mov eax, esi
 		pop esi
-		pop edx
 		pop ecx
 		pop ebx
 		ret
@@ -2333,7 +2368,7 @@ wcfd32win32_near_syscall_low:
 		mov ecx, 19h
 		pe.reloc 4, PE_BSSREF(force_last_error), mov [relval], edx  ; ERROR_SUCCESS. Don't force the last error.
 		pe.reloc 4, PE_DATAREF(dos_syscall_numbers), mov edi, relval
-		mov al, [eax+1]
+		mov al, [esi+1]
 		repne scasb
 		pe.reloc 4, PE_DATAREF(dos_syscall_handlers), movzx ecx, word [relval+ecx*2]
 		pe.reloc 4, PE_TEXTREF(first_handler), add ecx, relval
@@ -2361,7 +2396,7 @@ loc_410EFA:
 		jnz dos_error_with_code
 		pe.call.imp GetLastError
 dos_error_with_code:
-		mov [esi], eax  ; Return DOS error code in AX.
+		mov [esi], eax  ; Return DOS error code in EAX.
 dos_error:
 		mov eax, 100h  ; Set CF=1 (error) in returned flags.
 		jmp loc_410BE9
@@ -2390,7 +2425,12 @@ handle_INT21H_FUNC_4FH_FIND_NEXT_MATCHING_FILE:
 		jmp done_handling
 handle_INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES:
 		mov eax, esi	    ; jumptable 00410ED7 case 15
-		call func_INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES
+		cmp byte [esi], 0  ; Get or set attributes.
+		jne .get_set
+		xor eax, eax
+		inc eax  ; EAX := 1 (ERR_INVALID_FUNCTION).
+		jmp dos_error_with_code
+.get_set:	call func_INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES
 		jmp done_handling
 handle_INT21H_FUNC_47H_GET_CURRENT_DIR:
 		mov edx, [esi+10h]  ; jumptable 00410ED7 case 17
@@ -2661,7 +2701,12 @@ handle_INT21H_FUNC_48H_ALLOCATE_MEMORY:
 		jmp done_handling  ; Force success, because EAX is not 0.
 handle_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME:  ; !! WDOSX and PMODE/W (e.g. _int213C) don't extend it. !! What else?
 		mov eax, esi	    ; jumptable 00410ED7 case 23
-		call func_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME
+		cmp byte [esi], 1  ; Get or set attributes.
+		jbe .get_set
+		xor eax, eax
+		inc eax  ; EAX := 1 (ERR_INVALID_FUNCTION).
+		jmp dos_error_with_code
+.get_set:	call func_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME
 		jmp done_handling
 handle_INT21H_FUNC_60H_GET_FULL_FILENAME:  ; !! WDOSX and PMODE/W (e.g. _int213C) don't extend it. What else?
 		mov eax, esi	    ; jumptable 00410ED7 case 24
@@ -2687,10 +2732,10 @@ handle_INT21H_FUNC_44H_IOCTL_IN_FILE:  ; jumptable 00410ED7 case 16
 .skip:		xor eax, eax  ; Set CF=0 (success) in returned flags.
 		jmp loc_410BE9
 handle_unsupported_int21h_function:  ; jumptable 00410ED7 case 0
-		movzx eax, byte [esi+1]  ; Report AH (%h).
+		movzx eax, byte [esi+1]  ; Report AH (%h in aUnsupportedInt).
 		mov byte [esi], ah  ; Indicate function not supported by setting AL := 0. MS-DOS 2.0, MS-DOS 6.22, DOSBox 0.74 DOS_21Handler and kvikdos also set AL := 0, some of them also set CF := 1.
 		push eax
-		pe.reloc 4, PE_DATAREF(aUnsupportedInt), push relval  ; "Unsupported int 21h function AH=%h\r\n"
+		pe.reloc 4, PE_DATAREF(aUnsupportedInt), push relval
 		call PrintMsg
 		add esp, 8  ; Clean up stack from PrintMsg.
 		jmp dos_error
@@ -2837,8 +2882,8 @@ dos_syscall_handlers:
 		dw -first_handler+handle_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME  ; jumptable 00410ED7 case 23
 		dw -first_handler+handle_INT21H_FUNC_60H_GET_FULL_FILENAME  ; jumptable 00410ED7 case 24
 
-; char fmt[]
-fmt		db 'Environment Variables:',0Dh,0Ah,0
+; char aEnv[]
+aEnv		db 'Environment Variables:',0Dh,0Ah,0
 ; char aS[]
 aS		db '%s',0Dh,0Ah,0
 dump_filename	db '_watcom_.dmp',0
@@ -2869,7 +2914,7 @@ aIntegerDivideB db 'Integer divide by 0',0
 aStackOverflow	db 'Stack overflow',0
 aCon		db 'con',0
 ; char aUnsupportedInt[]
-aUnsupportedInt db 'Unsupported int 21h function AH=%h'  ; Continues in str_crlf.
+aUnsupportedInt db 'warning: unsupported OIX syscall 0x%h'  ; Continues in str_crlf.
 str_crlf	db 0Dh,0Ah  ; Continues in empty_env.
 empty_env	db 0  ; Continues in empty_str.
 empty_str	db 0

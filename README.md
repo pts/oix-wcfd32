@@ -337,6 +337,51 @@ Here is the initial register setup of the OIX program entry point (based on
 * BSS is not initlizated with 0 bytes. (But the WCFD32 runtime system and
   *oixrun.c* do it.)
 
+Indication of error:
+
+* Syscall INT21H_FUNC_4CH_EXIT_PROCESS never returns to the program.
+
+* For an invalid or unsupported syscall, CF := 1 is set and AL is set to 0.
+  The rest of EAX (including the syscall number in AH) is unchanged.
+
+* Syscalls INT21H_FUNC_06H_DIRECT_CONSOLE_IO,
+  INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO,
+  INT21H_FUNC_19H_GET_CURRENT_DRIVE,
+  INT21H_FUNC_1AH_SET_DISK_TRANSFER_ADDRESS, INT21H_FUNC_2AH_GET_DATE,
+  INT21H_FUNC_2CH_GET_TIME always succeed, they don't indicate error, they
+  keep CF unchanged.
+
+* Syscall INT21H_FUNC_48H_ALLOCATE_MEMORY indicates error by setting CF := 1
+  and setting EAX to the error code ERR_NOT_ENOUGH_MEMORY (8). On success,
+  it sets CF := 0.
+
+* All other syscalls (including INT21H_FUNC_60H_GET_FULL_FILENAME) indicate
+  error by setting CF := 1 and setting EAX to the error code. On
+  success, they set CF := 0.
+
+  Most of the error codes for these syscalls can be meaningless nonzero
+  values, except that:
+
+  * for INT21H_FUNC_3CH_CREATE_FILE,
+    INT21H_FUNC_3DH_OPEN_FILE, INT21H_FUNC_41H_DELETE_NAMED_FILE,
+    INT21H_FUNC_56H_RENAME_FILE, INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES
+    can be ERR_FILE_NOT_FOUND (2), ERR_PATH_NOT_FOUND (3), ERR_ACCESS_DENIED
+    (5) or some other meaningless nonzero value;
+
+  * for INT21H_FUNC_3DH_OPEN_FILE if AL (flags) is not 0, 1 or 2,
+    the error code is ERR_INVALID_ACCESS (12);
+
+  * for INT21H_FUNC_60H_GET_FULL_FILENAME, if the output would be too long,
+    the error code in some implementations is ERR_INVALID_ACCESS (12);
+
+  * for INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES,
+    INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME if AL is not 0 or 1, or if
+    setting is not supported and AL is 1, then the error code is
+    ERR_INVALID_FUNCTION (1);
+
+  * for INT21H_FUNC_44H_IOCTL_IN_FILE if the value of AL is not 0 (get), then
+    the error code is ERR_INVALID_FUNCTION (1).
+
 TODO(pts): Write about the syscall (\_\_Int21) ABI.
 
 ## Executable file format debugging

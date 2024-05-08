@@ -382,6 +382,8 @@ wcfd32_far_syscall:  ; proc far
                 je strict short .handle_INT21H_FUNC_42H_SEEK_IN_FILE
                 cmp ah, INT21H_FUNC_60H_GET_FULL_FILENAME
 		je strict short .handle_far_INT21H_FUNC_60H_GET_FULL_FILENAME
+		cmp ah, INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME
+		je strict short .handle_far_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME
 		cmp ah, INT21H_FUNC_48H_ALLOCATE_MEMORY
 		jne .not_48h
 		mov eax, ebx
@@ -426,6 +428,13 @@ wcfd32_far_syscall:  ; proc far
 		rol eax, 16  ; Set high word of EAX to DX, for compatibility with int21nt.c and oixrun.c.
 		movzx edx, dx  ; Set high word of EDX to 0, for compatibility with int21nt.c and oixrun.c.
 		clc
+		retf
+.handle_far_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME:
+		cmp al, 1  ; We check it because DOSBox 0.74 doesn't report the error properly.
+		jbe strict short .not_48h
+		xor eax, eax
+		inc eax  ; EAX := 1 (ERR_INVALID_FUNCTION).
+		stc
 		retf
 .handle_far_INT21H_FUNC_60H_GET_FULL_FILENAME:
 		; This is different from https://stanislavs.org/helppc/int_21-60.html ,

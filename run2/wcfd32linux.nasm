@@ -131,6 +131,17 @@ NULL equ 0
 EXIT_SUCCESS equ 0
 EXIT_FAILURE equ 1
 
+; DOS error codes between 1 and 18 == 0x12.
+; https://stanislavs.org/helppc/dos_error_codes.html
+ERR_INVALID_FUNCTION equ 1
+ERR_FILE_NOT_FOUND equ 2
+ERR_PATH_NOT_FOUND equ 3
+ERR_TOO_MANY_OPEN_FILES equ 4
+ERR_ACCESS_DENIED equ 5
+ERR_NOT_ENOUGH_MEMORY equ 8
+ERR_BAD_FORMAT equ 11
+ERR_INVALID_ACCESS equ 12
+ERR_INVALID_DATA equ 13
 
 _start:  ; Linux i386 program entry point.
 %if RUNPROG==0
@@ -277,21 +288,21 @@ wcfd32_near_syscall:
 
 first_handler:  ; Don't move anything above this, otherwise handlers_3CH would have negative values.
 
-handle_unimplemented:
+handle_unsupported:
 		push eax  ; Save.
 		push ebp  ; Save.
 		mov al, ah
 		aam 0x10  ; AH := high nibble; AL := low nibble
 		cmp ah, 10
 		jb .ah
-		add ah, 'a'-'0'-10
+		add ah, 'A'-'0'-10
 .ah:		cmp al, 10
 		jb .al
-		add al, 'a'-'0'-10
+		add al, 'A'-'0'-10
 .al		add ax, '0'<<8|'0'
 		xchg al, ah
-		mov ebp, msg_unimplemented
-		mov word [ebp+msg_unimplemented.hexdigits-msg_unimplemented], ax
+		mov ebp, msg_unsupported
+		mov word [ebp+msg_unsupported.hexdigits-msg_unsupported], ax
 		xchg eax, ebp  ; EAX := EBP; EBP := junk.
 		call print_str  ; !! Print to stderr.
 		pop ebp  ; Restore.
@@ -315,9 +326,9 @@ wcfd32_far_syscall: ; proc far
 		cmp ah, INT21H_FUNC_60H_GET_FULL_FILENAME
 		je strict short handle_INT21H_FUNC_60H_GET_FULL_FILENAME
 		cmp ah, 0x3c
-.hui:		jb strict short handle_unimplemented
+.hui:		jb strict short handle_unsupported
 		cmp ah, 0x3c + ((handlers_3CH.end-handlers_3CH)>>1)
-		jnb strict short handle_unimplemented
+		jnb strict short handle_unsupported
 		push eax  ; Save EAX.
 		movzx eax, ah
 		movzx eax, word [handlers_3CH-2*0x3c+2*eax]
@@ -344,26 +355,6 @@ handle_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO:
 		pop ecx
 		pop ebx
 		retf
-
-handle_INT21H_FUNC_56H_RENAME_FILE:  ; EDX: old filename, EDI: new filename.
-		push ebx
-		push ecx
-		push eax
-		push SYS_rename
-		pop eax
-		mov ebx, edx
-		mov ecx, edi
-		int 0x80  ; Linux i386 syscall.
-		test eax, eax
-		pop eax
-		pop ecx
-		pop ebx
-		clc
-		jns .good
-		stc
-		push 0xb  ; Fallback DOS error: Invalid format.
-		pop eax
-.good:		retf
 
 handle_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME:
 		cmp al, 0
@@ -413,14 +404,35 @@ handle_INT21H_FUNC_60H_GET_FULL_FILENAME:
 		clc
 		pop esi
 		retf
-.err:		push 0x18  ; ERR_BAD_LENGTH.
+.err:		push ERR_INVALID_ACCESS  ; ERRH_BAD_LENGTH would be more appropriate, but that's above the 0x12 allowed.
 		pop eax
 		stc
 		pop esi
 		retf
 
-handle_INT21H_FUNC_3DH_OPEN_FILE:  ; Open file. AL is access mode (0, 1 or 2). EDX points to the filename. Returns: CF indicating failure; EAX (if CF=0) is the filehandle (high word is 0). EAX (if CF=1) is DOS error code (high word is 0).
+handle_INT21H_FUNC_56H_RENAME_FILE:  ; EDX: old filename, EDI: new filename.
+		push edx  ; Save for handle_common.pop_xret.
 		push ebx
+		push ecx
+		push eax  ; Save EAX.
+		push SYS_rename
+		pop eax
+		mov ebx, edx
+		mov ecx, edi
+		int 0x80  ; Linux i386 syscall.
+		test eax, eax  ; Also sets CF := 0 (success).
+		pop eax  ; Restore EAX.
+		jmp strict short handle_common.pop_xret
+		; Not reached.
+
+handle_INT21H_FUNC_3DH_OPEN_FILE:  ; Open file. AL is access mode (0, 1 or 2). EDX points to the filename. Returns: CF indicating failure; EAX (if CF=0) is the filehandle (high word is 0). EAX (if CF=1) is DOS error code (high word is 0).
+		cmp al, 2
+		jbe .ok
+		push ERR_INVALID_ACCESS
+		pop eax
+		stc
+		retf
+.ok:		push ebx
 		push ecx
 		push edx
 		xchg ecx, eax  ; ECX := EAX; EAX := junk.
@@ -433,7 +445,7 @@ handle_INT21H_FUNC_3EH_CLOSE_FILE:  ; Close file. EBX is the file descriptor to 
 		push SYS_close
 		pop eax
 		int 0x80  ; Linux i386 syscall.
-		test eax, eax
+		test eax, eax  ; Also sets CF := 0 (success).
 		pop eax  ; Restore EAX.
 		jmp strict short handle_common.xret  ; Treat any negative values as error. This effectively limits the usable file size to <2 GiB (7fffffffh bytes). That's fine, Linux won't give us more without O_LARGEFILE anyway.
 
@@ -460,7 +472,7 @@ handle_INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE:  ; Write to or truncate file. 
 		push SEEK_CUR
 		pop edx
 		int 0x80  ; Linux i386 syscall.
-		test eax, eax
+		test eax, eax  ; Also sets CF := 0 (success).
 		js strict short handle_common.pop_xret
 		xchg ecx, eax  ; ECX := EAX (file position); EAX := junk.
 		push SYS_ftruncate
@@ -479,24 +491,25 @@ handle_common:
 		; !! TODO(pts): Fail of EAX (file descriptor) > 0xffff.
 .cax:		pop eax
 		int 0x80  ; Linux i386 syscall.
-.test_pop_xret:	test eax, eax
+.test_pop_xret:	test eax, eax  ; Also sets CF := 0 (success).
 .pop_xret:	pop edx
 		pop ecx
 		pop ebx
-.xret:		js .badret  ; Treat any negative values as error. This effectively limits the usable file size to <2 GiB (7fffffffh bytes). That's fine, Linux won't give us more without O_LARGEFILE anyway.
-		clc
+.xret:		; This assumes that CF == 0 even if jumped directly.
+		js .badret  ; Treat any negative values as error. This effectively limits the usable file size to <2 GiB (7fffffffh bytes). That's fine, Linux won't give us more without O_LARGEFILE anyway.
 		retf
 .badret:	push ebx
 		xor ebx, ebx
-		mov bl, 2  ; DOS error: File not found. https://stanislavs.org/helppc/dos_error_codes.html TODO(pts): Add better error mapping.
+		mov bl, ERR_FILE_NOT_FOUND
 		cmp eax, -ENOENT  ; This is important, _sopen in Watcom libc relies on error code 2 before attempting to create a file.
 		je .err_found
+		mov bl, ERR_PATH_NOT_FOUND
 		cmp eax, -ENOTDIR
 		je .err_found
-		mov bl, 5  ; DOS error: Access denied.
+		mov bl, ERR_ACCESS_DENIED
 		cmp eax, -EACCES
 		je .err_found
-		mov bl, 0xb ; Fallback DOS error: Invalid format.
+		mov bl, ERR_BAD_FORMAT  ; Fallback.
 .err_found:	xchg eax, ebx  ; EAX := EBX (DOS error code); EBX := junk.
 		pop ebx
 		stc
@@ -524,7 +537,7 @@ handle_INT21H_FUNC_42H_SEEK_IN_FILE:  ; Seek in file. EBX is the file descriptor
 		push SYS_lseek  ; Only 32-bit offsets.
 		pop eax
 		int 0x80  ; Linux i386 syscall.
-		test eax, eax
+		test eax, eax  ; Also sets CF := 0 (success).
 		js strict short handle_common.pop_xret
 		ror eax, 16
 		movzx edx, ax
@@ -558,7 +571,7 @@ handle_INT21H_FUNC_44H_IOCTL_IN_FILE:  ; EBX is the file descriptor. AL is the i
 		pop eax
 		;mov dl, 0  ; Indicate disk file to DOS. DL is already 0.
 		jmp .ret_edx
-.not_enotty:	test eax, eax  ; Also sets CF=0.
+.not_enotty:	test eax, eax  ; Also sets CF := 0 (success).
 		pop eax
 .pop_xret:	js strict short handle_common.pop_xret
 		mov dl, 0x80  ; Indicate character device to DOS.
@@ -591,9 +604,9 @@ handle_INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES:  ; EDX points to the filename. 
 		pop eax
 		int 0x80  ; Linux i386 syscall.
 		xchg eax, ebx  ; EBX := file descriptor or error code.
-		test ebx, ebx
+		test ebx, ebx  ; Also sets CF := 0 (success).
 		pop eax  ; Restore.
-		js strict short handle_INT21H_FUNC_44H_IOCTL_IN_FILE.pop_xret  ; handle_common.pop_xret
+		js strict short handle_INT21H_FUNC_44H_IOCTL_IN_FILE.pop_xret  ; handle_common.pop_xret.
 		push eax  ; Save.
 		push SYS_close
 		pop eax
@@ -612,7 +625,7 @@ handle_INT21H_FUNC_48H_ALLOCATE_MEMORY:
 		call malloc
 		cmp eax, 1
 		jnc .done  ; Success with CF=0.
-		mov al, 8  ; DOS error: Insufficient memory. https://stanislavs.org/helppc/dos_error_codes.html
+		mov al, ERR_NOT_ENOUGH_MEMORY
 		; Keep CF=1 for indicating error.
 .done:		retf
 
@@ -633,13 +646,13 @@ handlers_3CH:
 		dw -first_handler+handle_INT21H_FUNC_42H_SEEK_IN_FILE
 		dw -first_handler+handle_INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES
 		dw -first_handler+handle_INT21H_FUNC_44H_IOCTL_IN_FILE
-		dw -first_handler+handle_unimplemented  ; 45H
-		dw -first_handler+handle_unimplemented  ; 46H
-		dw -first_handler+handle_unimplemented  ; dw -first_handler+handle_INT21H_FUNC_47H_GET_CURRENT_DIR  ; WASM doesn't need it.
+		dw -first_handler+handle_unsupported  ; 45H
+		dw -first_handler+handle_unsupported  ; 46H
+		dw -first_handler+handle_unsupported  ; dw -first_handler+handle_INT21H_FUNC_47H_GET_CURRENT_DIR  ; WASM doesn't need it.
 		dw -first_handler+handle_INT21H_FUNC_48H_ALLOCATE_MEMORY
-		dw -first_handler+handle_unimplemented  ; 49H
-		dw -first_handler+handle_unimplemented  ; 4AH
-		dw -first_handler+handle_unimplemented  ; 4BH
+		dw -first_handler+handle_unsupported  ; 49H
+		dw -first_handler+handle_unsupported  ; 4AH
+		dw -first_handler+handle_unsupported  ; 4BH
 		dw -first_handler+handle_INT21H_FUNC_4CH_EXIT_PROCESS
 ; !! Implement these, but only if needed by WASM or WLIB.
 ; !! WASM by default needs: 3C, 3D, 3E, 3F, 40, 41, 42, 44, 48, 4C, also the help needs 08e
@@ -859,7 +872,7 @@ get_arg_quoted_size:
 		je .2
 		cmp byte [edx], ' '
 		je .2
-		cmp byte [edx], 0x9
+		cmp byte [edx], 0x9  ; !! TODO(pts): Make the comparisons below more compact.
 		je .2
 		cmp byte [edx], 0xa
 		je .2
@@ -941,7 +954,7 @@ append_arg_quoted:
 		je .10
 		cmp byte [ecx], ' '
 		je .10
-		cmp byte [ecx], 0x9
+		cmp byte [ecx], 0x9  ; !! TODO(pts): Make the comparisons below more compact.
 		je .10
 		cmp byte [ecx], 0xa
 		je .10
@@ -1133,7 +1146,7 @@ concatenate_env:
 
 ;section .data
 
-msg_unimplemented: db 'fatal: unimplemented syscall 0x',
+msg_unsupported: db 'warning: unsupported OIX syscall 0x',
 .hexdigits:	db '??', 13, 10, 0  ; The '??' part is read-write.
 
 %if RUNPROG

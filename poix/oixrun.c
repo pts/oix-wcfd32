@@ -218,7 +218,7 @@ static void handle_syscall(struct pushad_regs *r) {
    do_open:
     if ((fd = open((void*)r->edx, fd | O_BINARY, 0666)) < 0) {
      do_ferr:
-      r->eax = (errno == ENOENT || errno == ENOTDIR) ? ERR_FILE_NOT_FOUND : (errno == EACCES) ? ERR_ACCESS_DENIED : ERR_BAD_FORMAT;
+      r->eax = (errno == ENOENT) ? ERR_FILE_NOT_FOUND : (errno == ENOTDIR) ? ERR_PATH_NOT_FOUND : (errno == EACCES) ? ERR_ACCESS_DENIED : ERR_BAD_FORMAT;
       goto do_error;
     }
     /* The ABI only allows 16-bit filehandles. So we fail of the POSIX
@@ -228,6 +228,7 @@ static void handle_syscall(struct pushad_regs *r) {
     if ((unsigned)fd > 0xffff) { close(fd); r->eax = ERR_TOO_MANY_OPEN_FILES; goto do_error; }
     r->eax = fd;  /* We set the entire EAX (not only AX), just like int21nt.c does it. The PMODE/W DOS extender also sets the entire EAX. */
   } else if (ah == INT21H_FUNC_3DH_OPEN_FILE) {
+    if (*(const unsigned char*)&r->eax > 2) { do_invalid_access: r->eax = ERR_INVALID_ACCESS; goto do_error; }
     fd = r->eax & 3;  /* O_RDONLY == 0, O_WRONLY == 1, O_RDWR == 2. */
     goto do_open;
   } else if (ah == INT21H_FUNC_3EH_CLOSE_FILE) {
@@ -237,10 +238,7 @@ static void handle_syscall(struct pushad_regs *r) {
     r->edx = (unsigned)pos >> 16;  /* Zero-extend. The PMODE/W DOS extender doesn't zero-extend it, but WCFD32 fixes it. */
     r->eax = pos;  /* Don't clobber to 16 bits, int21nt.c doesn't do it either. The PMODE/W DOS extender clobbers it, but WCFD32 fixes it. */
   } else if (ah == INT21H_FUNC_44H_IOCTL_IN_FILE) {
-    if ((r->eax & 0xff) != 0) { do_invalid:
-      r->eax = ERR_INVALID_FUNCTION;
-      goto do_error;
-    }
+    if ((r->eax & 0xff) != 0) { do_invalid_function: r->eax = ERR_INVALID_FUNCTION; goto do_error; }
     /* Get device information. */
     r->edx = isatty(bx) ? 0x80 : 0;  /* 0x80 indicates character device. */  /* We set the entire EDX (not only DX), just like int21nt.c does it. The PMODE/W DOS extender sets only DX, but WCFD32 fixes it. */
   } else if (ah == INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES) {  /* TODO(pts): Do the real thing on DOS, OS/2 and Windows. */
@@ -252,7 +250,7 @@ static void handle_syscall(struct pushad_regs *r) {
       if ((fd = open((void*)r->edx, O_WRONLY | O_BINARY, 0666)) < 0) goto do_ferr;
       /* Simulate the attribute change by doing nothing. */
     } else {
-      goto do_invalid;
+      goto do_invalid_function;
     }
     close(fd);
   } else if (ah == INT21H_FUNC_41H_DELETE_NAMED_FILE) {
@@ -272,7 +270,7 @@ static void handle_syscall(struct pushad_regs *r) {
      * binw/wlib.exe in Watcom C/C++ 10.5 and 10.6 use it for .lib file creation (default OMF LIBHEAD format), and only for getting the time.
      * We could use our own gmtime(2), but this syscall expects local time, but not all libcs have a working localtime(2).
      */
-    if (*(const char*)r->eax != 0) goto do_invalid;
+    if (*(const char*)r->eax != 0) goto do_invalid_function;
     r->ecx = 0;  /* Fake file time. */
     r->edx = 1 << 5 | 1;  /* Fake file date. */
   } else if (ah == INT21H_FUNC_60H_GET_FULL_FILENAME) {
@@ -293,7 +291,7 @@ static void handle_syscall(struct pushad_regs *r) {
 #ifdef DEBUG_MORE
     fprintf(stderr, "warning: trying to get full filename of: (%s)\r\n", (const char*)r->edx);
 #endif
-    if (r->ecx <= size) { r->eax = ERR_INVALID_ACCESS /* ERR_BAD_LENGTH */; goto do_error; }  /* No way to query the required size. */
+    if (r->ecx <= size) goto do_invalid_access;  /* ERR_BAD_LENGTH */ /* No way to query the required size. */
     memcpy((char*)r->ebx, (char*)r->edx, size + 1);
   } else {
     /* binw/wlib.exe in Watcom C/C++ 11.0b and 11.0c call these when creating library:
@@ -304,7 +302,7 @@ static void handle_syscall(struct pushad_regs *r) {
      * INT21H_FUNC_4FH_FIND_NEXT_MATCHING_FILE = 0x4f,
      */
 #ifdef DEBUG  /* TODO(pts): Make this non-debugging? */
-    fprintf(stderr, "warning: unknown OIX function: 0x%02x\r\n", ah);
+    fprintf(stderr, "warning: unsupported OIX syscall 0x%02X\r\n", ah);
 #endif
     /* TODO(pts): Implement more of the API. */
     *(unsigned char*)&r->eax = 0;  /* Indicate function not supported. MS-DOS 2.0, MS-DOS 6.22, DOSBox 0.74 DOS_21Handler and kvikdos also set AL := 0, some of them also set CF := 1. */

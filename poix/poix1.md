@@ -134,8 +134,12 @@ typedef signed ... int64_t;  /* Not always defined. */
 #define __i386__  /* Only defined if generating code for the 32-bit protected mode of the Intel i386 CPU (ia32, x86 32-bit architecture). */
 
 /* POSIX file I/O functions. */
-int open(const char *pathname, int flags, ...);  /* `...' is either `mode_t mode' or missing, may be ignored, good value: 0666. */
-int creat(const char *pathname, mode_t mode);  /* mode may be ignored, good value: 0666. */
+/* `...' is either `mode_t mode' or missing, may be ignored, good value: 0666.
+ * On failure, returns -1 and sets errno to ENOENT, ENOTDIR, EACCES or
+ * something else. The something else may be ENXIO only.
+ */
+int open(const char *pathname, int flags, ...);
+int creat(const char *pathname, mode_t mode);  /* See open(...) for accepting mode and setting errno. */
 int close(int fd);
 ssize_t write(int fd, const void *buf, size_t count);
 ssize_t read(int fd, void *buf, size_t count);
@@ -165,8 +169,9 @@ extern char **environ;  /* Read-only, NULL-terminated, `KEY=VALUE` pairs. */
 #define ENOENT  ...  /* Positive integer constant for No such file or directory. */
 #define ENOTDIR ...  /* Positive integer constant for Not a directory. */
 #define EACCES  ...  /* Positive integer constant for Permission denied. */
-#define ENXIO   ...  /* Positive integer constant for No such device or address. Used by POIX as a generic errno value. */
-extern into errno;  /* Only open(..) and create(...) are guranteed to set it on error; E... value. */
+#define ENXIO   ...  /* Positive integer constant for No such device or address. Used by POIX as a generic errno value for open(2), creat(2), remove(2), unlink(2) and rename(2). */
+#define ERANGE  ...  /* Positive integer constant for Numerical result out of range. May be used by POIX as a generic errno value in the future. */
+extern into errno;  /* Only open(..), creat(...), remove(...), unlink(...) and rename(...) are guranteed to set it on error; E... value. Other calls may set it arbitrarily. */
 
 /* POSIX memory management functions. */
 void *malloc(size_t size);  /* Returned pointer is aligned to C long size. Memory is read-write (it may also be read-write-execute), initial contents not defined. There is no way to free memory (except for exiting the process) in POIX. */
