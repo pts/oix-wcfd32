@@ -1294,31 +1294,31 @@ dos_syscall_numbers db 60h, 57h, 56h, 4Fh, 4Eh, 4Ch, 48h, 47h, 44h, 43h, 42h
 		db 8, 6
 		align 4
 dos_syscall_handlers:
-		dd handle_unsupported_int21h_function  ; jump table for switch statement
-		dd handle_INT21H_FUNC_06H_DIRECT_CONSOLE_IO  ; jumptable 00410ED7 case 1
-		dd handle_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO  ; jumptable 00410ED7 case 2
-		dd handle_INT21H_FUNC_2AH_GET_CURRENT_DRIVE  ; jumptable 00410ED7 case 3
-		dd handle_INT21H_FUNC_1AH_SET_DISK_TRANSFER_ADDRESS  ; jumptable 00410ED7 case 4
-		dd handle_INT21H_FUNC_2AH_GET_DATE  ; jumptable 00410ED7 case 5
-		dd handle_INT21H_FUNC_2CH_GET_TIME  ; jumptable 00410ED7 case 6
-		dd handle_INT21H_FUNC_3BH_CHDIR  ; jumptable 00410ED7 case 7
-		dd handle_INT21H_FUNC_3CH_CREATE_FILE  ; jumptable 00410ED7 case 8
-		dd handle_INT21H_FUNC_3DH_OPEN_FILE  ; jumptable 00410ED7 case 9
-		dd handle_INT21H_FUNC_3EH_CLOSE_FILE  ; jumptable 00410ED7 case 10
-		dd handle_INT21H_FUNC_3FH_READ_FROM_FILE  ; jumptable 00410ED7 case 11
-		dd handle_INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE  ; jumptable 00410ED7 case 12
-		dd handle_INT21H_FUNC_41H_DELETE_NAMED_FILE  ; jumptable 00410ED7 case 13
-		dd handle_INT21H_FUNC_42H_SEEK_IN_FILE  ; jumptable 00410ED7 case 14
-		dd handle_INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES  ; jumptable 00410ED7 case 15
-		dd handle_INT21H_FUNC_44H_IOCTL_IN_FILE  ; jumptable 00410ED7 case 16
-		dd handle_INT21H_FUNC_47H_GET_CURRENT_DIR  ; jumptable 00410ED7 case 17
-		dd handle_INT21H_FUNC_48H_ALLOCATE_MEMORY  ; jumptable 00410ED7 case 18
-		dd handle_INT21H_FUNC_4CH_EXIT_PROCESS  ; jumptable 00410ED7 case 19
-		dd handle_INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE  ; jumptable 00410ED7 case 20
-		dd handle_INT21H_FUNC_4FH_FIND_NEXT_MATCHING_FILE  ; jumptable 00410ED7 case 21
-		dd handle_INT21H_FUNC_56H_RENAME_FILE  ; jumptable 00410ED7 case 22
-		dd handle_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME  ; jumptable 00410ED7 case 23
-		dd handle_INT21H_FUNC_60H_GET_FULL_FILENAME  ; jumptable 00410ED7 case 24
+		dw -first_handler+handle_unsupported_int21h_function  ; jump table for switch statement
+		dw -first_handler+handle_INT21H_FUNC_06H_DIRECT_CONSOLE_IO  ; jumptable 00410ED7 case 1
+		dw -first_handler+handle_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO  ; jumptable 00410ED7 case 2
+		dw -first_handler+handle_INT21H_FUNC_2AH_GET_CURRENT_DRIVE  ; jumptable 00410ED7 case 3
+		dw -first_handler+handle_INT21H_FUNC_1AH_SET_DISK_TRANSFER_ADDRESS  ; jumptable 00410ED7 case 4
+		dw -first_handler+handle_INT21H_FUNC_2AH_GET_DATE  ; jumptable 00410ED7 case 5
+		dw -first_handler+handle_INT21H_FUNC_2CH_GET_TIME  ; jumptable 00410ED7 case 6
+		dw -first_handler+handle_INT21H_FUNC_3BH_CHDIR  ; jumptable 00410ED7 case 7
+		dw -first_handler+handle_INT21H_FUNC_3CH_CREATE_FILE  ; jumptable 00410ED7 case 8
+		dw -first_handler+handle_INT21H_FUNC_3DH_OPEN_FILE  ; jumptable 00410ED7 case 9
+		dw -first_handler+handle_INT21H_FUNC_3EH_CLOSE_FILE  ; jumptable 00410ED7 case 10
+		dw -first_handler+handle_INT21H_FUNC_3FH_READ_FROM_FILE  ; jumptable 00410ED7 case 11
+		dw -first_handler+handle_INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE  ; jumptable 00410ED7 case 12
+		dw -first_handler+handle_INT21H_FUNC_41H_DELETE_NAMED_FILE  ; jumptable 00410ED7 case 13
+		dw -first_handler+handle_INT21H_FUNC_42H_SEEK_IN_FILE  ; jumptable 00410ED7 case 14
+		dw -first_handler+handle_INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES  ; jumptable 00410ED7 case 15
+		dw -first_handler+handle_INT21H_FUNC_44H_IOCTL_IN_FILE  ; jumptable 00410ED7 case 16
+		dw -first_handler+handle_INT21H_FUNC_47H_GET_CURRENT_DIR  ; jumptable 00410ED7 case 17
+		dw -first_handler+handle_INT21H_FUNC_48H_ALLOCATE_MEMORY  ; jumptable 00410ED7 case 18
+		dw -first_handler+handle_INT21H_FUNC_4CH_EXIT_PROCESS  ; jumptable 00410ED7 case 19
+		dw -first_handler+handle_INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE  ; jumptable 00410ED7 case 20
+		dw -first_handler+handle_INT21H_FUNC_4FH_FIND_NEXT_MATCHING_FILE  ; jumptable 00410ED7 case 21
+		dw -first_handler+handle_INT21H_FUNC_56H_RENAME_FILE  ; jumptable 00410ED7 case 22
+		dw -first_handler+handle_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME  ; jumptable 00410ED7 case 23
+		dw -first_handler+handle_INT21H_FUNC_60H_GET_FULL_FILENAME  ; jumptable 00410ED7 case 24
 
 section .text
 ; Returns flags in AH. Modifies regs in place.
@@ -1338,7 +1338,10 @@ wcfd32_near_syscall_low:
 		mov edi, dos_syscall_numbers
 		mov al, [eax+1]
 		repne scasb
-		jmp [dos_syscall_handlers+ecx*4]  ; switch 25 cases
+		movzx ecx, word [dos_syscall_handlers+ecx*2]
+		add ecx, first_handler
+		jmp ecx  ; switch 25 cases
+first_handler:  ; Don't move anything above this, otherwise dos_syscall_handlers would have negative values.
 handle_INT21H_FUNC_06H_DIRECT_CONSOLE_IO:
 		push 0		     ; jumptable 00410ED7 case 1
 		lea eax, [esp+34h-20h]
