@@ -79,6 +79,7 @@ Program compilation instructions:
   the [OpenWatcom v2 C compiler](https://open-watcom.github.io/) (command `owcc -bos2v2 -s -O2 -W -Wall -o prog.exe prog.c`),
 * When targeting 16-bit DOS, use
   the [OpenWatcom v2 C compiler](https://open-watcom.github.io/) (command `owcc -bdos -s -Os -W -Wall -o prog.exe prog.c`),
+* Alternatively, when targeting 16-bit DOS, you can use the Turbo C or Borland C compilers (command on DOS: `tcc -O -X -w-rch prog.c`).
 * When targeting 32-bit DOS, use
   the [OpenWatcom v2 C compiler](https://open-watcom.github.io/) (command `owcc -bdos4g -Wc,-bt=dos32 -s -Os -W -Wall -o prog.exe prog.c`),
   This method is untested, and it needs an additional DOS extender .exe file
