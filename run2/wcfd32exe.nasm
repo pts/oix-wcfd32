@@ -710,7 +710,7 @@ wcfd32_far_syscall:  ; proc far
 		pop edx			; restore filename address
 		mov ah, 4eh		; find first
 		int 21h			; ...
-		jmp strict short .done
+		retf
 .handle_INT21H_FUNC_4FH_FIND_NEXT_MATCHING_FILE:  ; Based on OpenWatcom 1.0 bld/w32loadr/int21dos.asm
 		cmp AL,0		; if not FIND NEXT
 		jne strict short .done  ; then return
@@ -720,14 +720,14 @@ wcfd32_far_syscall:  ; proc far
 		mov ah, 4fh		; find next
 		int 21h			; ...
 		pop edx			; restore EDX
-		jmp strict short .done
+		retf
 .handle_INT21H_FUNC_44H_IOCTL_IN_FILE:
 		cmp al, 0
 		jne strict short .not_48h
 		int 21h
 		jc strict short .done
 		movzx edx, dx  ; Clear high word of EDX, for compatibility with int21nt.c and oixrun.c.
-		jmp strict short .done
+		retf
 .handle_INT21H_FUNC_42H_SEEK_IN_FILE:
 		int 21h
 		jc strict short .done
@@ -736,7 +736,7 @@ wcfd32_far_syscall:  ; proc far
 		rol eax, 16  ; Set high word of EAX to DX, for compatibility with int21nt.c and oixrun.c.
 		movzx edx, dx  ; Set high word of EDX to 0, for compatibility with int21nt.c and oixrun.c.
 		clc
-		jmp strict short .done
+		retf
 .handle_far_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME:
 		cmp al, 1  ; We check it because DOSBox 0.74 doesn't report the error properly.
 		jbe strict short .not_48h
