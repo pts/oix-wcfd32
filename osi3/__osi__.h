@@ -426,7 +426,8 @@ static char * __watcall parse_first_arg(char *pw) {
     } else if (c == '"') {
       is_quote ^= 1;
     } else if (!is_quote && (c == ' ' || c == '\t' || c == '\n' || c == '\v')) {
-      if (p == pw) ++p;  /* Don't clobber the rest with '\0' below. */
+     got_space:
+      if (p - 1 != pw) --p;  /* Don't clobber the rest with '\0' below. */
      after_arg:
       *pw = '\0';
       return (char*)p;

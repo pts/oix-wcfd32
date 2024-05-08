@@ -170,7 +170,7 @@ print_crlf:  ; Prints a CRLF ("\r", "\n") to stdout.
 ;     } else if (c == '"') {
 ;       is_quote ^= 1;
 ;     } else if (!is_quote && (c == ' ' || c == '\t' || c == '\n' || c == '\v')) {
-;       if (p -1 != pw) --p;  /* Don't clobber the rest with '\0' below. */
+;       if (p - 1 != pw) --p;  /* Don't clobber the rest with '\0' below. */
 ;      after_arg:
 ;       *pw = '\0';
 ;       return (char*)p;
