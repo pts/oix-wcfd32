@@ -464,7 +464,7 @@ wcfd32_far_syscall:  ; proc far
 		clc
 		pop esi
 		retf
-.err:		push 0x18  ; ERR_BAD_LENGTH.
+.err:		push 12  ; ERR_INVALID_ACCESS.
 		pop eax
 		stc
 		pop esi

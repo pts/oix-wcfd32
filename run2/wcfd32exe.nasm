@@ -752,6 +752,8 @@ wcfd32_far_syscall:  ; proc far
 		; filename.
 		;
 		; We just fake it by returning the input unmodified.
+		xor eax, eax
+		mov cs, eax
 		push esi
 		xor esi, esi
 .next:		cmp byte [edx+esi], 0
@@ -772,7 +774,7 @@ wcfd32_far_syscall:  ; proc far
 		clc
 		pop esi
 		retf
-.err:		push 0x18  ; ERR_BAD_LENGTH.
+.err:		push ERR_INVALID_ACCESS
 		pop eax
 		stc
 		pop esi
@@ -1137,7 +1139,6 @@ pe.text:
   %1 'DosDateTimeToFileTime', DosDateTimeToFileTime, 0  ;; BOOL __stdcall DosDateTimeToFileTime (WORD wFatDate, WORD wFatTime, LPFILETIME lpFileTime);
   %1 'FileTimeToDosDateTime', FileTimeToDosDateTime, 0  ;; BOOL __stdcall FileTimeToDosDateTime (const FILETIME *lpFileTime, LPWORD lpFatDate, LPWORD lpFatTime);
   %1 'FileTimeToLocalFileTime', FileTimeToLocalFileTime, 0  ;; BOOL __stdcall FileTimeToLocalFileTime (const FILETIME *lpFileTime, LPFILETIME lpLocalFileTime);
-  %1 'GetFullPathNameA', GetFullPathNameA, 1  ;; DWORD __stdcall GetFullPathNameA (LPCSTR lpFileName, DWORD nBufferLength, LPSTR lpBuffer, LPSTR *lpFilePart);
   %1 'SetFileTime', SetFileTime, 0  ;; BOOL __stdcall SetFileTime (HANDLE hFile, const FILETIME *lpCreationTime, const FILETIME *lpLastAccessTime, const FILETIME *lpLastWriteTime);
   %1 'GetFileTime', GetFileTime, 0  ;; BOOL __stdcall GetFileTime (HANDLE hFile, LPFILETIME lpCreationTime, LPFILETIME lpLastAccessTime, LPFILETIME lpLastWriteTime);
   %1 'ReadFile', ReadFile, 1  ;; BOOL __stdcall ReadFile (HANDLE hFile, LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead, LPOVERLAPPED lpOverlapped);
@@ -2074,41 +2075,6 @@ loc_410BED:
 		pop ebx
 		ret
 
-func_INT21H_FUNC_60H_GET_FULL_FILENAME:
-		push ebx
-		push ecx
-		push edx
-		push esi
-		sub esp, 4
-		mov ebx, eax
-		pe.reloc 4, PE_DATAREF(aCon), mov edx, relval  ; "con"
-		mov eax, [eax+0Ch]
-		call strcmp
-		test eax, eax
-		jnz loc_410C1F
-		mov eax, [ebx+4]
-		pe.reloc 4, PE_DATAREF(aCon), mov ebx, dword [relval]  ; "con"
-		mov [eax], ebx
-		mov eax, 1
-		jmp loc_410C33
-loc_410C1F:
-		mov eax, esp
-		push eax	     ; lpFilePart
-		mov edx, [ebx+4]
-		push edx	     ; lpBuffer
-		mov ecx, [ebx+8]
-		push ecx	     ; nBufferLength
-		mov esi, [ebx+0Ch]
-		push esi	     ; lpFileName
-		pe.call.imp GetFullPathNameA
-loc_410C33:
-		add esp, 4
-		pop esi
-		pop edx
-		pop ecx
-		pop ebx
-		ret
-
 __MakeDOSDT:
 		push ecx
 		push esi
@@ -2709,9 +2675,38 @@ handle_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME:  ; !! WDOSX and PMODE/W (e.g. 
 .get_set:	call func_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME
 		jmp done_handling
 handle_INT21H_FUNC_60H_GET_FULL_FILENAME:  ; !! WDOSX and PMODE/W (e.g. _int213C) don't extend it. What else?
-		mov eax, esi	    ; jumptable 00410ED7 case 24
-		call func_INT21H_FUNC_60H_GET_FULL_FILENAME
-		jmp done_handling
+		; This is different from https://stanislavs.org/helppc/int_21-60.html ,
+		; see int21nt.c. This gives the input pathname in EDX.
+		; binw/wasm.exe in Watcom C/C++ 10.6, 11.0b and 11.0c call this when
+		; assembling, and it puts the result to the THEADR header as the
+		; filename.
+		;
+		; We just fake it by returning the input unmodified.
+		push esi
+		mov edx, [esi+0xc]
+		xor esi, esi
+.next:		cmp byte [edx+esi], 0
+		je .found
+		inc esi
+		jmp .next
+.found:		cmp ecx, esi
+		jbe .err
+		push edi
+		push ecx
+		mov ecx, esi
+		inc ecx
+		mov esi, edx
+		mov edi, ebx
+		rep movsb
+		pop ecx
+		pop edi
+		pop esi
+		jmp done_handling  ; Force success since EAX is nonzero (AL is still the syscall number).
+.err:		push ERR_INVALID_ACCESS
+		pop eax
+		pop esi
+		jmp dos_error_with_code
+		; Not reached.
 handle_INT21H_FUNC_4CH_EXIT_PROCESS:
 		push dword [esi]	    ; jumptable 00410ED7 case 19
 		jmp exit_pushed
@@ -2912,7 +2907,6 @@ aPrivilegedInst db 'Privileged instruction',0
 aIllegalInstruc db 'Illegal instruction',0
 aIntegerDivideB db 'Integer divide by 0',0
 aStackOverflow	db 'Stack overflow',0
-aCon		db 'con',0
 ; char aUnsupportedInt[]
 aUnsupportedInt db 'warning: unsupported OIX syscall 0x%h'  ; Continues in str_crlf.
 str_crlf	db 0Dh,0Ah  ; Continues in empty_env.
