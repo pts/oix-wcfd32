@@ -630,6 +630,69 @@ pop_edx_ebx_ret:
 		pop ebx
 		ret
 
+; Moves EAX past the first command-line argument, but not the whitespace
+; following it. It returns the new position in EAX.
+; Implementation based on parse_first_arg.
+skip_first_arg:
+		push ebx
+		push ecx
+		xor bh, bh  ; is_quote = 0;
+		; From now: EAX is p (input command-line), BH is is_quote.
+.1:		mov bl, [eax]
+		cmp bl, ' '
+		je .2
+		cmp bl, 0x9
+		jb .3
+		cmp bl, 0xb
+		ja .3
+.2:		inc eax
+		jmp .1
+.3:		test bl, bl
+		jne .next_char
+		jmp strict short .ret
+.4:		cmp bl, '"'
+		jne .12
+.5:		cmp eax, ecx
+		jae .6
+		inc eax
+		inc eax
+		jmp .5
+.6:		je .10
+.not_isq:	not bh
+.next_char:	mov bl, [eax]
+		test bl, bl
+		je .after_arg  ; Reached end of input.
+		inc eax
+		cmp bl, 0x5c  ; "\\"
+		jne .13
+		mov ecx, eax
+.9:		mov bl, [ecx]
+		cmp bl, 0x5c  ; "\\"
+		jne .4
+		inc ecx
+		jmp .9
+.10:		lea eax, [ecx+0x1]
+		jmp .next_char
+.12:		cmp eax, ecx
+		je .next_char
+		inc eax
+		jmp .12
+.13:		cmp bl, '"'
+		je .not_isq  ; if (c == '"') goto not_isq;
+		test bh, bh
+		jne .next_char
+		cmp bl, ' '
+		je .got_space
+		cmp bl, 0x9
+		jb .next_char
+		cmp bl, 0xb
+		ja .next_char
+.got_space:	dec eax
+.after_arg:
+.ret:		pop ecx
+		pop ebx
+		ret
+
 ; Attributes: noreturn
 global _start
 _start:
@@ -641,45 +704,14 @@ _mainCRTStartup:
 		call add_seh_frame
 		call populate_stdio_handles
 		call [__imp__GetCommandLineA]
-loc_4108C3:
-		xor edx, edx
-		mov dl, [eax]
-		cmp edx, ' '
-		jz loc_4108D1
-		cmp edx, 9
-		jnz loc_4108D4
-loc_4108D1:
-		inc eax
-		jmp loc_4108C3
-loc_4108D4:
-		cmp byte [eax], 0
-		jz loc_4108EA
-		xor edx, edx
-		mov dl, [eax]
-		cmp edx, ' '
-		jz loc_4108EA
-		cmp edx, 9
-		jz loc_4108EA
-		inc eax
-		jmp loc_4108D4
-loc_4108EA:
-		xor edx, edx
-		mov dl, [eax]
-		cmp edx, ' '
-		jz loc_4108F8
-		cmp edx, 9
-		jnz loc_4108FB
-loc_4108F8:
-		inc eax
-		jmp loc_4108EA
-loc_4108FB:
+		call skip_first_arg
 		mov [wcfd32_command_line], eax
 		;
 		call [__imp__GetEnvironmentStrings]
 		mov [wcfd32_env_strings], eax
 		;
 		mov eax, esp
-		push 104h	     ; nSize
+		push 104h	     ; nSize  TODO(pts): Make it work if the full program pathname is longer than _PATH_MAX.
 		push eax	     ; lpFilename
 		push 0		     ; hModule
 		call [__imp__GetModuleFileNameA]
