@@ -369,6 +369,7 @@ handle_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME:
 		; (default OMF LIBHEAD format) only the getter has to be
 		; implemented. But we fake that one as well. We could use
 		; our own gmtime(2), but not localtime(2) like DOSBox.
+		;movzx ebx, bx  ; Use only BX as the filehandle.
 		xor ecx, ecx  ; Fake file time.
 		mov edx, 1<<5|1  ; Fake file date.
 		clc
@@ -453,15 +454,17 @@ handle_INT21H_FUNC_3FH_READ_FROM_FILE:  ; Read from file. EBX is the file descri
 		push ebx
 		push ecx
 		push edx
+		movzx ebx, bx
 		push SYS_read
 .do:		xchg edx, ecx
 		jmp strict short handle_common.cax
 		; Not reached.
 
 handle_INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE:  ; Write to or truncate file. EBX is the file descriptor. ECX is the number of bytes to read. EDX is the data pointer. Returns: CF indicating failure; EAX (if CF=0) is the filehandle (high word is 0). EAX (if CF=1) is DOS error code (high word is 0).
-		push ebx  ; !! TODO(pts): Only use BX as the filehandle.
+		push ebx
 		push ecx
 		push edx
+		movzx ebx, bx
 		jecxz .truncate
 .write:		push SYS_write
 		jmp strict short handle_INT21H_FUNC_3FH_READ_FROM_FILE.do
@@ -531,6 +534,7 @@ handle_INT21H_FUNC_42H_SEEK_IN_FILE:  ; Seek in file. EBX is the file descriptor
 		push ebx
 		push ecx
 		push edx
+		movzx ebx, bx
 		shl ecx, 16
 		mov cx, dx
 		movzx edx, al
@@ -547,6 +551,42 @@ handle_INT21H_FUNC_42H_SEEK_IN_FILE:  ; Seek in file. EBX is the file descriptor
 		pop ecx
 		pop ebx
 		retf
+
+handle_INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES:  ; EDX points to the filename. AL is function number (0: get, 1: set). Returns: CF indicating failure; CX (if CF=0) is the attribute bits for the get function. EAX (if CF=1) is DOS error code (high word is 0).
+		push ebx  ; Save.
+		push ecx  ; Save.
+		mov ebx, edx
+		xor ecx, ecx  ; ECX := 0 (O_RDONLY).
+		cmp al, 1  ; Get or set attributes.
+		jbe .get_set
+.bad:		pop ecx
+		pop ebx
+		xor eax, eax
+		inc eax  ; EAX := 1 (ERR_INVALID_FUNCTION).
+		stc
+		retf
+.get_set:	add cl, al  ; ECX := 0 (O_RDONLY) for get, 1 O_WRONLY (O_WRONLY) for set.
+		push edx  ; Save for handle_common.pop_xret.
+		push eax  ; Save.
+		push SYS_open  ; TODO(pts): Use stat(2) instead, in case the file is not readable or writable.
+		pop eax
+		int 0x80  ; Linux i386 syscall.
+		xchg eax, ebx  ; EBX := file descriptor or error code.
+		test ebx, ebx  ; Also sets CF := 0 (success).
+		pop eax  ; Restore.
+.pop_xret:	js strict short handle_common.pop_xret  ; handle_common.pop_xret.
+		push eax  ; Save.
+		push SYS_close
+		pop eax
+		int 0x80  ; Linux i386 syscall.
+		pop eax  ; Restore.
+		pop edx  ; Restore.
+		pop ecx  ; Restore.
+		pop ebx  ; Restore.
+		test al, al  ; As a side effect, sets CF := 0 (success).
+		jnz .ret
+		xor cx, cx  ; CX := 0. Simulate that there are no DOS attributes (read-only, hidden, system, archive) set.
+.ret:		retf
 
 handle_INT21H_FUNC_44H_IOCTL_IN_FILE:  ; EBX is the file descriptor. AL is the ioctl number (we support only 0). Returns: CF indicating failure; EDX (if CF=0) contains the device information bits (high word is 0). EAX (if CF=1) is DOS error code (high word is 0).
 		cmp al, 0  ; Get device information.
@@ -573,7 +613,7 @@ handle_INT21H_FUNC_44H_IOCTL_IN_FILE:  ; EBX is the file descriptor. AL is the i
 		jmp .ret_edx
 .not_enotty:	test eax, eax  ; Also sets CF := 0 (success).
 		pop eax
-.pop_xret:	js strict short handle_common.pop_xret
+.pop_xret:	js strict short handle_INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES.pop_xret  ; handle_common.pop_xret.
 		mov dl, 0x80  ; Indicate character device to DOS.
 .ret_edx:	pop ecx  ; Ignore saved EDX.
 		pop ecx
@@ -583,42 +623,6 @@ handle_INT21H_FUNC_44H_IOCTL_IN_FILE:  ; EBX is the file descriptor. AL is the i
 		inc eax  ; EAX := 1 (ERR_INVALID_FUNCTION).
 		stc
 		retf
-
-handle_INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES:  ; EDX points to the filename. AL is function number (0: get, 1: set). Returns: CF indicating failure; CX (if CF=0) is the attribute bits for the get function. EAX (if CF=1) is DOS error code (high word is 0).
-		push ebx  ; Save.
-		push ecx  ; Save.
-		mov ebx, edx
-		xor ecx, ecx  ; ECX := 0 (O_RDONLY).
-		cmp al, 1  ; Get or set attributes.
-		jbe .get_set
-.bad:		pop ecx
-		pop ebx
-		xor eax, eax
-		inc eax  ; EAX := 1 (ERR_INVALID_FUNCTION).
-		stc
-		retf
-.get_set:	add cl, al  ; ECX := 0 (O_RDONLY) for get, 1 O_WRONLY (O_WRONLY) for set.
-		push edx  ; Save for handle_common.pop_xret.
-		push eax  ; Save.
-		push SYS_open  ; TODO(pts): Use stat(2) instead, in case the file is not readable or writable.
-		pop eax
-		int 0x80  ; Linux i386 syscall.
-		xchg eax, ebx  ; EBX := file descriptor or error code.
-		test ebx, ebx  ; Also sets CF := 0 (success).
-		pop eax  ; Restore.
-		js strict short handle_INT21H_FUNC_44H_IOCTL_IN_FILE.pop_xret  ; handle_common.pop_xret.
-		push eax  ; Save.
-		push SYS_close
-		pop eax
-		int 0x80  ; Linux i386 syscall.
-		pop eax  ; Restore.
-		pop edx  ; Restore.
-		pop ecx  ; Restore.
-		pop ebx  ; Restore.
-		test al, al  ; As a side effect, sets CF := 0 (success).
-		jnz .ret
-		xor cx, cx  ; CX := 0. Simulate that there are no DOS attributes (read-only, hidden, system, archive) set.
-.ret:		retf
 
 handle_INT21H_FUNC_48H_ALLOCATE_MEMORY:
 		mov eax, ebx
