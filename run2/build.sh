@@ -65,6 +65,7 @@
 # TODO(pts): Make the size of the command-line unlimited on Windows, currently it's 0x100 bytes.
 # TODO(pts): Use only BX as filehandle in wcfd32linux.nasm.
 # TODO(pts): INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE makes mwperun.exe crash DOSBox (even if there are no wildcards in the filename) in: dosbox.nox.static --cmd --mem-mb=3 ~/prg/mwpestub/mwperun.exe run1/oixrun.exe wl.exe t.lib rex2oix.o
+# TODO(pts): INT21H_FUNC_60H_GET_FULL_FILENAME should be a fake (for wasm) even on Win32.
 #
 
 set -ex
