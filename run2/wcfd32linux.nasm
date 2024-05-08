@@ -275,31 +275,57 @@ wcfd32_near_syscall:
 		call wcfd32_far_syscall
 		ret
 
+first_handler:  ; Don't move anything above this, otherwise handlers_3CH would have negative values.
+
+handle_unimplemented:
+		push eax  ; Save.
+		push ebp  ; Save.
+		mov al, ah
+		aam 0x10  ; AH := high nibble; AL := low nibble
+		cmp ah, 10
+		jb .ah
+		add ah, 'a'-'0'-10
+.ah:		cmp al, 10
+		jb .al
+		add al, 'a'-'0'-10
+.al		add ax, '0'<<8|'0'
+		xchg al, ah
+		mov ebp, msg_unimplemented
+		mov word [ebp+msg_unimplemented.hexdigits-msg_unimplemented], ax
+		xchg eax, ebp  ; EAX := EBP; EBP := junk.
+		call print_str  ; !! Print to stderr.
+		pop ebp  ; Restore.
+		pop eax  ; Restore.
+		;mov al, 120  ; Exit code.
+		;jmp strict short handle_INT21H_FUNC_4CH_EXIT_PROCESS
+		mov al, 0  ; Indicate function not supported. MS-DOS 2.0, MS-DOS 6.22, DOSBox 0.74 DOS_21Handler and kvikdos also set AL := 0, some of them also set CF := 1.
+		stc
+		retf
+
 ; !! It differs from the DOS syscall API in some register sizes (e.g. uses
 ; EDX instead of DX), and it may change some flags not in the documentation.
 wcfd32_far_syscall: ; proc far
 		;call debug_syscall
 		cmp ah, INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO
-		je strict short handle_far_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO
+		je strict short handle_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO
 		cmp ah, INT21H_FUNC_56H_RENAME_FILE
-		je strict short handle_far_INT21H_FUNC_56H_RENAME_FILE
+		je strict short handle_INT21H_FUNC_56H_RENAME_FILE
 		cmp ah, INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME
-		je strict short handle_far_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME
+		je strict short handle_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME
 		cmp ah, INT21H_FUNC_60H_GET_FULL_FILENAME
-		je strict short handle_far_INT21H_FUNC_60H_GET_FULL_FILENAME
-		push esi
-		mov esi, handle_unimplemented
+		je strict short handle_INT21H_FUNC_60H_GET_FULL_FILENAME
 		cmp ah, 0x3c
-		jb .do_handle
-		cmp ah, 0x3c + ((handlers_3CH.end-handlers_3CH)>>2)
-		jnb .do_handle
-		movzx esi, ah
-		mov esi, [handlers_3CH-4*0x3c+4*esi]
-.do_handle:	call esi
-		pop esi
-		retf
+.hui:		jb strict short handle_unimplemented
+		cmp ah, 0x3c + ((handlers_3CH.end-handlers_3CH)>>1)
+		jnb strict short handle_unimplemented
+		push eax  ; Save EAX.
+		movzx eax, ah
+		movzx eax, word [handlers_3CH-2*0x3c+2*eax]
+		add eax, first_handler
+		xchg eax, [esp]  ; Restore ESI; push jump address.
+		ret  ; Jump to handle_* handler.
 
-handle_far_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO:
+handle_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO:
 		; !! TODO(pts): Disable line buffering and echo; tio.c_lflag &= ~(ICANON | ECHO);
 		; However, the default behavior is good enough, WASM only waits for <Enter>.
 		push ebx
@@ -319,7 +345,7 @@ handle_far_INT21H_FUNC_08H_CONSOLE_INPUT_WITHOUT_ECHO:
 		pop ebx
 		retf
 
-handle_far_INT21H_FUNC_56H_RENAME_FILE:  ; EDX: old filename, EDI: new filename.
+handle_INT21H_FUNC_56H_RENAME_FILE:  ; EDX: old filename, EDI: new filename.
 		push ebx
 		push ecx
 		push eax
@@ -339,7 +365,7 @@ handle_far_INT21H_FUNC_56H_RENAME_FILE:  ; EDX: old filename, EDI: new filename.
 		pop eax
 .good:		retf
 
-handle_far_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME:
+handle_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME:
 		cmp al, 0
 		je .get
 .bad:		xor eax, eax
@@ -357,7 +383,7 @@ handle_far_INT21H_FUNC_57H_GET_SET_FILE_HANDLE_MTIME:
 		clc
 		retf
 
-handle_far_INT21H_FUNC_60H_GET_FULL_FILENAME:
+handle_INT21H_FUNC_60H_GET_FULL_FILENAME:
 		; This is different from https://stanislavs.org/helppc/int_21-60.html ,
 		; see int21nt.c. This gives the input pathname in EDX.
 		; binw/wasm.exe in Watcom C/C++ 10.6, 11.0b and 11.0c call this when
@@ -459,7 +485,7 @@ handle_common:
 		pop ebx
 .xret:		js .badret  ; Treat any negative values as error. This effectively limits the usable file size to <2 GiB (7fffffffh bytes). That's fine, Linux won't give us more without O_LARGEFILE anyway.
 		clc
-		ret
+		retf
 .badret:	push ebx
 		xor ebx, ebx
 		mov bl, 2  ; DOS error: File not found. https://stanislavs.org/helppc/dos_error_codes.html TODO(pts): Add better error mapping.
@@ -474,7 +500,7 @@ handle_common:
 .err_found:	xchg eax, ebx  ; EAX := EBX (DOS error code); EBX := junk.
 		pop ebx
 		stc
-		ret
+		retf
 
 handle_INT21H_FUNC_41H_DELETE_NAMED_FILE:  ; Open file. EDX points to the filename. Returns: CF indicating failure; EAX (if CF=1) is DOS error code (high word is 0).
 		push eax  ; Save.
@@ -495,7 +521,6 @@ handle_INT21H_FUNC_42H_SEEK_IN_FILE:  ; Seek in file. EBX is the file descriptor
 		shl ecx, 16
 		mov cx, dx
 		movzx edx, al
-		;call handle_unimplemented
 		push SYS_lseek  ; Only 32-bit offsets.
 		pop eax
 		int 0x80  ; Linux i386 syscall.
@@ -508,7 +533,7 @@ handle_INT21H_FUNC_42H_SEEK_IN_FILE:  ; Seek in file. EBX is the file descriptor
 		pop ecx  ; Just pop it, but don't overwrite EDX.
 		pop ecx
 		pop ebx
-		ret
+		retf
 
 handle_INT21H_FUNC_44H_IOCTL_IN_FILE:  ; EBX is the file descriptor. AL is the ioctl number (we support only 0). Returns: CF indicating failure; EDX (if CF=0) contains the device information bits (high word is 0). EAX (if CF=1) is DOS error code (high word is 0).
 		cmp al, 0  ; Get device information.
@@ -540,11 +565,11 @@ handle_INT21H_FUNC_44H_IOCTL_IN_FILE:  ; EBX is the file descriptor. AL is the i
 .ret_edx:	pop ecx  ; Ignore saved EDX.
 		pop ecx
 		pop ebx
-		ret
+		retf
 .bad:		xor eax, eax
 		inc eax  ; EAX := 1 (ERR_INVALID_FUNCTION).
 		stc
-		ret
+		retf
 
 handle_INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES:  ; EDX points to the filename. AL is function number (0: get, 1: set). Returns: CF indicating failure; CX (if CF=0) is the attribute bits for the get function. EAX (if CF=1) is DOS error code (high word is 0).
 		push ebx  ; Save.
@@ -558,7 +583,7 @@ handle_INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES:  ; EDX points to the filename. 
 		xor eax, eax
 		inc eax  ; EAX := 1 (ERR_INVALID_FUNCTION).
 		stc
-		ret
+		retf
 .get_set:	add cl, al  ; ECX := 0 (O_RDONLY) for get, 1 O_WRONLY (O_WRONLY) for set.
 		push edx  ; Save for handle_common.pop_xret.
 		push eax  ; Save.
@@ -580,32 +605,7 @@ handle_INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES:  ; EDX points to the filename. 
 		test al, al  ; As a side effect, sets CF := 0 (success).
 		jnz .ret
 		xor cx, cx  ; CX := 0. Simulate that there are no DOS attributes (read-only, hidden, system, archive) set.
-.ret:		ret
-
-handle_unimplemented:
-		push eax  ; Save.
-		push ebp  ; Save.
-		mov al, ah
-		aam 0x10  ; AH := high nibble; AL := low nibble
-		cmp ah, 10
-		jb .ah
-		add ah, 'a'-'0'-10
-.ah:		cmp al, 10
-		jb .al
-		add al, 'a'-'0'-10
-.al		add ax, '0'<<8|'0'
-		xchg al, ah
-		mov ebp, msg_unimplemented
-		mov word [ebp+msg_unimplemented.hexdigits-msg_unimplemented], ax
-		xchg eax, ebp  ; EAX := EBP; EBP := junk.
-		call print_str  ; !! Print to stderr.
-		pop ebp  ; Restore.
-		pop eax  ; Restore.
-		;mov al, 120  ; Exit code.
-		;jmp strict short handle_INT21H_FUNC_4CH_EXIT_PROCESS
-		mov al, 0  ; Indicate function not supported. MS-DOS 2.0, MS-DOS 6.22, DOSBox 0.74 DOS_21Handler and kvikdos also set AL := 0, some of them also set CF := 1.
-		stc
-		ret
+.ret:		retf
 
 handle_INT21H_FUNC_48H_ALLOCATE_MEMORY:
 		mov eax, ebx
@@ -614,7 +614,7 @@ handle_INT21H_FUNC_48H_ALLOCATE_MEMORY:
 		jnc .done  ; Success with CF=0.
 		mov al, 8  ; DOS error: Insufficient memory. https://stanislavs.org/helppc/dos_error_codes.html
 		; Keep CF=1 for indicating error.
-.done:		ret
+.done:		retf
 
 handle_INT21H_FUNC_4CH_EXIT_PROCESS:
 		movzx ebx, al
@@ -624,23 +624,23 @@ handle_INT21H_FUNC_4CH_EXIT_PROCESS:
 		; Not reached.
 
 handlers_3CH:
-		dd handle_INT21H_FUNC_3CH_CREATE_FILE
-		dd handle_INT21H_FUNC_3DH_OPEN_FILE
-		dd handle_INT21H_FUNC_3EH_CLOSE_FILE
-		dd handle_INT21H_FUNC_3FH_READ_FROM_FILE
-		dd handle_INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE
-		dd handle_INT21H_FUNC_41H_DELETE_NAMED_FILE
-		dd handle_INT21H_FUNC_42H_SEEK_IN_FILE
-		dd handle_INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES
-		dd handle_INT21H_FUNC_44H_IOCTL_IN_FILE
-		dd handle_unimplemented  ; 45H
-		dd handle_unimplemented  ; 46H
-		dd handle_unimplemented  ; dd handle_INT21H_FUNC_47H_GET_CURRENT_DIR  ; WASM doesn't need it.
-		dd handle_INT21H_FUNC_48H_ALLOCATE_MEMORY
-		dd handle_unimplemented  ; 49H
-		dd handle_unimplemented  ; 4AH
-		dd handle_unimplemented  ; 4BH
-		dd handle_INT21H_FUNC_4CH_EXIT_PROCESS
+		dw -first_handler+handle_INT21H_FUNC_3CH_CREATE_FILE
+		dw -first_handler+handle_INT21H_FUNC_3DH_OPEN_FILE
+		dw -first_handler+handle_INT21H_FUNC_3EH_CLOSE_FILE
+		dw -first_handler+handle_INT21H_FUNC_3FH_READ_FROM_FILE
+		dw -first_handler+handle_INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE
+		dw -first_handler+handle_INT21H_FUNC_41H_DELETE_NAMED_FILE
+		dw -first_handler+handle_INT21H_FUNC_42H_SEEK_IN_FILE
+		dw -first_handler+handle_INT21H_FUNC_43H_GET_OR_CHANGE_ATTRIBUTES
+		dw -first_handler+handle_INT21H_FUNC_44H_IOCTL_IN_FILE
+		dw -first_handler+handle_unimplemented  ; 45H
+		dw -first_handler+handle_unimplemented  ; 46H
+		dw -first_handler+handle_unimplemented  ; dw -first_handler+handle_INT21H_FUNC_47H_GET_CURRENT_DIR  ; WASM doesn't need it.
+		dw -first_handler+handle_INT21H_FUNC_48H_ALLOCATE_MEMORY
+		dw -first_handler+handle_unimplemented  ; 49H
+		dw -first_handler+handle_unimplemented  ; 4AH
+		dw -first_handler+handle_unimplemented  ; 4BH
+		dw -first_handler+handle_INT21H_FUNC_4CH_EXIT_PROCESS
 ; !! Implement these, but only if needed by WASM or WLIB.
 ; !! WASM by default needs: 3C, 3D, 3E, 3F, 40, 41, 42, 44, 48, 4C, also the help needs 08e
 ; !! Check WASM and WLIB code, all versions. Maybe it's too much.
@@ -653,7 +653,6 @@ handlers_3CH:
 ;INT21H_FUNC_3BH_CHDIR           equ 0x3B
 ;INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE equ 0x4E
 ;INT21H_FUNC_4FH_FIND_NEXT_MATCHING_FILE equ 0x4F
-;INT21H_FUNC_60H_GET_FULL_FILENAME equ 0x60
 .end:
 
 %ifdef DEBUG
