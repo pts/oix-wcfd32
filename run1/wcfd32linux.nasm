@@ -157,21 +157,20 @@ _start:  ; Linux i386 program entry point.
 		; Apply relocations.
 		; Input: EDX: image_base; ESI: reloc_rva.
 		; Spoils: EAX, EBX, ECX, ESI.
-		add esi, edx  ; ESI := image_base + cf_header.reloc_rva (old EDX).
-		jmp strict short .next_block
+		add esi, edx  ; ESI := image_base + cf_header.reloc_rva.
+		xor eax, eax  ; The high word of EAX will remain 0 until .rdone.
+.next_block:	lodsw
+		mov ecx, eax
+		jecxz .rdone
+		lodsw
+		mov ebx, eax
+		shl ebx, 16
+		add ebx, edx
 .next_reloc:	lodsw
 		add ebx, eax
-.first_reloc:	add [ebx], edx
+		add [ebx], edx
 		loop .next_reloc
-.next_block:	lodsw
-		movzx ecx, ax
-		jecxz .rdone
-		lodsd
-		xchg ebx, eax  ; EBX := EAX; EAX := junk.
-		ror ebx, 16
-		add ebx, edx
-		xor eax, eax
-		jmp strict short .first_reloc
+		jmp strict short .next_block
 .rdone:		; Keep image_base in EDX. It will be unused.
 		mov esi, [cf_header.entry_rva]
 		add esi, edx

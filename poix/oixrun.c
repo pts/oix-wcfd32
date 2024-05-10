@@ -407,7 +407,7 @@ static void apply_relocations(char *image_base, const unsigned short *rp) {
   while ((count = *rp++)) {
     at = image_base + ((unsigned)*rp++ << 16);
     do {
-      at += *rp++;  /* !! Apply this optimization to other implementations. */
+      at += *rp++;
       *(unsigned*)at += (unsigned)image_base;  /* Apply single relocation. */
     } while (--count);
   }
