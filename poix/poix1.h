@@ -75,7 +75,7 @@
 #endif
 
 #ifndef __i386__
-#  if (defined(__i386) || defined(i386) || defined(__386) || defined(_M_I386) || defined(__386__)) || (defined(__SC__) && __INTSIZE == 4 && !_M_AMD64)
+#  if (defined(__i386) || defined(i386) || defined(__386) || defined(_M_I386) || defined(__386__)) || (defined(__SC__) && __INTSIZE == 4 && !_M_AMD64) || __POCC_TARGET__ == 1 || (defined(_M_IX86) && !(defined(__WATCOMC__) && !defined(__386__)))
 #    define __i386__ 1
 #  endif
 #endif
