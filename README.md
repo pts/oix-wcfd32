@@ -99,9 +99,10 @@ These are the programs officially released by Watcom (as part of Watcom
 C/C++ 10.x and 11.x) which use OIX:
 
 * WASM (Watcom Assembler) *binw/wasm.exe* in 10.0a (1994-09-01), 10.5
-  (1995-07-11), 10.6 (1996-02-29), 11.0b (1998-02-24, 11.0c (2002-08-27).
-* WLIB (Watcom Library Manager) *binw/wlib.exe* in 10.5, 10.6 and 11.0b,
-  11.0c. (In 10.0a, it was a 16-bit DOS program.)
+  (1995-07-11), 10.6 (1996-02-29), 11.0 (1996-05-11), 11.0A (1997-08-19),
+  11.0B (1998-02-24, 11.0C (2002-08-27).
+* WLIB (Watcom Library Manager) *binw/wlib.exe* in 10.5, 10.6 and 11.0B,
+  11.0C. (In 10.0a, it was a 16-bit DOS program.)
 * WLINK (Watcom Linker) *binw/wlink.exe* has never used OIX, it had its own
   DOS extender built in. Likewise, the Watcom C and C++ compilers had their
   own DOS extender unrelated to OIX.
@@ -154,7 +155,7 @@ software targeting OIX:
 
 * The DOS extender and OIX implementation for 32-bit DOS in *w32run.exe*.
   This has never been part of OpenWatcom even though it is mentioned in the
-  OpenWatcom 1.0 sources. It was part of Watcom C/C++ 11.0b, but not 11.0c.
+  OpenWatcom 1.0 sources. It was part of Watcom C/C++ 10.0a--11.0C.
   Apparently lots of the source code of the DOS extender is available in
   OpenWatcom 1.0 *bld/w32loadr*: *loader.c* (for *x32run.obj*), *cmain32.asm*,
   *x32start.asm*, but the *x32fix* program is not provided.
