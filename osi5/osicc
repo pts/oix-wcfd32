@@ -22,6 +22,7 @@ fi
 
 if ! type owcc >/dev/null 2>&1; then
   echo "fatal: compiler command not found: owcc" >&2
+  exit 3
 fi
 
 
