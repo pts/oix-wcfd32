@@ -18,6 +18,7 @@ global mini__exit
 global mini_exit
 global mini_environ
 ; !! TODO(pts): Move thee functions below to separate .o files.
+global mini___M_fopen_open
 global mini_open
 global mini_close
 global mini_read
@@ -243,6 +244,7 @@ O_RDWR equ 2
 LINUX_O_CREAT equ 100q    ; Linux-specific value used by __MINILIBC686__ <fcntl.h>.
 LINUX_O_TRUNC equ 1000q   ; Linux-specific value used by __MINILIBC686__ <fcntl.h>.
 
+mini___M_fopen_open:
 mini_open:  ; int __cdecl mini_open(const char *pathname, int flags, mode_t mode);  /* The mode argument is optional, it is only used when the file is created. */
 		push ebx  ; No need to save, but save code size by mergining it with mini_write.
 		mov eax, [esp+0xc]
