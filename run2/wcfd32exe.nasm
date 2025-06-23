@@ -900,7 +900,7 @@ section .le.text
   dd 0  ; End of import address table.
   import_dll_name:
   ..@0x4550:
-  db 'kernel32.dll', 0, 0
+  db 'kernel32.dll', 0, 0  ; We add a double trailing NUL to enforce even name alignment, because the name has even length.
   ..@0x454e:
   %define PE_IFUNC_NUMBER 0
   emit_ifuncs emit_ifunc_name
@@ -961,6 +961,7 @@ IMAGE_FILE_MACHINE_I386 equ 0x014c
 ..@0x31f0:
 .NumberOfSymbols: dd 0
 .SizeOfOptionalHeader: dw optional_header.end-optional_header
+IMAGE_FILE_RELOCS_STRIPPED equ 1
 IMAGE_FILE_EXECUTABLE_IMAGE equ 2
 IMAGE_FILE_LINE_NUMS_STRIPPED equ 4  ; !! Add.
 IMAGE_FILE_LOCAL_SYMS_STRIPPED equ 8  ; !! Add.
