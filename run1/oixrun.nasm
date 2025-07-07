@@ -119,10 +119,13 @@ print_crlf:  ; Prints a CRLF ("\r", "\n") to stdout.
 %endif
 
 %ifndef SELF
-; /* Parses the first argument of the Windows command-line (specified in EAX)
-;  * in place. Returns (in EAX) the pointer to the rest of the command-line.
-;  * The parsed argument will be available as NUL-terminated string at the
-;  * same location as the input.
+; /* Parses the first argument of the Windows command-line (specified in
+;  * EAX) in place. Returns (in EAX) the pointer to the rest of the
+;  * command-line, suitable for subsequent calls. Puts the unescaped
+;  * (unquoted) argvumet as a NUL-terminated string to the original location
+;  * (starting at the pointer specified at call time). Reports
+;  * no-more-arguments by returning the same pointer it has received, i.e.
+;  * `if ((arg = parse_first_arg(pw)) == pw) no_more_args();'.
 ;  *
 ;  * Similar to CommandLineToArgvW(...) in SHELL32.DLL, but doesn't aim for
 ;  * 100% accuracy, especially that it doesn't support non-ASCII characters
@@ -182,6 +185,7 @@ print_crlf:  ; Prints a CRLF ("\r", "\n") to stdout.
 ;     } else if (c == '"') {
 ;       is_quote ^= -1;
 ;     } else if (!is_quote && (c == ' ' || c == '\t' || c == '\n' || c == '\v')) {
+;      got_space:
 ;       if (p - 1 != pw) --p;  /* Don't clobber the rest with '\0' below. */
 ;      after_arg:
 ;       *pw = '\0';
@@ -196,8 +200,9 @@ parse_first_arg:
 		push ecx
 		push edx
 		push esi
-		xor bh, bh  ; is_quote.
+		xor bh, bh  ; is_quote = 0;
 		mov edx, eax
+		; From now: EAX is pw, EDX is p (input command-line), BH is is_quote.
 .1:		mov bl, [edx]
 		cmp bl, ' '
 		je .2
@@ -208,7 +213,7 @@ parse_first_arg:
 .2:		inc edx
 		jmp .1
 .3:		test bl, bl
-		jne .8
+		jne .next_char
 		mov [eax], bl
 		jmp strict short .ret
 .4:		cmp bl, '"'
@@ -222,10 +227,10 @@ parse_first_arg:
 		inc edx
 		jmp .5
 .6:		je .10
-.7:		not bh
-.8:		mov bl, [edx]
+.not_isq:	not bh
+.next_char:	mov bl, [edx]
 		test bl, bl
-		je .16
+		je .after_arg  ; Reached end of input.
 		inc edx
 		cmp bl, 0x5c  ; "\\"
 		jne .13
@@ -238,34 +243,34 @@ parse_first_arg:
 .10:		mov byte [eax], '"'
 		mov eax, esi
 		lea edx, [ecx+0x1]
-		jmp .8
+		jmp .next_char
 .11:		mov byte [eax], 0x5c  ; "\\"
 		inc eax
 .12:		cmp edx, ecx
-		je .8
+		je .next_char
 		mov byte [eax], 0x5c  ; "\\"
 		inc eax
 		inc edx
 		jmp .12
 .13:		cmp bl, '"'
-		je .7
+		je .not_isq  ; if (c == '"') goto not_isq;
 		test bh, bh
-		jne .15
+		jne .copy_char
 		cmp bl, ' '
-		je .14
+		je .got_space
 		cmp bl, 0x9
-		jb .15
+		jb .copy_char
 		cmp bl, 0xb
-		jna .14
-.15:		mov [eax], bl
+		jna .got_space
+.copy_char:	mov [eax], bl
 		inc eax
-		jmp .8
-.14:		dec edx
+		jmp .next_char
+.got_space:	dec edx
 		cmp eax, edx
-		jne .16
+		jne .after_arg
 		inc edx
-.16:		mov byte [eax], 0x0
-		xchg eax, edx  ; EAX := EDX: EDX := junk.
+.after_arg:	mov byte [eax], 0x0
+		xchg eax, edx  ; EAX := EDX (p, for returning): EDX := junk.
 .ret:		pop esi
 		pop edx
 		pop ecx
