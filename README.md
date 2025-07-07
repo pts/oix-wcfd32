@@ -470,11 +470,12 @@ The runtime consists of the following programs:
     conversion like this: `./oixconv <prog.oix> <prog> epl`.
 
   * just an OIX program file (.oix), without any other (native)
-    functionality. It needs *oixrun* to run.
+    functionality. It needs *oixrun* to run. Do the conversion like this:
+    `./oixconv <prog.oix> <prog2.oix> oix'.
 
-  With these conversions, it's trivial to port a OIX program to many target:
-  just compile it to an OIX program, and then run *oixconv* to generate the
-  target-specific executables.
+  With these conversions, it's trivial to port a OIX program to many targets:
+  just compile it to an OIX program, and then run *oixconv* to generate
+  each target-specific executables.
 
   *oixconv* is not implemented yet, currently a temporary stop-gap tool
   *wcfd32stub* is provided instead (as part of the runtime), and it runs on
