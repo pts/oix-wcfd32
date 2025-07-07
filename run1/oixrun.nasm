@@ -21,7 +21,7 @@ text:
 ; WCFD32 ABI constants.
 INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE equ 0x40
 STDOUT_FILENO equ 1
-EXIT_SUCCESS equ 0
+EXIT_FAILURE equ 1
 
 _start:		call .vcont
 .vcont:
@@ -31,25 +31,29 @@ org $$-.vcont  ; Position independent code (PIC): from now all global variables 
 		push eax  ; Save.
 		mov [ebp+wcfd32_syscall.offset], edx
 		mov [ebp+wcfd32_syscall.segment], bx
+%ifdef SELF
+		mov eax, [edi]  ; dword [wcfd32_param_struct]: program filename (ASCIIZ).
+%else
 		mov eax, [edi+4]  ; dword [wcfd32_param_struct+4]: command-line (ASCIIZ).
 		call parse_first_arg
 		cmp eax, [edi+4]
 		jne .found_arg
-		push 1  ; Exit code.
+		push byte EXIT_FAILURE  ; Proram exit code.
 		lea eax, [ebp+msg_usage]
 		jmp .print_exit
-.found_arg:	xchg eax, [edi+4]
+  .found_arg:	xchg eax, [edi+4]
 		mov [edi], eax  ; dword [wcfd32_param_struct]: program filename (ASCIIZ).
+%endif
 		; Now: EAX: filename of the WCFD32 executable program to load.
 		call load_wcfd32_program_image  ; Also modifies EDX.
 		cmp eax, -10
 		jb .load_ok
 		neg eax  ; EAX := load_error_code.
-		push eax
+		push eax  ; Program exit code.
 		mov eax, [ebp+load_errors+4*eax]
 		add eax, ebp  ; For PIC.
 .print_exit:	call print_str  ; !! Report filename etc. on file open error.
-		pop eax
+		pop eax  ; Program exit code.
 		pop ebx  ; Ignore saved EAX.
 		pop edx  ; Ignore saved EDX.
 		retf  ; exit(load_error_code).
@@ -64,8 +68,15 @@ org $$-.vcont  ; Position independent code (PIC): from now all global variables 
 %define CONFIG_LOAD_FIND_CF_HEADER
 %define CONFIG_LOAD_SINGLE_READ
 %define CONFIG_LOAD_INT21H call wcfd32_syscall
-%undef  CONFIG_LOAD_MALLOC_EAX
 %define CONFIG_LOAD_CLEAR_BSS
+%undef  CONFIG_LOAD_CF_HEADER_FOFS  ; The default is good.
+%undef  CONFIG_LOAD_MALLOC_EAX  ; Use the WCFD32 API for malloc(3).
+%ifdef NOREL
+  %define CONFIG_LOAD_NO_RELOCATIONS  ; Makes load_wcfd32_program_image shorter.
+%else
+  %undef  CONFIG_LOAD_NO_RELOCATIONS  ; Needed for general correctness.
+%endif
+%undef  CONFIG_LOAD_RELOCATED_DD  ; Message pointers are not relocated.
 %include "wcfd32load.inc.nasm"  ; We use the fact that this code doesn't read or write EBP.
 
 wcfd32_syscall:
@@ -107,6 +118,7 @@ print_crlf:  ; Prints a CRLF ("\r", "\n") to stdout.
 		ret
 %endif
 
+%ifndef SELF
 ; /* Parses the first argument of the Windows command-line (specified in EAX)
 ;  * in place. Returns (in EAX) the pointer to the rest of the command-line.
 ;  * The parsed argument will be available as NUL-terminated string at the
@@ -156,7 +168,7 @@ print_crlf:  ; Prints a CRLF ("\r", "\n") to stdout.
 ;           *pw++ = '\\';
 ;         }
 ;         if (p != q) {
-;           is_quote ^= 1;
+;           is_quote ^= -1;
 ;         } else {
 ;           *pw++ = '"';
 ;           ++p;  /* Skip over the '"'. */
@@ -168,7 +180,7 @@ print_crlf:  ; Prints a CRLF ("\r", "\n") to stdout.
 ;         }
 ;       }
 ;     } else if (c == '"') {
-;       is_quote ^= 1;
+;       is_quote ^= -1;
 ;     } else if (!is_quote && (c == ' ' || c == '\t' || c == '\n' || c == '\v')) {
 ;       if (p - 1 != pw) --p;  /* Don't clobber the rest with '\0' below. */
 ;      after_arg:
@@ -259,12 +271,15 @@ parse_first_arg:
 		pop ecx
 		pop ebx
 		ret
+%endif
 
 %ifdef DEBUG
 msg:		db 'Hello, World!', 13, 10, 0
 %endif
 
+%ifndef SELF
 msg_usage:	db 'Usage: oixrun <prog.oix> [<arg> ...]', 13, 10, 0
+%endif
 
 emit_load_errors
 

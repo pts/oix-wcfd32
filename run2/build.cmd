@@ -29,6 +29,8 @@ exit
 @echo on
 %nasm% -O999999999 -w+orphan-labels -f bin -o oixrun.oix oixrun.nasm
 @if errorlevel 1 exit %b%
+%nasm% -O999999999 -w+orphan-labels -f bin -DSELF -DNOREL -o oixruns.oix oixrun.nasm
+@if errorlevel 1 exit %b%
 %nasm% -O999999999 -w+orphan-labels -f bin -o oixrun.exe wcfd32exe.nasm
 @if errorlevel 1 exit %b%
 %nasm% -O999999999 -w+orphan-labels -f bin -DSTUB -o wcfd32linux.bin wcfd32linux.nasm

@@ -180,6 +180,9 @@ load_wcfd32_program_image:
 		pop edi
 		pop ecx
 %endif
+%ifdef CONFIG_LOAD_NO_RELOCATIONS
+		mov edx, esi  ; EDX := ESI (image_base).
+%else
 		mov edx, [edi+0Ch]  ; cf_header.reloc_rva.
 		push ebx  ; Save DOS filehandle.
 		xchg esi, edx
@@ -202,10 +205,11 @@ load_wcfd32_program_image:
 		loop .next_reloc
 		jmp strict short .next_block
 .rdone:		; Return image_base in EDX.
+		pop ebx  ; Restore EBX := DOS filehandle.
+%endif
 		mov eax, [edi+14h]  ; cf_header.entry_rva.
 		add eax, edx
 		; Now: EAX: entry point address. It will be returned.
-		pop ebx  ; Restore DOS filehandle.
 .close_return:
 		push eax  ; Save return value.
 		mov ah, LOAD_INT21_FUNC_3EH_CLOSE_FILE  ; r_eax

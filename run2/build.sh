@@ -64,6 +64,7 @@
 # TODO(pts): Preload oixrun.oix to wcfd32win32.exe, don't let oixrun.exe contain `Memory allocation failed' 2 times, just once. This is possible by overlapping the end of the LE image with the beginning of the PE image. the winning is 211 file bytes, and the loss is more virtual memory usage.
 # TODO(pts): Make the size of the command-line unlimited on Windows, currently it's 0x100 bytes.
 # TODO(pts): INT21H_FUNC_4EH_FIND_FIRST_MATCHING_FILE makes mwperun.exe crash DOSBox (even if there are no wildcards in the filename) in: dosbox.nox.static --cmd --mem-mb=3 ~/prg/mwpestub/mwperun.exe run1/oixrun.exe wl.exe t.lib rex2oix.o
+# TODO(pts): size optimization: make ../run[12]/pmodew133.exe smaller by removing features
 #
 
 set -ex
@@ -79,6 +80,7 @@ fi
 nasm=tools/nasm    # NASM 0.98.39 (2005-01-15) was the last version without amd64 (`bits 64') support. Integers are still 32-bit.
 
 "$nasm" -O999999999 -w+orphan-labels -f bin -o oixrun.oix oixrun.nasm
+"$nasm" -O999999999 -w+orphan-labels -f bin -DSELF -DNOREL -o oixruns.oix oixrun.nasm
 "$nasm" -O999999999 -w+orphan-labels -f bin -o oixrun.exe wcfd32exe.nasm
 "$nasm" -O999999999 -w+orphan-labels -f bin -DSTUB -o wcfd32linux.bin wcfd32linux.nasm
 rm -f wcfd32stub  # For correct permissions below.

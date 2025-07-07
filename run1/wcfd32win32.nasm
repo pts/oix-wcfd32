@@ -306,11 +306,12 @@ pop_esi_edx_ecx_ebx_ret:
 		pop ebx
 		ret
 
-%undef  CONFIG_LOAD_FIND_CF_HEADER
-%define CONFIG_LOAD_SINGLE_READ
+%undef  CONFIG_LOAD_FIND_CF_HEADER  ; Makes load_wcfd32_program_image shorter.
+%define CONFIG_LOAD_SINGLE_READ  ; Makes load_wcfd32_program_image shorter.
 %define CONFIG_LOAD_INT21H call wcfd32_near_syscall
 %undef  CONFIG_LOAD_MALLOC_EAX  ; TODO(pts): Move malloc to a separate function, define this to make it shorter.
-%undef  CONFIG_LOAD_CLEAR_BSS  ; VirtualAlloc(...) already returns 0 bytes.
+%undef  CONFIG_LOAD_CLEAR_BSS  ; Makes load_wcfd32_program_image shorter. VirtualAlloc(...) already returns 0 bytes.
+%define CONFIG_LOAD_NO_RELOCATIONS  ; Makes load_wcfd32_program_image shorter.
 %include "wcfd32load.inc.nasm"
 
 DumpEnvironment:
@@ -720,7 +721,7 @@ _mainCRTStartup:
 		;call change_binnt_to_binw_in_full_pathname  ; No need to change the pathname, the program is self-contained.
 		mov [wcfd32_program_filename], eax
 		;mov eax, esp	    ;  ; var_wcfd32_program_filename_buf.
-		call load_wcfd32_program_image  ; Sets EAX and EDX.
+		call load_wcfd32_program_image  ; Sets EAX and EDX. Loads a copy of oixrun.oix from itself (argv[0], "oixrun.exe", GetModuleFileNameA()).
 		;
 		cmp eax, -10
 		jb .load_ok

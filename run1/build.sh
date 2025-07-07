@@ -57,6 +57,7 @@ wlink=tools/wlink  # OpenWatcom 1.4 (2005-11-15) was the first one with a Linux 
 nasm=tools/nasm    # NASM 0.98.39 (2005-01-15) was the last version without amd64 (`bits 64') support. Integers are still 32-bit.
 
 "$nasm" -O999999999 -w+orphan-labels -f bin -o oixrun.oix oixrun.nasm
+"$nasm" -O999999999 -w+orphan-labels -f bin -DSELF -DNOREL -o oixruns.oix oixrun.nasm
 "$nasm" -O999999999 -w+orphan-labels -f obj -o wcfd32dos.obj wcfd32dos.nasm
 # Using the output name w.exe because WLiNK inserts the output filename
 # (without the .exe extension) to the program, and we want it short.
