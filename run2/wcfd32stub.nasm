@@ -44,8 +44,40 @@ O_TRUNC  equ 1000q  ; Linux-specific (not the same on FreeBSD).
 _start:		pop eax  ; Skip argc.
 		pop eax  ; Skip argv[0].
 		pop eax  ; argv[1]: input filename.
-		call check_filename
-		xchg ebx, eax  ; EBX := EAX; EAX := junk.
+		test eax, eax
+		jz short .usage
+		pop ebx  ; argv[2]: output filename.
+		test ebx, ebx
+		jz short .usage
+		mov [output_filename], ebx
+		pop ecx  ; argv[3]: output format or NULL. Default is 'exe'.
+		test ecx, ecx
+		jz short .no_argv3
+		pop ebx  ; argv[4]: must be NULL.
+		test ebx, ebx
+		jz short .have_ofmt
+.usage:		mov eax, fatal_usage
+.j_fatal:	jmp strict near fatal
+.no_argv3:	xor ecx, ecx  ; ZF := 0, `je' below will jump.
+		jmp short .have_ofmt_ecx
+.have_ofmt:	mov ecx, [ecx]
+		cmp ecx, 'exe'  ; Default.
+.have_ofmt_ecx: mov ebx, output_exe
+		je short found_ofmt
+		cmp ecx, 'elf'  ; ELF-32.
+		mov ebx, output_elf
+		je short found_ofmt
+		cmp ecx, 'epl'  ; ELF-32 pre-relocated.
+		mov ebx, output_epl
+		je short found_ofmt
+		cmp ecx, 'oix'
+		mov ebx, output_oix
+		je short found_ofmt
+output_elf:  ; !! Implement this.
+		mov eax, fatal_ofmt
+		jmp short _start.j_fatal
+found_ofmt:	mov [output_code_ptr], ebx
+		xchg ebx, eax  ; EBX := EAX (input_filename); EAX := junk.
 		xor ecx, ecx  ; O_RDONLY.
 		mov al, SYS_open
 		call check_syscall_al
@@ -86,26 +118,27 @@ _start:		pop eax  ; Skip argc.
 .cf_found:	; CF header found at file offset ESI-ESP, at [esi].
 		mov edi, cf_header
 		movsd  ; Signature.
-		mov ecx, [esi]  ; wcfd32_load_fofs.
-		mov dword [esi], stub_end-stub  ; New load_fofs.
-		times 5 movsd
-		;mov edi, [eax+8]  ; wcfd32_load_size.  No need to save this, we copy until EOF, to include the Watcom resources after the image.
+		lodsd  ; cf_header.load_fofs.
+		xchg ecx, eax  ; ECX := cf_header.load_fofs; EAX := junk.
+		mov eax, stub_end-stub  ; Output cf_header.load_fofs.
+		stosd  ; Output cf_header.load_fofs.
+		times 4 movsd  ; Copy 4 more cf_header fields.
+		;mov edi, [eax+8]  ; cf_header.load_size.  No need to save this, we copy until EOF, to include the Watcom resources after the image.
 		mov al, SYS_lseek
-		xor edx, edx  ; SEEK_SET.
+		xor edx, edx  ; SEEK_SET. ECX == cf_header.load_fofs.
 		call check_syscall_al
-		pop eax  ; argv[2]: output filename.
-		call check_filename
-		pop ebp  ; argv[3].
+		mov eax, [output_filename]
+
 		push ebx  ; Save input filehandle.
-		xchg ebx, eax  ; EBX := EAX; EAX := junk.
+		xchg ebx, eax  ; EBX := EAX (output_filename); EAX := junk.
 		mov ecx, O_WRONLY|O_CREAT|O_TRUNC
 		mov edx, 666q  ; Permission bits (mode_t) for file creation.
 		mov al, SYS_open
 		call check_syscall_al
-		test ebp, ebp  ; argv[3].
-		xchg ebp, eax  ; EBP := EAX (fd); EAX := junk.
-		jz .exe_output
-.elf_output:	; ---
+		xchg ebp, eax  ; EBP := EAX (output_filehandle); EAX := junk.
+		jmp dword [output_code_ptr]
+
+output_epl:
 		mov eax, [cf_header.entry_rva]
 		;add eax, [elf_org]
 		;add eax, elf_stub_end-elf_header
@@ -184,28 +217,35 @@ _start:		pop eax  ; Skip argc.
 .done_strip0:	mov ebx, ebp  ; Output filehandle.
 		sub edi, edx
 		sub [elf_text_filesiz], edi
-		push ecx
-		push edx
+		push ecx  ; Save.
+		push edx  ; Save.
 		mov ecx, elf_stub
 		mov edx, elf_stub_end-elf_stub
 		push SYS_write
 		pop eax
 		call check_syscall_al
+		pop edx  ; Restore.
+		pop ecx  ; Restore.
+		jmp short write_and_copy_rest
+
+output_oix:	push byte 6*4  ; 6*4  ; OIX image starts right after the CF header.
 		pop edx
-		pop ecx
+		mov [edi-6*4+cf_header.load_fofs-cf_header], edx
+		lea ecx, [edi-6*4]  ; cf_header.
+		jmp short output_exe.after_ecdx
+
+output_exe:	mov edx, stub_end-stub  ; MZ stub (DOS and Win32).
+		mov ecx, stub
+.after_ecdx:	mov ebx, ebp  ; Output filehandle.
+		; Falls through to write_and_copy_rest
+
+write_and_copy_rest:  ; Also copies resources (i.e. overlay) after the image.
 		push SYS_write
-		pop eax
+		pop eax  ; Output filehandle.
 		call check_syscall_al
-		jmp .pop_read_next  ; Read resources after the image.
-		; ---
-.exe_output:	mov ecx, stub
-		mov edx, stub_end-stub
-		mov ebx, ebp
-		push SYS_write
-		pop eax
-		call check_syscall_al
-		; !! Also strip trailing NULs here (needs big rewrite).
-.pop_read_next:	pop ebx  ; Input filehandle.
+		; !! Also strip trailing NULs from EOF here (needs big rewrite).
+		; Falls through to copy_rest.
+.copy_rest:	pop ebx  ; Input filehandle.
 .read_next:	call read_to_buf
 		test eax, eax
 		jz .rw_done
@@ -238,21 +278,26 @@ check_syscall_al:  ; Input: AL: syscall number.
 		js .bad
 		add esp, 4
 		ret
-.bad:		pop ebx  ; Syscall number.
-		mov eax, fatal_open
-		cmp ebx, SYS_open
-		je .fatal
+.bad:		pop eax  ; Syscall number.
+		cmp eax, SYS_open
+		je short .bad_open
 		mov eax, fatal_read
-		cmp ebx, SYS_read
-		je .fatal
+		cmp eax, SYS_read
+		je short .fatal
 		mov eax, fatal_write
-		cmp ebx, SYS_write
-		je .fatal
+		cmp eax, SYS_write
+		je short .fatal
 		mov eax, fatal_lseek
-		cmp ebx, SYS_lseek
-		je .fatal
+		cmp eax, SYS_lseek
+		je short .fatal
 		mov eax, fatal_syscall
-.fatal:		;jmp fatal  ; Fall through to fatal.
+		jmp short .fatal
+.bad_open:	cmp ebx, [output_filename]
+		mov eax, fatal_open_in
+		jne short .fatal
+		; Falls through.
+		mov eax, fatal_open_out
+.fatal:		;jmp fatal  ; Falls through to fatal.
 
 fatal:  ; Writes message at EAX to stderr, and exits with EXIT_FAILURE.
 		xchg eax, ecx  ; ECX := EAX; EAX := junk.
@@ -272,17 +317,10 @@ fatal:  ; Writes message at EAX to stderr, and exits with EXIT_FAILURE.
 		int 0x80  ; Linux i386 syscall.
 		; Not reached.
 
-check_filename:  ; Checks filename in EAX.
-		test eax, eax
-		jz .bad
-		cmp byte [eax], 0
-		je .bad
-		ret
-.bad:		mov eax, fatal_filename
-		jmp fatal
-
-fatal_filename:	db 'fatal: filename expected', 10, 0
-fatal_open:	db 'fatal: error opening', 10, 0
+fatal_usage:	db 'Usage: wcfd32stub <input.prog> <output.prog> [<output-format>]', 10, 0
+fatal_ofmt:	db 'fatal: unknown output format', 10, 0
+fatal_open_in:	db 'fatal: error opening input program file', 10, 0
+fatal_open_out:	db 'fatal: error opening output program file', 10, 0
 fatal_read:	db 'fatal: error reading', 10, 0
 fatal_write:	db 'fatal: error writing', 10, 0
 fatal_lseek:	db 'fatal: error seeking', 10, 0
@@ -319,6 +357,8 @@ prebss:
 		bss_align equ ($$-$)&3
 section .bss align=1  ; We could use `absolute $' here instead, but that's broken (breaks address calculation in program_end-bss+prebss-file_header) in NASM 0.95--0.97.
 		bss resb bss_align  ; Uninitialized data follows.
+output_filename: resd 1
+output_code_ptr: resd 1
 read_buf:	resb 0x8000
 .end:
 program_end:
