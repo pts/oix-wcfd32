@@ -23,7 +23,18 @@ INT21H_FUNC_40H_WRITE_TO_OR_TRUNCATE_FILE equ 0x40
 STDOUT_FILENO equ 1
 EXIT_FAILURE equ 1
 
-_start:		call .vcont
+_start:
+%ifdef SELF1
+  ; If entered via the regular entry point (_start), then this program
+  ; behaves like oixrun.oix, i.e. it runs the OIX program specified in its
+  ; first argument (argv[1]).
+  ;
+  ; If entered via the _start+1 entry point, then this program runs itself
+  ; (argv[0]) as an OIX program.
+		db 0xa8  ; Opcode byte of `test al, ...'. Sets CF := 0.
+		stc  ; Sets CF := 1.
+%endif
+		call .vcont
 .vcont:
 org $$-.vcont  ; Position independent code (PIC): from now all global variables will be accessed through EBP.
 		pop ebp  ; EBP := vaddr of .vcont.
@@ -31,6 +42,10 @@ org $$-.vcont  ; Position independent code (PIC): from now all global variables 
 		push eax  ; Save.
 		mov [ebp+wcfd32_syscall.offset], edx
 		mov [ebp+wcfd32_syscall.segment], bx
+%ifdef SELF1
+		mov eax, [edi]  ; dword [wcfd32_param_struct]: program filename (ASCIIZ).
+		jc short .do_load  ; Jumps iff the _start+1 entry point has been used above.
+%endif
 %ifdef SELF
 		mov eax, [edi]  ; dword [wcfd32_param_struct]: program filename (ASCIIZ).
 %else
@@ -44,7 +59,7 @@ org $$-.vcont  ; Position independent code (PIC): from now all global variables 
   .found_arg:	xchg eax, [edi+4]
 		mov [edi], eax  ; dword [wcfd32_param_struct]: program filename (ASCIIZ).
 %endif
-		; Now: EAX: filename of the WCFD32 executable program to load.
+.do_load:	; Now: EAX: filename of the WCFD32 executable program to load.
 		call load_wcfd32_program_image  ; Also modifies EDX.
 		cmp eax, -10
 		jb .load_ok

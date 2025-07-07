@@ -105,12 +105,12 @@ assert_at 0xa
 %macro emit_cf_header 0
   cf_header:
   .signature:	dd 'CF'
-  .load_fofs:	dd oixrun_image-file
-  .load_size:	dd oixrun_image.end-oixrun_image
-  .reloc_rva:	;dd ?
-  ;.mem_size:	dd ?
-  ;.entry_rva:	dd ?
-  incbin 'oixrun.oix', 0xc, 0xc
+  .load_fofs:	dd oixrun1_image-file
+  .load_size:	dd oixrun1_image.end-oixrun1_image
+  .reloc_rva:	;dd ?  ; We can't know this address. It points to a 0 word to indicate no relocations.
+  ;.mem_size:	dd oixrun1_image.end-oixrun1_image.  ; Only for oixrun.
+  ;.entry_rva:	dd 0  ; Only for oixrun.
+  incbin 'oixrun1.oix', 0xc, 0xc
 %endm
 %ifdef PE
   ;.minalloc:	dw ?

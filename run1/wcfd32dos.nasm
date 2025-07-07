@@ -191,7 +191,7 @@ obss_end: obss_resb 0
 		mov bx, cs  ; Segment of wcfd32_far_syscall for the far call.
 		mov ah, WCFD32_OS_DOS  ; !! wasmx106.exe (loader16.asm) does OS_WIN16. !! Why? Which of DOS or OS2? Double check.
 		push cs  ; For the `retf' of the far call.
-		call oixruns_image
+		call oixrun1_image+1  ; Uses the _start+1 entry point of oixrun.nasm (-DSELF1), so the OIX program will be loaded from argv[0].
 .exit:		mov ah, 4ch  ; Exit with exit code in AL.
 		int 21h  ; This is the only way to exit from PMODE/W, these don't work: `ret', `retf', `iret', `int 20h'.
 		; Not reached.
@@ -489,15 +489,11 @@ debug_syscall:	push eax
 		call print_crlf
 		pop eax
 		ret
-
-message db '?$'  ; !!
-done_message db '.', 13, 10, '$' ; !!
 %endif
 
 		times (le.start-$)&3 db 0  ; Align to 4 bytes.
-oixrun_image:	incbin 'oixrun.oix', 0x18
+oixrun1_image:	incbin 'oixrun1.oix', 0x18
 .end:
-oixruns_image:	incbin 'oixruns.oix', 0x18
 
 ; Unfortunately the format LE 4 KiB of alignment between .code and .data, no
 ; way to make it smaller, but PMODE/W supports LE only. So we just put
