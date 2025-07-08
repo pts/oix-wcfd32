@@ -66,7 +66,7 @@ program_header:	dd 1, 0, file_header, file_header
     .load_size:	dd -1
     .reloc_rva:	dd -1
     .mem_size:	dd -1
-    .entry_rva: dd -1
+    .entry_rva:	dd -1
   %else
     .load_size:	;dd ?
     .reloc_rva:	equ .load_size+4  ;dd ?
