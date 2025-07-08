@@ -16,11 +16,6 @@ BEGIN { $^W = 1 }  # Enable warnings.
 use integer;
 use strict;
 
-my $header_type = "none";  # Default, also `--bin'.
-if (@ARGV and $ARGV[0] eq "--elf") { $header_type = "elf"; shift(@ARGV) }  # Shorter ELF header (1 PT_LOAD, 0x54 bytes, like `ld -N').
-elsif (@ARGV and $ARGV[0] eq "--elf2") { $header_type = "elf2"; shift(@ARGV) }  # Longer ELF header (2 PT_LOADs, 0x74 bytes, like `ld').
-elsif (@ARGV and $ARGV[0] eq "--bin") { $header_type = "none"; shift(@ARGV) }
-elsif (@ARGV and $ARGV[0] eq "--") { shift(@ARGV) }
 die "Usage: $0 <input.elf> <output.oix>\n" if @ARGV != 2;
 my($fn, $fnout) = @ARGV;
 
