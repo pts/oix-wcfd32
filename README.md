@@ -506,25 +506,28 @@ The runtime is free and open source software (GNU GPL v2), it is written in
 NASM 0.98.39 (2005-01-15) for reproducible builds, but newer versions of
 NASM are also able to compile it. A copy of NASM 0.98.39 precompiled for
 Linux i386 and Win32 is bundled with the runtime sources. In addition to
-NASM, the runtime also uses the WLINK (OpenWatcom Linker) tool for linking,
-from [OpenWatcom
+NASM, version 1 of the runtime also uses the WLINK (OpenWatcom Linker) tool
+for linking, from [OpenWatcom
 1.4](http://openwatcom.org/ftp/archive/open-watcom-c-win32-1.4.exe)
 (2005-11-15). Newer versions of WLINK are also able to link it. A copy of
 WLINK 1.4 precompiled for Linux i386 and Win32 is bundled with the runtime
-sources. The runtime uses the DOS extender
+sources. Version 2 of the runtime doesn't need WLINK anymore, the linker
+functionality is implemented in pure NASM instead. The runtime uses the DOS
+extender
 [PMODE/W](http://www.sid6581.net/pmodew/) 1.33 (1997-01-01, open sourced in
 2023-07 under the MIT license) as the DOS stub, a copy of *pmodew.exe* is
 bundled with the runtime sources.
 
-It's possible to build the runtime on any system which has NASM and WLINK
-installed, but it's most convenient to do so on Linux i386 (or amd64) or
+It's possible to build the runtime on any system which has NASM (and WLINK,
+for version 1 only) installed, but it's most convenient to do so on Linux
+i386 (or amd64) or
 Win32 (including 64-bit x86 Windows) systems, for which build automation is
 provided and the tools NASM and WLINK are precompiled and bundled. For
 version 1, the automation for Linux is the simple and short shell script
-[build.sh](https://github.com/pts/oix-wcfd32/blob/master/run1/build.sh) (run
+[build.sh](run1/build.sh) (run
 it as `sh build.sh` after cloning the Git repository), and for Win32 is the
 simple and short .cmd script
-[build.cmd](https://github.com/pts/oix-wcfd32/blob/master/run1/build.cmd)
+[build.cmd](run1/build.cmd)
 (run it as `build.cmd` from within the cmd.exe Command Prompt window after
 cloning the Git repository). (On Windows 95, copy or rename *build.cmd* to
 *build.bat*, and then run it.) (The minimum version of Windows which can run
@@ -534,7 +537,8 @@ failure.) It's also possible to run *build.cmd* in Wine, like this `wine cmd
 /c build.cmd`. As of the writing of this paragraph, the build automation
 script runs NASM 13 times and WLINK 2 times, producing multiple temporary
 files and final output files. It all happens in less than a second on a
-modern system.
+modern system. For version 2, there is a [build.sh](run2/build.sh) and a
+[build.cmd](run2/build.cmd] in a separate directory.
 
 The build process of the runtime:
 
@@ -548,12 +552,6 @@ The build process of the runtime:
   from source first for the host system.)
 * is non-incremental: the build automation script does a full build each
   time it is run. This is OK, because it's still fast enough.
-
-It is planned to drop the build dependency of the runtime on WLINK, by
-recreating the linker functionality in pure NASM (with `nasm -f bin`). This
-will be possible, but it is especially tricky for LE (32-bit DOS) and PE
-(Win32) executables with relocation. After that point building the runtime
-will depend on NASM only.
 
 ## The C reference implementation
 
