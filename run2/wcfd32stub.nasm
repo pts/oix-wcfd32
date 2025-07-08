@@ -137,8 +137,25 @@ found_ofmt:	mov [output_code_ptr], ebx
 		xchg ebp, eax  ; EBP := EAX (output_filehandle); EAX := junk.
 		jmp dword [output_code_ptr]
 
-output_epl:	mov eax, [cf_header.entry_rva]
-		mov edi, [epl_cf_entry_vaddr]  ; bss.
+output_epl:
+.precompute_bss_clear_edi_and_ecx:  ; Ruins EBX, ECX, ESI, EDI.
+		mov edx, [epl_cf_entry_vaddr]  ; oix_image, i.e. image_base in the output executable program.
+		mov ebx, [byte edi-6*4+cf_header.entry_rva-cf_header]  ; EBX := dword [cf_header.entry_rva].
+		mov esi, [byte edi-6*4+cf_header.load_size-cf_header]  ; ESI := dword [cf_header.load_size].
+		mov edi, [byte edi-6*4+cf_header.mem_size -cf_header]  ; EDI := dword [cf_header.mem_size ].
+		add edi, edx
+		mov ecx, edi
+		and edi, ~0xfff  ; Round down to i386 page boundary. EDI := start of last page of BSS.
+		add esi, edx
+		cmp edi, esi
+		jnb short .done_edi  ; Jump iff the start of the first page of BSS is not earlier than the end of load (.text and .data).
+		mov edi, esi  ; Start filling from the end of load (.text and .data).
+.done_edi:	sub ecx, edi
+		mov [epl_clear_bss_ecx], ecx
+		mov [epl_clear_bss_edi], edi
+.update_elf_headers:
+		mov edi, edx  ; oix_image, i.e. image_base in the output executable program.
+		mov eax, [cf_header.entry_rva]
 		add [epl_cf_entry_vaddr], eax
 		mov eax, [cf_header.load_size]
 		add [epl_text_filesiz], eax
@@ -154,7 +171,7 @@ output_epl:	mov eax, [cf_header.entry_rva]
 .bad_alloc:	mov eax, fatal_alloc
 		jmp fatal
 .brk1_ok:	xchg ebx, eax  ; EBX := EAX; EAX := junk.
-		mov ecx, ebx  ; ECX := EBX (image base vaddr).
+		mov ecx, ebx  ; ECX := EBX (image_base vaddr).
 		add ebx, [cf_header.load_size]
 		push SYS_brk
 		pop eax
@@ -174,13 +191,13 @@ output_epl:	mov eax, [cf_header.entry_rva]
 		mov eax, fatal_read
 		jmp fatal
 .readall_ok:
-		mov edx, ecx  ; image_base in the stub-allocated buffer.
+		mov edx, ecx  ; EDX := image_base in the stub-allocated buffer.
 		mov esi, [cf_header.reloc_rva]
 .apply_relocations_and_clear:
 		; Apply relocations and clear (set-to-zero) relocation data bytes.
-		; Input: EDX, EDI: image_base; ESI: reloc_rva.
+		; Input: EDX: image_base in the stub-allocated buffer, EDI: image_base in the output executable program; ESI: reloc_rva.
 		; Spoils: EAX, EBX, ECX, ESI.
-		add esi, edx  ; ESI := stub-allocated image_base + cf_header.reloc_rva.
+		add esi, edx  ; ESI := image_base in the stub-allocated buffer + cf_header.reloc_rva.
 		jmp strict short .next_block
 .next_reloc:	lodsw
 		and word [esi-2], 0  ; Clear.
@@ -357,7 +374,9 @@ epl_stub:
 epl_header:
 incbin 'wcfd32linuxepl.bin'
 epl_stub_end:
-epl_cf_entry_vaddr equ epl_header+0x54+1  ; Will be modified in place. The argument of the `mov esi, ...' instruction in wcfd32linux.nasm.
+epl_cf_entry_vaddr equ epl_header+0x54+0*5+1  ; Will be modified in place. The argument of the `mov esi, ...' instruction in wcfd32linux.nasm.
+epl_clear_bss_ecx  equ epl_header+0x54+1*5+1  ; Will be modified in place. The argument of the `mov ecx, ...' instruction in wcfd32linux.nasm.
+epl_clear_bss_edi  equ epl_header+0x54+2*5+1  ; Will be modified in place. The argument of the `mov edi, ...' instruction in wcfd32linux.nasm.
 epl_text_filesiz equ epl_header+0x54-0x10  ; Will be modified in place.
 epl_text_memsiz  equ epl_header+0x54-0xc   ; Will be modified in place.
 

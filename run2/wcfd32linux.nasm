@@ -157,8 +157,12 @@ ERR_INVALID_DATA equ 13
 
 _start:  ; Linux i386 program entry point.
 %if EPLSTUB
-		mov esi, bss  ; Value will be patched by wfcd32stub to OIX program oix_image+cf_header.entry_rva during executable program file generation.
-		; Now: ESI: entry point address.
+		mov esi, oix_image  ; Value is used as image_base in wcfd32stub.nasm. Value will be patched by wfcd32stub.nasm to OIX program oix_image+cf_header.entry_rva during executable program file generation.
+		mov ecx, 0  ; Value will be patched by wcfd32stub to the size  of to-be-zeroed range in BSS. !! TODO(pts): Omit this and below if size is 0.
+		mov edi, 0  ; Value will be patched by wcfd32stub to the start of to-be-zeroed range in BSS.
+		xor eax, eax  ; AL := 0, with side effects of setting the rest of EAX.
+		rep stosb  ; See .clear_last_page_of_bss why we are doing this.
+		; Now ESI is entry point address.
 %endif
 %if ELFSTUB  ; Apply relocations. No need to do it for SELFPROG, because SELFPROG supports only oixrun.oix, and it doesn't have any relocations.
   ; TODO(pts): size optimization: Omit this in wcfd32stub.nasm if there are 0 relocations in the OIX program.
@@ -193,7 +197,7 @@ _start:  ; Linux i386 program entry point.
   ; of the OIX program ends) is present in the file.
   ;
   ; !! TODO(pts): size optimization: Omit this in wcfd32stub.nasm if the count is 0 (e.g. if BSS is empty). (But then `lea es, [ebx+dex]' below has to be changed as well.)
-  ; !! TODO(pts): size optimization: Precompute EDI and ECX in wcfd32stub.nasm.
+  ; !! TODO(pts): size optimization: Precompute EDI and ECX in wcfd32stub.nasm, just like in output_epl.precompute_bss_clear_edi_and_ecx.
   .clear_last_page_of_bss:
 		;xor eax, eax  ; Not needed. We only need AL := 0, but that's already set by .apply_relocations.
 		mov ebx, [byte edi+cf_header.entry_rva-cf_header.reloc_rva]  ; EBX := dword [cf_header.entry_rva].
@@ -1214,6 +1218,9 @@ msg_unsupported: db 'warning: unsupported OIX syscall 0x',
   bss_align equ ($$-$)&3
 		times bss_align db 0  ; align 4. Doesn't do anything, it has already been aligned above.
   bss:  ; .bss must be empty so that the OIX program image can be appended.
+  %if EPLSTUB
+    oix_image:
+  %endif
 %endif
 %if SELFPROG || ELFSTUB
 		times ($$-$)&3 db 0  ; align 4. Doesn't do anything, it has already been aligned above.
