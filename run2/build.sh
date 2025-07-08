@@ -87,10 +87,10 @@ rm -f wcfd32stub  # For correct permissions below.
 "$nasm" -O999999999 -w+orphan-labels -f bin -DLINUXPROG -o wcfd32stub wcfd32stub.nasm  # incbin: wcfd32linux.bin, wcfd32dos.exe, wcfd32dosp.exe, wcfd32win32.exe
 chmod +x wcfd32stub  # Final output: wcfd32stub Linux i386 executable program.
 rm -f oixrun0  # For correct permissions below.
-"$nasm" -O999999999 -w+orphan-labels -f bin -DRUNPROG -DOIXRUN0 -o oixrun0 wcfd32linux.nasm  # Native Linux i386 implementation.
+"$nasm" -O999999999 -w+orphan-labels -f bin -DRUNPROG -o oixrun0 wcfd32linux.nasm  # Native Linux i386 implementation.
 chmod +x oixrun0  # Final output: oixrun0 i386 executable program.
 rm -f oixrun  # For correct permissions below.
-"$nasm" -O999999999 -w+orphan-labels -f bin -DSELFPROG -DOIXRUN -o oixrun wcfd32linux.nasm  # ELF-flavored OIX implementation using oixrun.oix, containing the relocation code twice. -DOIXRUN doesn't make a difference, oixrun.oix is precompiled.
+"$nasm" -O999999999 -w+orphan-labels -f bin -DSELFPROG -o oixrun wcfd32linux.nasm  # ELF-flavored OIX implementation using oixrun.oix, containing the relocation code twice. -DOIXRUN doesn't make a difference, oixrun.oix is precompiled.
 chmod +x oixrun  # Final output: oixrun i386 executable program.
 # TODO(pts): Sync changes from build.sh to build.cmd.
 ls -l oixrun.exe oixrun0 oixrun oixrun.oix wcfd32stub

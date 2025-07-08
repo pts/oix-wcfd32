@@ -26,8 +26,8 @@
 %endif
 ; The difference between RUNPROG (oixrun0) and SELFPROG (oixrun): SELFPROG
 ; is also an OIX program (it contains a copy of the oixrun.oix image), and
-; thus it is anout 355 bytes longer. Please note that there is is no code
-; duplication bwetween oixrun0.oix and the runner.
+; thus it is about 355 bytes longer. Please note that there is is no code
+; duplication between oixrun0.oix and the runner.
 
 org 0x8048000  ; Typical Linux i386 executable program.
 bits 32
@@ -144,13 +144,11 @@ ERR_INVALID_ACCESS equ 12
 ERR_INVALID_DATA equ 13
 
 _start:  ; Linux i386 program entry point.
-%if RUNPROG==0
-  %if SELFPROG==0
-		mov esi, bss  ; Value will be patched by wfcd32stub to WCFD32 program entry_vaddr during executable program file generation.
+%if STUB
+		mov esi, bss  ; Value will be patched by wfcd32stub to OIX program cf_header.entry_vaddr during executable program file generation.
 		; Now: ESI: entry point address.
-  %endif
 %endif
-%if SELFPROG  ; Apply relocations.
+%if SELFPROG  ; Apply relocations. No need to do it for SELFPROG, because SELFPROG supports only oixrun.oix, and it doesn't have any relocations.
 		mov edx, oix_image  ; Same as [cf_header.load_fofs]. Moving it without changing the ELF-32 phdr fields is not supported.
 		mov esi, [cf_header.reloc_rva]
 .apply_relocations:
@@ -172,11 +170,9 @@ _start:  ; Linux i386 program entry point.
 		loop .next_reloc
 		jmp strict short .next_block
 .rdone:		; Keep image_base in EDX. It will be unused.
-		mov esi, [cf_header.entry_rva]
-		add esi, edx
 %endif
-		pop edx  ; argc.
 %if RUNPROG
+		pop edx  ; argc.
 		pop eax  ; Ignore argv[0].
 		dec edx
 		jnz .have_argv1
@@ -185,6 +181,12 @@ _start:  ; Linux i386 program entry point.
 		mov al, EXIT_FAILURE
 		jmp handle_INT21H_FUNC_4CH_EXIT_PROCESS
 .have_argv1:
+%else
+  %if SELFPROG
+		mov esi, [cf_header.entry_rva]
+		add esi, edx
+  %endif
+		pop edx  ; argc.
 %endif
 		pop edi  ; argv[0]: program invocation name. No need to replace it with "/proc/self/exe" in open, if it doesn't contain a slash, but on macOS in Docker: https://github.com/pts/staticpython/blob/1bc021851823cbbc38c0dbd0790a252b760e9beb/calculate_path.2.7.c#L71-L75
 		mov eax, esp  ; argv.
@@ -231,7 +233,7 @@ _start:  ; Linux i386 program entry point.
 .load_ok:	; Now: EAX: entry point address.
 %else
 		xchg eax, esi  ; EAX := ESI (entry point address); ESI := junk.
-%endif  ; else RUNPROG.
+%endif  ; %if RUNPROG %else.
 		; Now we call the entry point.
 		;
 		; Input: AH: operating system (WCFD32_OS_OS2 or WCFD32_OS_WIN32).
@@ -1161,15 +1163,17 @@ msg_unsupported: db 'warning: unsupported OIX syscall 0x',
   _malloc_simple_base resd 1  ; char *base;
   _malloc_simple_free resd 1  ; char *free;
   _malloc_simple_end  resd 1  ; char *end;
-%else
+%else  ; We can't have a BSS for oixrun, because we want to copy bytes from oix_image (from oixrun.oix) afterwards.
 		times ($$-$)&3 db 0  ; align 4.
 		_malloc_simple_base	dd 0  ; char *base;
 		_malloc_simple_free	dd 0  ; char *free;
 		_malloc_simple_end	dd 0  ; char *end;
   prebss:
   bss:  ; .bss must be empty so that the OIX program image can be appended.
+		times ($$-$)&3 db 0  ; align 4. Doesn't do anything, it has already been aligned above.
 %endif
 %if SELFPROG
+		times ($$-$)&3 db 0  ; align 4. Doesn't do anything, it has already been aligned above.
   oix_image:	incbin 'oixrun.oix', 0x18
 %endif
 program_end:
