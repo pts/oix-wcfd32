@@ -50,7 +50,7 @@ program_header:	dd 1, 0, file_header, file_header
 %else
 		dd prebss-file_header
 %endif
-		dd program_end-bss+prebss-file_header, RWX, 0x1000
+		dd program_end-bss+prebss+bss_align-file_header, RWX, 0x1000
 
 %macro assert_at 1
   times  (%1)-($-$$) db 0
@@ -160,7 +160,7 @@ _start:  ; Linux i386 program entry point.
 		mov esi, bss  ; Value will be patched by wfcd32stub to OIX program cf_header.entry_vaddr during executable program file generation.
 		; Now: ESI: entry point address.
 %endif
-%if SELFPROG || ELFSTUB  ; Apply relocations. No need to do it for SELFPROG, because SELFPROG supports only oixrun.oix, and it doesn't have any relocations.
+%if ELFSTUB  ; Apply relocations. No need to do it for SELFPROG, because SELFPROG supports only oixrun.oix, and it doesn't have any relocations.
 		mov edx, oix_image  ; Same as [cf_header.load_fofs]. Moving it without changing the ELF-32 phdr fields is not supported.
 		mov esi, [cf_header.reloc_rva]
 .apply_relocations:
@@ -194,7 +194,9 @@ _start:  ; Linux i386 program entry point.
 		jmp handle_INT21H_FUNC_4CH_EXIT_PROCESS
 .have_argv1:
 %else
-  %if SELFPROG || ELFSTUB
+  %if SELFPROG
+		mov esi, strict dword oix_image+0  ; oixrun.oix starts at the beginning, i.e. [cf_header.entry_rva] == 0.
+  %elif ELFSTUB
 		mov esi, [cf_header.entry_rva]
 		add esi, edx
   %endif
@@ -1171,7 +1173,8 @@ msg_unsupported: db 'warning: unsupported OIX syscall 0x',
   prebss:
   bss_align equ ($$-$)&3
   section .bss align=1  ; We could use `absolute $' here instead, but that's broken (breaks address calculation in program_end-bss+prebss-file_header) in NASM 0.95--0.97.
-  bss:		resb bss_align  ; Uninitialized data follows.
+		resb bss_align  ; Uninitialized data follows.
+  bss:
   _malloc_simple_base resd 1  ; char *base;
   _malloc_simple_free resd 1  ; char *free;
   _malloc_simple_end  resd 1  ; char *end;
@@ -1181,8 +1184,9 @@ msg_unsupported: db 'warning: unsupported OIX syscall 0x',
 		_malloc_simple_free	dd 0  ; char *free;
 		_malloc_simple_end	dd 0  ; char *end;
   prebss:
+  bss_align equ ($$-$)&3
+		times bss_align db 0  ; align 4. Doesn't do anything, it has already been aligned above.
   bss:  ; .bss must be empty so that the OIX program image can be appended.
-		times ($$-$)&3 db 0  ; align 4. Doesn't do anything, it has already been aligned above.
 %endif
 %if SELFPROG || ELFSTUB
 		times ($$-$)&3 db 0  ; align 4. Doesn't do anything, it has already been aligned above.

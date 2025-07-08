@@ -64,7 +64,7 @@ _start:		pop eax  ; Skip argc.
 		cmp ecx, 'exe'  ; Default.
 .have_ofmt_ecx: mov ebx, output_exe
 		je short found_ofmt
-		cmp ecx, 'elf'  ; ELF-32.
+		cmp ecx, 'elf'  ; ELF-32. 72 bytes longer than 'epl' because of 24 bytes of CF header and ~48 bytes of .apply_relocations. Also a bit slower to start up because of .apply_relocations.
 		mov ebx, output_elf
 		je short found_ofmt
 		cmp ecx, 'epl'  ; ELF-32 pre-relocated.
@@ -73,7 +73,6 @@ _start:		pop eax  ; Skip argc.
 		cmp ecx, 'oix'
 		mov ebx, output_oix
 		je short found_ofmt
-output_elf:  ; !! Implement this.
 		mov eax, fatal_ofmt
 		jmp short _start.j_fatal
 found_ofmt:	mov [output_code_ptr], ebx
@@ -122,7 +121,7 @@ found_ofmt:	mov [output_code_ptr], ebx
 		xchg ecx, eax  ; ECX := cf_header.load_fofs; EAX := junk.
 		mov eax, stub_end-stub  ; Output cf_header.load_fofs.
 		stosd  ; Output cf_header.load_fofs.
-		times 4 movsd  ; Copy 4 more cf_header fields.
+		times 4 movsd  ; Copy 4 more cf_header fields to cf_header.
 		;mov edi, [eax+8]  ; cf_header.load_size.  No need to save this, we copy until EOF, to include the Watcom resources after the image.
 		mov al, SYS_lseek
 		xor edx, edx  ; SEEK_SET. ECX == cf_header.load_fofs.
@@ -138,11 +137,7 @@ found_ofmt:	mov [output_code_ptr], ebx
 		xchg ebp, eax  ; EBP := EAX (output_filehandle); EAX := junk.
 		jmp dword [output_code_ptr]
 
-output_epl:
-		mov eax, [cf_header.entry_rva]
-		;add eax, [epl_org]
-		;add eax, epl_stub_end-epl_header
-		;mov [epl_cf_entry_vaddr], eax
+output_epl:	mov eax, [cf_header.entry_rva]
 		mov edi, [epl_cf_entry_vaddr]  ; bss.
 		add [epl_cf_entry_vaddr], eax
 		mov eax, [cf_header.load_size]
@@ -228,9 +223,23 @@ output_epl:
 		pop ecx  ; Restore.
 		jmp short write_and_copy_rest
 
+output_elf:	lea esi, [edi-6*4+cf_header.load_size-cf_header]  ; ESI := cf_header.load_size.
+		mov edi, elf_cf_header.load_size
+		lodsd  ; EAX := .load_size.
+		stosd  ; Copy .load_size.
+		movsd  ; Copy .reloc_rva.
+		mov edx, [esi]  ; .mem_size.
+		times 2 movsd  ; Copy .mem_size and .entry_rva from cf_header to elf_cf_header.
+		lea ecx, [edi-6*4-elf_cf_header+elf_header]  ; ECX := elf_header.
+		add [byte ecx-elf_header+elf_text_filesiz], eax  ; EAX == .load_size.
+		add [byte ecx-elf_header+elf_text_memsiz ], edx  ; EDX == .mem_size. !!! Add code to overwrite the last page of OIX program BSS with NUL (before that it contained the start of the overlay), for Linux 1.0.4.
+		mov edx, elf_stub_end-elf_header
+		; TODO(pts): Write shorter stub if there are no relocations.
+		jmp short output_exe.after_ecdx  ; !!! Add chmod +x for output_elf and output_epl.
+
 output_oix:	push byte 6*4  ; 6*4  ; OIX image starts right after the CF header.
 		pop edx
-		mov [edi-6*4+cf_header.load_fofs-cf_header], edx
+		mov [byte edi-6*4+cf_header.load_fofs-cf_header], edx
 		lea ecx, [edi-6*4]  ; cf_header.
 		jmp short output_exe.after_ecdx
 
@@ -348,15 +357,29 @@ epl_stub:
 epl_header:
 incbin 'wcfd32linuxepl.bin'
 epl_stub_end:
-epl_entry equ epl_header+0x54
-epl_cf_entry_vaddr equ epl_entry+1  ; Will be modified in place. The argument of the `mov esi, ...' instruction in wcfd32linux.nasm.
-epl_org equ epl_header+0x54-0x14
+epl_cf_entry_vaddr equ epl_header+0x54+1  ; Will be modified in place. The argument of the `mov esi, ...' instruction in wcfd32linux.nasm.
 epl_text_filesiz equ epl_header+0x54-0x10  ; Will be modified in place.
 epl_text_memsiz  equ epl_header+0x54-0xc   ; Will be modified in place.
+
+elf_stub:
+elf_header:
+incbin 'wcfd32linuxelf.bin'
+elf_stub_end:
+elf_cf_header equ elf_header+0x54
+elf_cf_header.signature equ elf_cf_header+0  ; "CF\0\0". Correct when loaded.
+elf_cf_header.load_fofs equ elf_cf_header+4  ; Correct when loaded.
+elf_cf_header.load_size equ elf_cf_header+8  ; Will be modified in place, copied from cf_header.
+elf_cf_header.reloc_rva equ elf_cf_header+0xc  ; Will be modified in place, copied from cf_header.
+elf_cf_header.mem_size  equ elf_cf_header+0x10  ; Will be modified in place, copied from cf_header.
+elf_cf_header.entry_rva equ elf_cf_header+0x14  ; Will be modified in place, copied from cf_header.
+elf_text_filesiz equ elf_header+0x54-0x10  ; Will be modified in place.
+elf_text_memsiz  equ elf_header+0x54-0xc   ; Will be modified in place.
+
 prebss:
 		bss_align equ ($$-$)&3
 section .bss align=1  ; We could use `absolute $' here instead, but that's broken (breaks address calculation in program_end-bss+prebss-file_header) in NASM 0.95--0.97.
-		bss resb bss_align  ; Uninitialized data follows.
+		resb bss_align  ; Uninitialized data follows.
+bss:
 output_filename: resd 1
 output_code_ptr: resd 1
 read_buf:	resb 0x8000

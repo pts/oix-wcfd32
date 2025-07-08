@@ -436,7 +436,7 @@ The runtime consists of the following programs:
 * *oixconv*: A command-line tool which can convert OIX program files. One
   possible conversion is converting an OIX program (.oix, .exe etc.) to a
   self-contained native executable program, embedding *oixrun*, so that it
-  doesn't need an external *oixrun* program to run. Conversions targets:
+  doesn't need an external *oixrun* program to run. Conversion targets:
 
   * an .exe which works on both Win32 (including 64-bit Windows systems,
     also including emulators like Wine) and 32-bit DOS (including emulators
@@ -479,19 +479,16 @@ The runtime consists of the following programs:
 
   *oixconv* is not implemented yet, currently a temporary stop-gap tool
   *wcfd32stub* is provided instead (as part of the runtime), and it runs on
-  Linux i386 only. *wcfd32stub* can:
-
-  * create the Win32--DOS dual .exe: *./wcfd32stub <prog.oix> <prog.exe>*
-
-  * create a pre-relocated Linux i386 executable (which cannot be converted
-    back to an OIX program file): *./wcfd32stub <prog.oix> <prog> epl*.
+  Linux i386 only, and the generated i386 ELF-32 executable program
+  works on Linux only (not FreeBSD). Otherwise *wcfd32stub* can do everything
+  explained above.
 
 The runtime is able to run the Watcom tools such as *binw/wasm.exe* and
 *binw/wlib.exe*, released between 1994 and 2002, see above which Watcom
 C/C++ version had them. For example, run `./oixrun wasm.exe testprog.asm`.
 The Watcom tools are not distributed together with the runtime (because they
 are neither open source nor free software, because they were released before
-OpenWatcom), you need to obteain them separately.
+OpenWatcom), you need to obtain them separately.
 
 The development of the runtime started in 2024-04 by studying the
 *bld/w32loadr* directory of
