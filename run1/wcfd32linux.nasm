@@ -156,8 +156,8 @@ ERR_INVALID_ACCESS equ 12
 ERR_INVALID_DATA equ 13
 
 _start:  ; Linux i386 program entry point.
-%if EPLSTUB
-		mov esi, oix_image  ; Value is used as image_base in wcfd32stub.nasm. Value will be patched by wfcd32stub.nasm to OIX program oix_image+cf_header.entry_rva during executable program file generation.
+%if EPLSTUB  ; Fill the last, partial page of the OIX program BSS with NUL bytes.
+		mov esi, oix_image  ; Value is used as image_base in wcfd32stub.nasm. Value will be patched by wfcd32stub.nasm in .precompute_bss_clear_edi_and_ecx to OIX program oix_image+cf_header.entry_rva during executable program file generation.
 		mov ecx, 0  ; Value will be patched by wcfd32stub to the size  of to-be-zeroed range in BSS. !! TODO(pts): Omit this and below if size is 0.
 		mov edi, 0  ; Value will be patched by wcfd32stub to the start of to-be-zeroed range in BSS.
 		xor eax, eax  ; AL := 0, with side effects of setting the rest of EAX.
@@ -189,9 +189,9 @@ _start:  ; Linux i386 program entry point.
 		jmp strict short .next_block
   .rdone:	; Now EDX is oix_image == image_base (it will be used by .clear_last_page_of_bss and .set_esi_to_entry); EAX == 0; ECX == 0; EDI == address of cf_header.reloc_rva.
 %endif
-%if ELFSTUB  ; Fill the last, partial page of the OIX program BSS with NUL bytes.
+%if ELFSTUB  ; Fill the first, partial page of the OIX program BSS with NUL bytes.
   ; It is the responsibility of the kernel to fill the entire BSS with NUL
-  ; bytes. However, some early Linux kernels (such as 1.0 and 1.04, but not
+  ; bytes. However, some early Linux kernels (such as 1.0 and 1.0.4, but not
   ; 5.4.0) fail to do so for the last page of BSS if an overlay (i.e.
   ; resource bytes, i.e. unloaded junk bytes in the file right where the BSS
   ; of the OIX program ends) is present in the file.
@@ -201,16 +201,17 @@ _start:  ; Linux i386 program entry point.
   .clear_last_page_of_bss:
 		;xor eax, eax  ; Not needed. We only need AL := 0, but that's already set by .apply_relocations.
 		mov ebx, [byte edi+cf_header.entry_rva-cf_header.reloc_rva]  ; EBX := dword [cf_header.entry_rva].
-		mov esi, [byte edi+cf_header.load_size-cf_header.reloc_rva]  ; ESI := dword [cf_header.load_size].
-		mov edi, [byte edi+cf_header.mem_size -cf_header.reloc_rva]  ; EDI := dword [cf_header.mem_size ].
+		mov esi, [byte edi+cf_header.mem_size -cf_header.reloc_rva]  ; ESI := dword [cf_header.mem_size ].
+		mov edi, [byte edi+cf_header.load_size-cf_header.reloc_rva]  ; EDI := dword [cf_header.load_size].
 		add edi, edx
-		mov ecx, edi
-		and edi, ~0xfff  ; Round down to i386 page boundary. EDI := start of last page of BSS.
 		add esi, edx
-		cmp edi, esi
-		jnb short .done_edi  ; Jump iff the start of the first page of BSS is not earlier than the end of load (.text and .data).
-		mov edi, esi  ; Start filling from the end of load (.text and .data).
-  .done_edi:	sub ecx, edi
+		mov ecx, edi
+		add ecx, 0xfff
+		and ecx, ~0xfff  ; Round up to i386 page boundary. ECX := end of first page of BSS.
+		cmp ecx, esi
+		jna short .done_ecx  ; Jump iff the end of the first page of BSS is not later than the end of BSS.
+		mov ecx, esi  ; Start filling from the end of load (.text and .data).
+  .done_ecx:	sub ecx, edi
 		rep stosb
 %endif
 

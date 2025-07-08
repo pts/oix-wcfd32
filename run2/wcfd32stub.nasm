@@ -64,7 +64,7 @@ _start:		pop eax  ; Skip argc.
 		cmp ecx, 'exe'  ; Default.
 .have_ofmt_ecx: mov ebx, output_exe
 		je short found_ofmt
-		cmp ecx, 'elf'  ; ELF-32. 100 bytes longer than 'epl' because of 24 bytes of CF header, 48 bytes of .apply_relocations, 28 bytes of .clear_last_page_of_bss. Also a bit slower to start up because of .apply_relocations.
+		cmp ecx, 'elf'  ; ELF-32. 84 bytes (+ the number of trailing NULs) longer than 'epl' because of 24 bytes of CF header, 48 bytes of .apply_relocations, 12 bytes of extra .clear_last_page_of_bss. Also a bit slower to start up because of .apply_relocations.
 		mov ebx, output_elf
 		je short found_ofmt
 		cmp ecx, 'epl'  ; ELF-32 pre-relocated.
@@ -138,23 +138,8 @@ found_ofmt:	mov [output_code_ptr], ebx
 		jmp dword [output_code_ptr]
 
 output_epl:
-.precompute_bss_clear_edi_and_ecx:  ; Ruins EBX, ECX, ESI, EDI.
-		mov edx, [epl_cf_entry_vaddr]  ; oix_image, i.e. image_base in the output executable program.
-		mov ebx, [byte edi-6*4+cf_header.entry_rva-cf_header]  ; EBX := dword [cf_header.entry_rva].
-		mov esi, [byte edi-6*4+cf_header.load_size-cf_header]  ; ESI := dword [cf_header.load_size].
-		mov edi, [byte edi-6*4+cf_header.mem_size -cf_header]  ; EDI := dword [cf_header.mem_size ].
-		add edi, edx
-		mov ecx, edi
-		and edi, ~0xfff  ; Round down to i386 page boundary. EDI := start of last page of BSS.
-		add esi, edx
-		cmp edi, esi
-		jnb short .done_edi  ; Jump iff the start of the first page of BSS is not earlier than the end of load (.text and .data).
-		mov edi, esi  ; Start filling from the end of load (.text and .data).
-.done_edi:	sub ecx, edi
-		mov [epl_clear_bss_ecx], ecx
-		mov [epl_clear_bss_edi], edi
 .update_elf_headers:
-		mov edi, edx  ; oix_image, i.e. image_base in the output executable program.
+		mov edi, [epl_cf_entry_vaddr]  ; oix_image, i.e. image_base in the output executable program.
 		mov eax, [cf_header.entry_rva]
 		add [epl_cf_entry_vaddr], eax
 		mov eax, [cf_header.load_size]
@@ -218,7 +203,7 @@ output_epl:
 .rdone:		; Now: EDX: image_base; EAX, EBX, ECX, ESI: spoiled.
 		mov ecx, edx  ; stub-allocated image_base.
 		mov edx, [cf_header.load_size]
-		mov edi, edx
+		mov ebx, edx
 		; Strip trailing NULs (0 bytes) from the image.
 .strip0:	test edx, edx
 		jz .done_strip0
@@ -226,9 +211,24 @@ output_epl:
 		jne .done_strip0
 		dec edx
 		jmp .strip0
-.done_strip0:	mov ebx, ebp  ; Output filehandle.
-		sub edi, edx
-		sub [epl_text_filesiz], edi
+.done_strip0:	sub ebx, edx
+		sub [epl_text_filesiz], ebx  ; Subtract the number of bytes saved at the end.
+		mov esi, [cf_header.mem_size]
+		add esi, edi  ; ESI += image_base in the output executable program.
+		add edi, [cf_header.load_size]
+		sub edi, ebx  ; Subtract the number of bytes saved at the end.
+.precompute_bss_clear_edi_and_ecx:  ; Ruins EBX, ESI, EDI.
+		mov ebx, edi
+		add ebx, 0xfff
+		and ebx, ~0xfff  ; Round up to i386 page boundary. EBX := end of first page of BSS.
+		cmp ebx, esi
+		jna short .done_ebx  ; Jump iff the end of the first page of BSS is not later than the end of BSS.
+		mov ebx, esi  ; Start filling from the end of load (.text and .data).
+.done_ebx:	sub ebx, edi
+		mov [epl_clear_bss_ecx], ebx
+		mov [epl_clear_bss_edi], edi
+.write_epl_stub:
+		mov ebx, ebp  ; Output filehandle.
 		push ecx  ; Save.
 		push edx  ; Save.
 		mov ecx, epl_stub
@@ -238,7 +238,7 @@ output_epl:
 		call check_syscall_al
 		pop edx  ; Restore.
 		pop ecx  ; Restore.
-		jmp short write_and_copy_rest
+		jmp short write_and_copy_rest  ; Writes EDX bytes starting at address ECX.
 
 output_elf:	lea esi, [edi-6*4+cf_header.load_size-cf_header]  ; ESI := cf_header.load_size.
 		mov edi, elf_cf_header.load_size
