@@ -64,7 +64,7 @@ _start:		pop eax  ; Skip argc.
 		cmp ecx, 'exe'  ; Default.
 .have_ofmt_ecx: mov ebx, output_exe
 		je short found_ofmt
-		cmp ecx, 'elf'  ; ELF-32. 72 bytes longer than 'epl' because of 24 bytes of CF header and ~48 bytes of .apply_relocations. Also a bit slower to start up because of .apply_relocations.
+		cmp ecx, 'elf'  ; ELF-32. 100 bytes longer than 'epl' because of 24 bytes of CF header, 48 bytes of .apply_relocations, 28 bytes of .clear_last_page_of_bss. Also a bit slower to start up because of .apply_relocations.
 		mov ebx, output_elf
 		je short found_ofmt
 		cmp ecx, 'epl'  ; ELF-32 pre-relocated.
@@ -232,7 +232,7 @@ output_elf:	lea esi, [edi-6*4+cf_header.load_size-cf_header]  ; ESI := cf_header
 		times 2 movsd  ; Copy .mem_size and .entry_rva from cf_header to elf_cf_header.
 		lea ecx, [edi-6*4-elf_cf_header+elf_header]  ; ECX := elf_header.
 		add [byte ecx-elf_header+elf_text_filesiz], eax  ; EAX == .load_size.
-		add [byte ecx-elf_header+elf_text_memsiz ], edx  ; EDX == .mem_size. !!! Add code to overwrite the last page of OIX program BSS with NUL (before that it contained the start of the overlay), for Linux 1.0.4.
+		add [byte ecx-elf_header+elf_text_memsiz ], edx  ; EDX == .mem_size.
 		mov edx, elf_stub_end-elf_header
 		; TODO(pts): Write shorter stub if there are no relocations.
 		jmp short output_exe.after_ecdx  ; !!! Add chmod +x for output_elf and output_epl.

@@ -157,32 +157,59 @@ ERR_INVALID_DATA equ 13
 
 _start:  ; Linux i386 program entry point.
 %if EPLSTUB
-		mov esi, bss  ; Value will be patched by wfcd32stub to OIX program cf_header.entry_vaddr during executable program file generation.
+		mov esi, bss  ; Value will be patched by wfcd32stub to OIX program oix_image+cf_header.entry_rva during executable program file generation.
 		; Now: ESI: entry point address.
 %endif
 %if ELFSTUB  ; Apply relocations. No need to do it for SELFPROG, because SELFPROG supports only oixrun.oix, and it doesn't have any relocations.
+  ; TODO(pts): size optimization: Omit this in wcfd32stub.nasm if there are 0 relocations in the OIX program.
 		mov edx, oix_image  ; Same as [cf_header.load_fofs]. Moving it without changing the ELF-32 phdr fields is not supported.
-		mov esi, [cf_header.reloc_rva]
-.apply_relocations:
+		mov edi, cf_header.reloc_rva
+		mov esi, [edi]
+  .apply_relocations:
 		; Apply relocations.
 		; Input: EDX: image_base; ESI: reloc_rva.
 		; Spoils: EAX, EBX, ECX, ESI.
 		add esi, edx  ; ESI := image_base + cf_header.reloc_rva.
 		xor eax, eax  ; The high word of EAX will remain 0 until .rdone.
-.next_block:	lodsw
+  .next_block:	lodsw
 		mov ecx, eax
 		jecxz .rdone
 		lodsw
 		mov ebx, eax
 		shl ebx, 16
 		add ebx, edx
-.next_reloc:	lodsw
+  .next_reloc:	lodsw
 		add ebx, eax
 		add [ebx], edx
 		loop .next_reloc
 		jmp strict short .next_block
-.rdone:		; Keep image_base in EDX. It will be unused.
+  .rdone:	; Now EDX is oix_image == image_base (it will be used by .clear_last_page_of_bss and .set_esi_to_entry); EAX == 0; ECX == 0; EDI == address of cf_header.reloc_rva.
 %endif
+%if ELFSTUB  ; Fill the last, partial page of the OIX program BSS with NUL bytes.
+  ; It is the responsibility of the kernel to fill the entire BSS with NUL
+  ; bytes. However, some early Linux kernels (such as 1.0 and 1.04, but not
+  ; 5.4.0) fail to do so for the last page of BSS if an overlay (i.e.
+  ; resource bytes, i.e. unloaded junk bytes in the file right where the BSS
+  ; of the OIX program ends) is present in the file.
+  ;
+  ; !! TODO(pts): size optimization: Omit this in wcfd32stub.nasm if the count is 0 (e.g. if BSS is empty). (But then `lea es, [ebx+dex]' below has to be changed as well.)
+  ; !! TODO(pts): size optimization: Precompute EDI and ECX in wcfd32stub.nasm.
+  .clear_last_page_of_bss:
+		;xor eax, eax  ; Not needed. We only need AL := 0, but that's already set by .apply_relocations.
+		mov ebx, [byte edi+cf_header.entry_rva-cf_header.reloc_rva]  ; EBX := dword [cf_header.entry_rva].
+		mov esi, [byte edi+cf_header.load_size-cf_header.reloc_rva]  ; ESI := dword [cf_header.load_size].
+		mov edi, [byte edi+cf_header.mem_size -cf_header.reloc_rva]  ; EDI := dword [cf_header.mem_size ].
+		add edi, edx
+		mov ecx, edi
+		and edi, ~0xfff  ; Round down to i386 page boundary. EDI := start of last page of BSS.
+		add esi, edx
+		cmp edi, esi
+		jnb short .done_edi  ; Jump iff the start of the first page of BSS is not earlier than the end of load (.text and .data).
+		mov edi, esi  ; Start filling from the end of load (.text and .data).
+  .done_edi:	sub ecx, edi
+		rep stosb
+%endif
+
 %if RUNPROG
 		pop edx  ; argc.
 		pop eax  ; Ignore argv[0].
@@ -194,11 +221,11 @@ _start:  ; Linux i386 program entry point.
 		jmp handle_INT21H_FUNC_4CH_EXIT_PROCESS
 .have_argv1:
 %else
+  .set_esi_to_entry:
   %if SELFPROG
-		mov esi, strict dword oix_image+0  ; oixrun.oix starts at the beginning, i.e. [cf_header.entry_rva] == 0.
+		mov esi, oix_image+0  ; oixrun.oix starts at the beginning (oix_image+0), i.e. dword [cf_header.entry_rva] == 0.
   %elif ELFSTUB
-		mov esi, [cf_header.entry_rva]
-		add esi, edx
+		lea esi, [ebx+edx]  ; Same result as, but shorter than: `mov esi, [cf_header.entry_rva]' ++ `add esi, edx'.
   %endif
 		pop edx  ; argc.
 %endif
@@ -1173,7 +1200,8 @@ msg_unsupported: db 'warning: unsupported OIX syscall 0x',
   prebss:
   bss_align equ ($$-$)&3
   section .bss align=1  ; We could use `absolute $' here instead, but that's broken (breaks address calculation in program_end-bss+prebss-file_header) in NASM 0.95--0.97.
-  bss:		resb bss_align  ; Uninitialized data follows.
+		resb bss_align  ; Uninitialized data follows.
+  bss:
   _malloc_simple_base resd 1  ; char *base;
   _malloc_simple_free resd 1  ; char *free;
   _malloc_simple_end  resd 1  ; char *end;
