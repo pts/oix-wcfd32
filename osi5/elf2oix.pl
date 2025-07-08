@@ -7,8 +7,12 @@ eval 'PERL_BADLANG=x;export PERL_BADLANG;exec perl -x "$0" "$@";exit 1'
 # elf2oix.pl: convert a simple Linux i386 ELF-32 executable program to an OIX programs
 # by pts@fazekas.hu at Sun Apr 28 03:26:17 CEST 2024
 #
+# This script works with Perl 5.004.04 (1997-10-15) or later.
+#
 
-BEGIN { $^W = 1 }
+BEGIN { $ENV{LC_ALL} = "C" }  # For deterministic output. Typically not needed. Is it too late for Perl?
+BEGIN { $ENV{TZ} = "GMT" }  # For deterministic output. Typically not needed. Perl respects it immediately.
+BEGIN { $^W = 1 }  # Enable warnings.
 use integer;
 use strict;
 
