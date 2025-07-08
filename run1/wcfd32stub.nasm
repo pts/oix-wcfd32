@@ -30,8 +30,11 @@ SYS_read equ 3
 SYS_write equ 4
 SYS_open equ 5
 SYS_close equ 6
+SYS_unlink equ 10
 SYS_lseek equ 19
 SYS_brk equ 45
+SYS_fchmod equ 94
+SYS_fstat equ 108  ; Supported by Linux 1.0.
 
 SEEK_SET equ 0
 
@@ -64,14 +67,15 @@ _start:		pop eax  ; Skip argc.
 		cmp ecx, 'exe'  ; Default.
 .have_ofmt_ecx: mov ebx, output_exe
 		je short found_ofmt
+		cmp ecx, 'oix'
+		mov ebx, output_oix
+		je short found_ofmt
+		inc byte [do_add_executable_bit]  ; For 'elf' and 'epl' below.
 		cmp ecx, 'elf'  ; ELF-32. 84 bytes (+ the number of trailing NULs) longer than 'epl' because of 24 bytes of CF header, 48 bytes of .apply_relocations, 12 bytes of extra .clear_last_page_of_bss. Also a bit slower to start up because of .apply_relocations.
 		mov ebx, output_elf
 		je short found_ofmt
 		cmp ecx, 'epl'  ; ELF-32 pre-relocated.
 		mov ebx, output_epl
-		je short found_ofmt
-		cmp ecx, 'oix'
-		mov ebx, output_oix
 		je short found_ofmt
 		mov eax, fatal_ofmt
 		jmp short _start.j_fatal
@@ -130,6 +134,9 @@ found_ofmt:	mov [output_code_ptr], ebx
 
 		push ebx  ; Save input filehandle.
 		xchg ebx, eax  ; EBX := EAX (output_filename); EAX := junk.
+		push byte SYS_unlink
+		pop eax
+		int 0x80  ; Linux i386 syscall. Ignore error returned in EAX (e.g. because the file was not found).
 		mov ecx, O_WRONLY|O_CREAT|O_TRUNC
 		mov edx, 666q  ; Permission bits (mode_t) for file creation.
 		mov al, SYS_open
@@ -252,7 +259,7 @@ output_elf:	lea esi, [edi-6*4+cf_header.load_size-cf_header]  ; ESI := cf_header
 		add [byte ecx-elf_header+elf_text_memsiz ], edx  ; EDX == .mem_size.
 		mov edx, elf_stub_end-elf_header
 		; TODO(pts): Write shorter stub if there are no relocations.
-		jmp short output_exe.after_ecdx  ; !!! Add chmod +x for output_elf and output_epl.
+		jmp short output_exe.after_ecdx
 
 output_oix:	push byte 6*4  ; 6*4  ; OIX image starts right after the CF header.
 		pop edx
@@ -276,16 +283,37 @@ write_and_copy_rest:  ; Also copies resources (i.e. overlay) after the image.
 		test eax, eax
 		jz .rw_done
 		xchg edx, eax  ; EDX := EAX (size); EAX := junk.
-		xchg ebp, ebx
+		xchg ebp, ebx  ; EBX := output filehandle.
 		mov al, SYS_write
 		call check_syscall_al
 		cmp eax, edx
 		je .write_ok
 		mov eax, fatal_write
 		jmp fatal
-.write_ok:	xchg ebp, ebx
+.write_ok:	xchg ebp, ebx  ; EBX := input filehandle.
 		jmp .read_next
-.rw_done:	xor eax, eax
+.rw_done:	cmp [do_add_executable_bit], al  ; AL == 0.
+		je short .after_add_executable_bit
+.add_executable_bit:
+		mov al, SYS_fstat  ; On Linux i386, this fails with EOVERFLOW == 75 if the file size is at least 1<<31 bytes (2 GiB).
+		mov ebx, ebp  ; EBX := output filehandle.
+		sub esp, byte 64  ; sizeof(struct stat) on Linux i386.
+		mov ecx, esp
+		call check_syscall_al
+		movzx ecx, word [ecx+8]  ; .st_mode.
+		add esp, byte 64  ; sizeof(struct stat) on Linux i386.
+		mov edx, ecx
+		and edx, 444q
+		shr edx, 2  ; Convert subset of 0444 (readable) to 0111 (executable).
+		or ecx, edx
+		cmp ecx, edx
+		je short .after_add_executable_bit  ; Jump if no change in permission bits.
+		mov al, SYS_fchmod
+		;mov ebx, ...  ; EBX == output filehandle.
+		;mov ecx, ...  ; ECX == mode, including permission bits.
+		call check_syscall_al
+.after_add_executable_bit:
+.exit_success:	xor eax, eax
 		inc eax  ; SYS_exit.
 		xor ebx, ebx  ; EXIT_SUCCESS.
 		int 0x80  ; Linux i386 syscall.
@@ -315,6 +343,12 @@ check_syscall_al:  ; Input: AL: syscall number.
 		je short .fatal
 		mov eax, fatal_lseek
 		cmp eax, SYS_lseek
+		je short .fatal
+		mov eax, fatal_fstat
+		cmp eax, SYS_fstat
+		je short .fatal
+		mov eax, fatal_fchmod
+		cmp eax, SYS_fchmod
 		je short .fatal
 		mov eax, fatal_syscall
 		jmp short .fatal
@@ -350,6 +384,8 @@ fatal_open_out:	db 'fatal: error opening output program file', 10, 0
 fatal_read:	db 'fatal: error reading', 10, 0
 fatal_write:	db 'fatal: error writing', 10, 0
 fatal_lseek:	db 'fatal: error seeking', 10, 0
+fatal_fstat:	db 'fatal: error getting file attributes', 10, 0
+fatal_fchmod:	db 'fatal: error adding executable bit to file', 10, 0
 fatal_syscall:	db 'fatal: error in syscall', 10, 0
 fatal_too_short: db 'fatal: file too short for CF header', 10, 0
 fatal_cf_not_found: db 'fatal: CF header not found', 10, 0
@@ -481,7 +517,27 @@ section .bss align=1  ; We could use `absolute $' here instead, but that's broke
 bss:
 output_filename: resd 1
 output_code_ptr: resd 1
+;struct_stat:  ; Linux i386. 64 bytes.
+;.st_dev: resd 1
+;.st_ino: resd 1
+;.st_mode: resw 1
+;.st_nlink: resw 1
+;.st_uid: resw 1  ; Special returned value 0xfffe means larger than 0xffff.
+;.st_gid: resw 1  ; Special returned value 0xfffe means larger than 0xffff.
+;.st_rdev: resd 1
+;.st_size: resd 1  ; If file_size >= 0x80000000, then the syscall fails with EOVERFLOW == 75 == Value too large for defined data type.
+;.st_blksize: resd 1  ; May be incorrect: 0x1000 reported here instead of 0x200 reported in struct stat64.
+;.st_blocks: resd 1
+;.st_atime: resd 1
+;.st_atime_nsec: resd 1
+;.st_mtime: resd 1
+;.st_mtime_nsec: resd 1
+;.st_ctime: resd 1
+;.st_ctime_nsec: resd 1
+;.__unused4: resd 1
+;.__unused5: resd 1
 read_buf:	resb 0x8000
 .end:
+do_add_executable_bit: resb 1
 program_end:
 %endif  ; LINUXPROG
