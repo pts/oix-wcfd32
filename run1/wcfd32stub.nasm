@@ -140,15 +140,15 @@ found_ofmt:	mov [output_code_ptr], ebx
 
 output_epl:
 		mov eax, [cf_header.entry_rva]
-		;add eax, [elf_org]
-		;add eax, elf_stub_end-elf_header
-		;mov [elf_cf_entry_vaddr], eax
-		mov edi, [elf_cf_entry_vaddr]  ; bss.
-		add [elf_cf_entry_vaddr], eax
+		;add eax, [epl_org]
+		;add eax, epl_stub_end-epl_header
+		;mov [epl_cf_entry_vaddr], eax
+		mov edi, [epl_cf_entry_vaddr]  ; bss.
+		add [epl_cf_entry_vaddr], eax
 		mov eax, [cf_header.load_size]
-		add [elf_text_filesiz], eax
+		add [epl_text_filesiz], eax
 		mov eax, [cf_header.mem_size]
-		add [elf_text_memsiz], eax
+		add [epl_text_memsiz], eax
 		; Now we read the entire image, and write it at once.
 		push SYS_brk
 		pop eax
@@ -216,11 +216,11 @@ output_epl:
 		jmp .strip0
 .done_strip0:	mov ebx, ebp  ; Output filehandle.
 		sub edi, edx
-		sub [elf_text_filesiz], edi
+		sub [epl_text_filesiz], edi
 		push ecx  ; Save.
 		push edx  ; Save.
-		mov ecx, elf_stub
-		mov edx, elf_stub_end-elf_stub
+		mov ecx, epl_stub
+		mov edx, epl_stub_end-epl_stub
 		push SYS_write
 		pop eax
 		call check_syscall_al
@@ -424,15 +424,15 @@ incbin 'wcfd32win32.exe', pe_header-mz_header+0xf8+0x50+8
 stub_end:
 
 %ifdef LINUXPROG
-elf_stub:
-elf_header:
-incbin 'wcfd32linux.bin'
-elf_stub_end:
-elf_entry equ elf_header+0x54
-elf_cf_entry_vaddr equ elf_entry+1  ; Will be modified in place. The argument of the `mov esi, ...' instruction in wcfd32linux.nasm.
-elf_org equ elf_header+0x54-0x14
-elf_text_filesiz equ elf_header+0x54-0x10  ; Will be modified in place.
-elf_text_memsiz  equ elf_header+0x54-0xc   ; Will be modified in place.
+epl_stub:
+epl_header:
+incbin 'wcfd32linuxepl.bin'
+epl_stub_end:
+epl_entry equ epl_header+0x54
+epl_cf_entry_vaddr equ epl_entry+1  ; Will be modified in place. The argument of the `mov esi, ...' instruction in wcfd32linux.nasm.
+epl_org equ epl_header+0x54-0x14
+epl_text_filesiz equ epl_header+0x54-0x10  ; Will be modified in place.
+epl_text_memsiz  equ epl_header+0x54-0xc   ; Will be modified in place.
 prebss:
 		bss_align equ ($$-$)&3
 section .bss align=1  ; We could use `absolute $' here instead, but that's broken (breaks address calculation in program_end-bss+prebss-file_header) in NASM 0.95--0.97.

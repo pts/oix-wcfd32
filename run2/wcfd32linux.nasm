@@ -5,23 +5,28 @@
 ; !! Add O_LARGEFILE, make it work with large files (even if seeking doesn't work).
 ;
 
-%ifdef    STUB
-  %define STUB 1
+%ifdef    EPLSTUB  ; To be used as epl_stub in oixconv (wcfd32stub.nasm) for output format 'epl'. Requires relocations to be pre-applied. Generated ELF-32 program is not a valid OIX program (i.e. no CF header).
+  %define EPLSTUB 1
 %else
-  %define STUB 0
+  %define EPLSTUB 0
 %endif
-%ifdef    RUNPROG
+%ifdef    ELFSTUB  ; To be used as elf_stub in oixconv (wcfd32stub.nasm) for output format 'elf'. Applies relocations at startup. Generated ELF-32 program is also a valid OIX program (with CF header).
+  %define ELFSTUB 1
+%else
+  %define ELFSTUB 0
+%endif
+%ifdef    RUNPROG  ; Standalone ELF-32 program doing oixrun. Not a valid OIX program (i.e. no CF header).
   %define RUNPROG 1
 %else
   %define RUNPROG 0
 %endif
-%ifdef    SELFPROG
+%ifdef    SELFPROG  ; Standalone ELF-32 program doing oixrun. Also a valid OIX program (with CF header).
   %define SELFPROG 1
 %else
   %define SELFPROG 0
 %endif
-%if STUB+RUNPROG+SELFPROG!=1
-  %error fatal: define exactly one of: -DSTUB, -DRUNPROG, -DSELFPROG
+%if EPLSTUB+ELFSTUB+RUNPROG+SELFPROG!=1
+  %error fatal: define exactly one of: -DEPLSTUB, -DELFSTUB, -DRUNPROG, -DSELFPROG
   db 1/0
 %endif
 ; The difference between RUNPROG (oixrun0) and SELFPROG (oixrun): SELFPROG
@@ -40,7 +45,7 @@ file_header:	db 0x7F,'ELF',1,1,1,OSABI_Linux,0,0,0,0,0,0,0,0,2,0,3,0
 		dd program_header-file_header, 0, 0
 		dw program_header-file_header, 0x20, 1, 0, 0, 0
 program_header:	dd 1, 0, file_header, file_header
-%if SELFPROG
+%if SELFPROG || ELFSTUB
 		dd program_end-file_header
 %else
 		dd prebss-file_header
@@ -52,16 +57,23 @@ program_header:	dd 1, 0, file_header, file_header
   times -(%1)+($-$$) db 0
 %endm
 
-%if SELFPROG
+%if SELFPROG || ELFSTUB
   assert_at 0x54
   cf_header:
   .signature:	db 'CF', 0, 0
   .load_fofs:	dd oix_image-file_header
-  .load_size:	;dd ?
-  .reloc_rva:	equ .load_size+4  ;dd ?
-  ;.mem_size:	;dd ?  ; Must be the same as .load_size (true for oixrun.oix) for the ELF-32 phdr memsiz formula above (program_end-bss+prebss-file_header) to work.
-  .entry_rva:	equ .load_size+0xc  ;dd ?
+  %if ELFSTUB  ; These fields will be filled by oixconv (wcfd32stub.nasm).
+    .load_size:	dd -1
+    .reloc_rva:	dd -1
+    .mem_size:	dd -1
+    .entry_rva: dd -1
+  %else
+    .load_size:	;dd ?
+    .reloc_rva:	equ .load_size+4  ;dd ?
+    ;.mem_size:	;dd ?  ; Must be the same as .load_size (true for oixrun.oix) for the ELF-32 phdr memsiz formula above (program_end-bss+prebss-file_header) to work.
+    .entry_rva:	equ .load_size+0xc  ;dd ?
 		incbin 'oixrun.oix', 8, 0x18-8  ; Fields .load_size, .reloc_rva, .mem_size, .entry_rva.
+  %endif
 %endif  ; SELFPROG.
 
 ; Linux i386 syscall numbers.
@@ -144,11 +156,11 @@ ERR_INVALID_ACCESS equ 12
 ERR_INVALID_DATA equ 13
 
 _start:  ; Linux i386 program entry point.
-%if STUB
+%if EPLSTUB
 		mov esi, bss  ; Value will be patched by wfcd32stub to OIX program cf_header.entry_vaddr during executable program file generation.
 		; Now: ESI: entry point address.
 %endif
-%if SELFPROG  ; Apply relocations. No need to do it for SELFPROG, because SELFPROG supports only oixrun.oix, and it doesn't have any relocations.
+%if SELFPROG || ELFSTUB  ; Apply relocations. No need to do it for SELFPROG, because SELFPROG supports only oixrun.oix, and it doesn't have any relocations.
 		mov edx, oix_image  ; Same as [cf_header.load_fofs]. Moving it without changing the ELF-32 phdr fields is not supported.
 		mov esi, [cf_header.reloc_rva]
 .apply_relocations:
@@ -182,7 +194,7 @@ _start:  ; Linux i386 program entry point.
 		jmp handle_INT21H_FUNC_4CH_EXIT_PROCESS
 .have_argv1:
 %else
-  %if SELFPROG
+  %if SELFPROG || ELFSTUB
 		mov esi, [cf_header.entry_rva]
 		add esi, edx
   %endif
@@ -1172,8 +1184,11 @@ msg_unsupported: db 'warning: unsupported OIX syscall 0x',
   bss:  ; .bss must be empty so that the OIX program image can be appended.
 		times ($$-$)&3 db 0  ; align 4. Doesn't do anything, it has already been aligned above.
 %endif
-%if SELFPROG
+%if SELFPROG || ELFSTUB
 		times ($$-$)&3 db 0  ; align 4. Doesn't do anything, it has already been aligned above.
-  oix_image:	incbin 'oixrun.oix', 0x18
+  oix_image:
+  %if SELFPROG
+		incbin 'oixrun.oix', 0x18
+  %endif
 %endif
 program_end:

@@ -82,9 +82,10 @@ nasm=tools/nasm    # NASM 0.98.39 (2005-01-15) was the last version without amd6
 "$nasm" -O999999999 -w+orphan-labels -f bin -o oixrun.oix oixrun.nasm
 "$nasm" -O999999999 -w+orphan-labels -f bin -DSELF1 -o oixrun1.oix oixrun.nasm
 "$nasm" -O999999999 -w+orphan-labels -f bin -o oixrun.exe wcfd32exe.nasm
-"$nasm" -O999999999 -w+orphan-labels -f bin -DSTUB -o wcfd32linux.bin wcfd32linux.nasm
+"$nasm" -O999999999 -w+orphan-labels -f bin -DEPLSTUB -o wcfd32linuxepl.bin wcfd32linux.nasm
+"$nasm" -O999999999 -w+orphan-labels -f bin -DELFSTUB -o wcfd32linuxelf.bin wcfd32linux.nasm
 rm -f wcfd32stub  # For correct permissions below.
-"$nasm" -O999999999 -w+orphan-labels -f bin -DLINUXPROG -o wcfd32stub wcfd32stub.nasm  # incbin: wcfd32linux.bin, wcfd32dos.exe, wcfd32dosp.exe, wcfd32win32.exe
+"$nasm" -O999999999 -w+orphan-labels -f bin -DLINUXPROG -o wcfd32stub wcfd32stub.nasm  # incbin: wcfd32linuxepl.bin, wcfd32linuxelf.bin, oixrun.exe.
 chmod +x wcfd32stub  # Final output: wcfd32stub Linux i386 executable program.
 rm -f oixrun0  # For correct permissions below.
 "$nasm" -O999999999 -w+orphan-labels -f bin -DRUNPROG -o oixrun0 wcfd32linux.nasm  # Native Linux i386 implementation.

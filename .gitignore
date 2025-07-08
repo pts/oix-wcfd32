@@ -8,6 +8,8 @@
 /run[0-9]/wcfd32dosp.exe
 /run[0-9]/wcfd32linux
 /run[0-9]/wcfd32linux.bin
+/run[0-9]/wcfd32linuxelf.bin
+/run[0-9]/wcfd32linuxepl.bin
 /run[0-9]/wcfd32stub
 /run[0-9]/wcfd32stub.bin
 /run[0-9]/wcfd32win32.exe
