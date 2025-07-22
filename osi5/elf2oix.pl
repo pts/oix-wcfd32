@@ -219,21 +219,19 @@ if (!$is_compressible and !@relocs) {
   my $reloc_rva_all = $code_prefix_size + length($data);
   $rpdata = build_rpdata($code_prefix_size);
   die("fatal: assert bad packed relocations\n") if length($rpdata) < 2 or substr($rpdata, -2) ne "\0\0";
-  my $reloc_rva_eof = $code_prefix_size + length($data) + length($rpdata) - 2;
   apply_reloc_delta($code_prefix_size);
   my $prog_entry_rva = $e_entry - $p_vaddr + $code_prefix_size;
   my $rpsize = length($rpdata) - 2;
   --$rpsize while $rpsize and !vec($rpdata, $rpsize - 1, 8);  # Remove trailing NULs (at least 2) from $rpdata.
-  substr($rpdata, $rpsize) = "";
   $code_prefix = pack(  # i386 machine code which applies the relocations at $reloc_rva_all, overwrites the relocation data with NULs, then jumps to $prog_entry_rva. Based on elf2oix_mode0.nasm.
       "a*Va*Va*Va*", "\x60\xe8\0\0\0\0\x5f\x8d\x7f\xfa\x8d\xb7", $reloc_rva_all,
       "\x56\x31\xc0\x66\xad\x89\xc1\xe3\x13\x66\xad\x89\xc3\xc1\xe3\x10\x01\xfb\x66\xad\x01\xc3\x01\x3b\xe2\xf8\xeb\xe7\x5f\xb9", $rpsize,
       "\xf3\xaa\x61\xe9", $prog_entry_rva - 0x3a, "\x90\x90");  # The last \0x90 bytes are for alignment to dword (4 bytes).
   die("fatal: assert: bad size of code prefix\n") if length($code_prefix) != $code_prefix_size;
-  my $mem_size = $code_prefix_size + $p_memsz;
-  $p_memsz = $code_prefix_size + length($data) + $rpsize if $code_prefix_size + length($data) + $rpsize > $p_memsz;
+  my $load_size = $code_prefix_size + length($data) + $rpsize;
+  my $mem_size = $code_prefix_size + ((length($data) + length($rpdata) > $p_memsz) ? length($data) + length($rpdata) : $p_memsz);
   # ($signature, $load_fofs, $load_size, $reloc_rva, $mem_size, $entry_rva).
-  $cf_header = pack("a4V5", "CF", 0x18, $code_prefix_size + length($data) + $rpsize, $reloc_rva_eof, $mem_size, 0);
+  $cf_header = pack("a4V5", "CF", 0x18, $load_size, $load_size, $mem_size, 0);
   substr($rpdata, $rpsize) = "";
 }
 unlink($outfn);  # To avoid the `Text file busy' error.
