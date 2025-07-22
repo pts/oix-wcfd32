@@ -141,8 +141,15 @@ printf STDERR "info: reloc_count=%d\n", scalar(@relocs);
 for (my $ri = 1; $ri < @relocs; ++$ri) {
   die "fatal: found overlapping relocations: $infn\n" if $relocs[$ri - 1] + 4 > $relocs[$ri];
 }
-# Now pack the relocations: most packed entries take only 2 bytes.
-sub build_rpdata($) {  # Build string containing packed relocations.
+#die("relocs: " . join(", ", map { sprintf("0x%x", $_) } @relocs));
+# Builds byte string containing packed relocations in mode 0 (i.e. the OIX
+# relocation format). A typical packed entry takes only 2 bytes, some of
+# them take 6 bytes (1 word to start a new run + 1 dword to specify the rva
+# for the new run). Terminated by two NUL bytes (i.e. empty run).
+#
+# See elf2oix_mode0.nasm for i386 assembly code which applies rpdata of
+# this format.
+sub build_rpdata0($) {
   my $rpbase = $_[0];
   my $rpdata = "";
   my $prev_rv;
@@ -167,7 +174,35 @@ sub build_rpdata($) {  # Build string containing packed relocations.
     $rpdata .= $rrun;
   }
   $rpdata .= "\0\0";  # Terminator.
-  $rpdata .= "\0" x (-length($rpdata) & 3);  # Align it to a multiple of 4. For good program image alignment.
+  $rpdata
+}
+# Builds byte string containing packed relocations in mode 3 (i.e. a custom
+# relocation format invented by elf2oix.pl). A typical packed entry takes 1
+# byte, some of them take 3 bytes (1 byte to indicate skip, 1 byte of skip
+# size, 1 byte to indicate relocation), some of them take more bytes (for
+# large skips). Terminated by two NUL bytes (i.e. empty skip).
+#
+# See elf2oix_mode3.nasm for i386 assembly code which applies rpdata of
+# this format.
+sub build_rpdata3() {
+  my $rpdata = "";
+  my $prev_rv = 0;
+  for my $rv (@relocs) {
+    my $rvd = $rv - $prev_rv;
+    $prev_rv = $rv + 4;
+    if ($rvd >= 0xff) {
+      while ($rvd >= 0xff * 0xff) {
+        $rpdata .= "\0\xff";
+        $rvd -= 0xff * 0xff;
+      }
+      if ($rvd >= 0xff) {
+        $rpdata .= pack("n", $rvd / 0xff);  # m@^\0[\x01-\0xfe]@.
+        $rvd %= 0xff;
+      }
+    }
+    $rpdata .= chr($rvd + 1);  # m@[\x01-\xff]@.
+  }
+  $rpdata .= "\0\0";  # Terminator.
   $rpdata
 }
 my($cf_header, $rpdata, $code_prefix);
@@ -192,9 +227,11 @@ if (!$is_compressible and !@relocs) {
   $cf_header = pack("a4V5", "CF", 0x18, length($data), length($data), $p_memsz, $e_entry - $p_vaddr);
 } elsif (!$is_compressible) {
   $code_prefix = "";
-  $rpdata = build_rpdata(0);
+  $rpdata = build_rpdata0(0);
+  $rpdata .= "\0" x (-length($rpdata) & 3);  # Align it to a multiple of 4. For good program image alignment.
   my $base = length($rpdata);
-  $rpdata = build_rpdata($base);  # Adjust base as soon as we have the size of $rpdata.
+  $rpdata = build_rpdata0($base);  # Adjust base as soon as we have the size of $rpdata.
+  $rpdata .= "\0" x (-length($rpdata) & 3);  # Align it to a multiple of 4. For good program image alignment.
   apply_reloc_delta($base);
   # ($signature, $load_fofs, $load_size, $reloc_rva, $mem_size, $entry_rva).
   $cf_header = pack("a4V5", "CF", 0x18, length($rpdata) + length($data), 0, length($rpdata) + $p_memsz, $e_entry - $p_vaddr + length($rpdata));
@@ -217,16 +254,24 @@ if (!$is_compressible and !@relocs) {
   $data .= "\0" if length($data) & 1;  # Make even alignment for packed relocations. Not strictly necessary, but speeds up decoding a bit.
   my $code_prefix_size = 0x3c;
   my $reloc_rva_all = $code_prefix_size + length($data);
-  $rpdata = build_rpdata($code_prefix_size);
+  my $rpdata0 = build_rpdata0($code_prefix_size);
+  my $rpdata3 = build_rpdata3();
+  my $mode = (length($rpdata0) < length($rpdata3)) ? 0 : 3;  # Choose the mode with shorter $rpdata.
+  $rpdata = !$mode ? $rpdata0 : $rpdata3;
+  #printf(STDERR "info: rpsize0=%d rpsize3=%d\n", length($rpdata0), length($rpdata3));
   die("fatal: assert bad packed relocations\n") if length($rpdata) < 2 or substr($rpdata, -2) ne "\0\0";
-  apply_reloc_delta($code_prefix_size);
+  apply_reloc_delta(!$mode ? $code_prefix_size : 0);
   my $prog_entry_rva = $e_entry - $p_vaddr + $code_prefix_size;
   my $rpsize = length($rpdata) - 2;
   --$rpsize while $rpsize and !vec($rpdata, $rpsize - 1, 8);  # Remove trailing NULs (at least 2) from $rpdata.
-  $code_prefix = pack(  # i386 machine code which applies the relocations at $reloc_rva_all, overwrites the relocation data with NULs, then jumps to $prog_entry_rva. Based on elf2oix_mode0.nasm.
+  $code_prefix = !$mode ? pack(  # i386 machine code which applies the relocations at $reloc_rva_all, overwrites the relocation data with NULs, then jumps to $prog_entry_rva. Based on elf2oix_mode0.nasm.
       "a*Va*Va*Va*", "\x60\xe8\0\0\0\0\x5f\x8d\x7f\xfa\x8d\xb7", $reloc_rva_all,
       "\x56\x31\xc0\x66\xad\x89\xc1\xe3\x13\x66\xad\x89\xc3\xc1\xe3\x10\x01\xfb\x66\xad\x01\xc3\x01\x3b\xe2\xf8\xeb\xe7\x5f\xb9", $rpsize,
-      "\xf3\xaa\x61\xe9", $prog_entry_rva - 0x3a, "\x90\x90");  # The last \0x90 bytes are for alignment to dword (4 bytes).
+      "\xf3\xaa\x61\xe9", $prog_entry_rva - 0x3a, "\x90\x90") :  # The last \x90 bytes are for alignment to dword (4 bytes).
+      pack(  # i386 machine code which applies the relocations at $reloc_rva_all, overwrites the relocation data with NULs, then jumps to $prog_entry_rva. Based on elf2oix_mode3.nasm.
+      "a*Va*Va*Va*", "\x60\xe8\0\0\0\0\x5f\x8d\x7f\x36\x8d\xb7", $reloc_rva_all - $code_prefix_size,
+      "\x56\x89\xfb\x31\xc0\xac\x2c\x01\x72\x09\x01\xc3\x01\x3b\x83\xc3\x04\xeb\xf2\xf6\x26\x46\x01\xc3\x85\xc0\x75\xe7\x5f\xb9", $rpsize,
+      "\xf3\xaa\x61\xe9", $prog_entry_rva - 0x3a, "\x90\x90");  # The last \x90 bytes are for alignment to dword (4 bytes).
   die("fatal: assert: bad size of code prefix\n") if length($code_prefix) != $code_prefix_size;
   my $load_size = $code_prefix_size + length($data) + $rpsize;
   my $mem_size = $code_prefix_size + ((length($data) + length($rpdata) > $p_memsz) ? length($data) + length($rpdata) : $p_memsz);
