@@ -165,6 +165,7 @@ output_epl:
 .brk1_ok:	xchg ebx, eax  ; EBX := EAX; EAX := junk.
 		mov ecx, ebx  ; ECX := EBX (image_base vaddr).
 		add ebx, [cf_header.load_size]
+		add ebx, byte 8  ; Allocate a few more NUL bytes in case the last few relocation bytes end in BSS.
 		push SYS_brk
 		pop eax
 		int 0x80  ; Linux i386 syscall.
